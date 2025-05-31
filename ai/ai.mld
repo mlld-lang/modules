@@ -1,0 +1,35 @@
+---
+author: mlld
+module: @mlld/ai
+description: Simple wrappers for AI CLI tools (llm, claude, codex)
+---
+
+>> LLM CLI (simonw/llm) wrappers
+@exec llm(system, prompt) = @run [llm "@prompt" -s "@system"]
+@exec llm_media(system, prompt, media) = @run [llm "@prompt" -s "@system" -a @media]
+@exec llm_tools(system, prompt, tools) = @run [llm "@prompt" -s "@system" --tool @tools]
+@exec llm_all(system, prompt, parameters) = @run [llm "@prompt" -s "@system" @parameters]
+
+>> Claude Code CLI wrapper
+@exec claude(prompt) = @run [claude "@prompt"]
+
+>> Codex CLI (OpenAI) wrappers
+@exec codex(prompt) = @run [codex "@prompt"]
+@exec codex_media(prompt, media) = @run [codex "@prompt" -a @media]
+
+>> Clean API export
+@data ai = {
+  llm: {
+    ask:   @llm,
+    media: @llm_media,
+    tools: @llm_tools,
+    all:   @llm_all
+  },
+  claude: {
+    ask:   @claude
+  },
+  codex: { 
+    ask:   @codex, 
+    media: @codex_media
+  }
+}

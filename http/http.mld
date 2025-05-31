@@ -1,0 +1,27 @@
+---
+author: mlld
+module: @mlld/http
+description: Simple HTTP client wrappers for REST APIs and web requests
+---
+
+>> Basic HTTP methods
+@exec get(url) = @run [curl -s "@url"]
+@exec post(url, data) = @run [curl -s -X POST -H "Content-Type: application/json" -d '@data' "@url"]
+@exec put(url, data) = @run [curl -s -X PUT -H "Content-Type: application/json" -d '@data' "@url"]
+@exec delete(url) = @run [curl -s -X DELETE "@url"]
+
+>> Authenticated requests
+@exec auth_get(url, token) = @run [curl -s -H "Authorization: Bearer @token" "@url"]
+@exec auth_post(url, token, data) = @run [curl -s -X POST -H "Authorization: Bearer @token" -H "Content-Type: application/json" -d '@data' "@url"]
+
+>> Clean API export
+@data http = {
+  get: @get,
+  post: @post,
+  put: @put,
+  delete: @delete,
+  auth: {
+    get: @auth_get,
+    post: @auth_post
+  }
+}
