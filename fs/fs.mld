@@ -1,0 +1,100 @@
+---
+author: mlld
+module: @mlld/fs
+description: Filesystem operations for directory contents as XML or Markdown
+---
+
+>> Convert filename to SCREAMING_SNAKE_CASE for XML tags
+@exec to_snake_case(name) = @run [echo "@name" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:lower:]' '[:upper:]']
+
+>> Generate XML format with nested directory structure
+@exec xml(path) = @run [
+  function cat_xml() {
+    local dir="$1"
+    local indent="$2"
+    
+    if [ ! -d "$dir" ]; then
+      echo "Error: $dir is not a directory" >&2
+      return 1
+    fi
+    
+    local base_name=$(basename "$dir")
+    local tag_name=$(echo "$base_name" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:lower:]' '[:upper:]')
+    
+    echo "${indent}<${tag_name}>"
+    
+    # Process directories first
+    find "$dir" -maxdepth 1 -type d ! -path "$dir" | sort | while read subdir; do
+      cat_xml "$subdir" "${indent}  "
+    done
+    
+    # Process files
+    find "$dir" -maxdepth 1 -type f | sort | while read file; do
+      local file_name=$(basename "$file")
+      local file_tag=$(echo "$file_name" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:lower:]' '[:upper:]')
+      echo "${indent}  <${file_tag} name=\"${file_name}\">"
+      cat "$file" | sed "s/^/${indent}    /"
+      echo "${indent}  </${file_tag}>"
+    done
+    
+    echo "${indent}</${tag_name}>"
+  }
+  
+  cat_xml "@path" ""
+]
+
+>> Generate Markdown format with headers and code blocks  
+@exec md(path) = @run [
+  function cat_md() {
+    local dir="$1"
+    local level="$2"
+    
+    if [ ! -d "$dir" ]; then
+      echo "Error: $dir is not a directory" >&2
+      return 1
+    fi
+    
+    local base_name=$(basename "$dir")
+    local header=$(printf '%*s' "$level" '' | tr ' ' '#')
+    
+    echo "${header} ${base_name}"
+    echo
+    
+    # Process directories first
+    find "$dir" -maxdepth 1 -type d ! -path "$dir" | sort | while read subdir; do
+      cat_md "$subdir" $((level + 1))
+    done
+    
+    # Process files
+    find "$dir" -maxdepth 1 -type f | sort | while read file; do
+      local file_name=$(basename "$file")
+      local file_header=$(printf '%*s' $((level + 1)) '' | tr ' ' '#')
+      
+      echo "${file_header} ${file_name}"
+      echo
+      echo '```'
+      cat "$file"
+      echo '```'
+      echo
+    done
+  }
+  
+  cat_md "@path" 1
+]
+
+
+>> List directory structure only (no content)
+@exec tree(path) = @run [
+  if command -v tree >/dev/null 2>&1; then
+    tree "@path"
+  else
+    find "@path" -type d | sed 's|[^/]*/|  |g'
+  fi
+]
+
+>> Clean API export
+@data fs = {
+  xml: @xml,
+  md: @md,
+  tree: @tree
+}
