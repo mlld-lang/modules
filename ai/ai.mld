@@ -11,7 +11,7 @@ description: Simple wrappers for AI CLI tools (llm, claude, codex)
 @exec llm_all(system, prompt, parameters) = @run [llm "@prompt" -s "@system" @parameters]
 
 >> Claude Code CLI wrapper
-@exec claude(prompt) = @run [claude "@prompt"]
+@exec claude(prompt) = @run [claude -p "@prompt"]
 
 >> Codex CLI (OpenAI) wrappers
 @exec codex(prompt) = @run [codex "@prompt"]
