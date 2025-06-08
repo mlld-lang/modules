@@ -1,0 +1,109 @@
+---
+author: mlld
+module: @mlld/core
+description: Core utilities for mlld including conditional helpers, type checking, and basic operations
+version: 1.0.0
+---
+
+>> Truthy/falsy helpers for @when conditions
+>> mlld @when only checks if a value is truthy (non-empty string) or falsy (empty string)
+>> These helpers convert various conditions to empty/non-empty strings
+
+>> Basic boolean conditions
+@exec isTrue(value) = @run js [(value === true || value === "true" || value === "1" || value === 1 ? "true" : "")]
+@exec isFalse(value) = @run js [(value === false || value === "false" || value === "0" || value === 0 || value === "" || value === null || value === undefined ? "true" : "")]
+@exec not(value) = @run js [(value === "" || value === false || value === "false" || value === "0" || value === 0 || value === null || value === undefined ? "true" : "")]
+
+>> Equality comparisons
+@exec equals(a, b) = @run js [(a == b ? "true" : "")]
+@exec strictEquals(a, b) = @run js [(a === b ? "true" : "")]
+@exec notEquals(a, b) = @run js [(a != b ? "true" : "")]
+
+>> Numeric comparisons
+@exec gt(a, b) = @run js [(Number(a) > Number(b) ? "true" : "")]
+@exec gte(a, b) = @run js [(Number(a) >= Number(b) ? "true" : "")]
+@exec lt(a, b) = @run js [(Number(a) < Number(b) ? "true" : "")]
+@exec lte(a, b) = @run js [(Number(a) <= Number(b) ? "true" : "")]
+
+>> String conditions
+@exec contains(str, substring) = @run js [(String(str).includes(String(substring)) ? "true" : "")]
+@exec startsWith(str, prefix) = @run js [(String(str).startsWith(String(prefix)) ? "true" : "")]
+@exec endsWith(str, suffix) = @run js [(String(str).endsWith(String(suffix)) ? "true" : "")]
+@exec matches(str, pattern) = @run js [(new RegExp(pattern).test(String(str)) ? "true" : "")]
+@exec isEmpty(value) = @run js [(value === "" || value === null || value === undefined || (Array.isArray(value) && value.length === 0) || (typeof value === "object" && Object.keys(value).length === 0) ? "true" : "")]
+@exec notEmpty(value) = @run js [(value !== "" && value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0) && !(typeof value === "object" && Object.keys(value).length === 0) ? "true" : "")]
+
+>> Array conditions
+@exec includes(array, item) = @run js [(Array.isArray(array) && array.includes(item) ? "true" : "")]
+@exec hasLength(array, length) = @run js [(Array.isArray(array) && array.length === Number(length) ? "true" : "")]
+@exec hasMinLength(array, minLength) = @run js [(Array.isArray(array) && array.length >= Number(minLength) ? "true" : "")]
+
+>> Type checking
+@exec isString(value) = @run js [(typeof value === "string" ? "true" : "")]
+@exec isNumber(value) = @run js [(typeof value === "number" && !isNaN(value) ? "true" : "")]
+@exec isArray(value) = @run js [(Array.isArray(value) ? "true" : "")]
+@exec isObject(value) = @run js [(value !== null && typeof value === "object" && !Array.isArray(value) ? "true" : "")]
+
+>> Logical operations (combine conditions)
+@exec and(a, b) = @run js [(a !== "" && b !== "" ? "true" : "")]
+@exec or(a, b) = @run js [(a !== "" || b !== "" ? "true" : "")]
+@exec xor(a, b) = @run js [((a !== "" && b === "") || (a === "" && b !== "") ? "true" : "")]
+
+>> Environment checks
+@exec exists(value) = @run js [(value !== undefined && value !== null ? "true" : "")]
+@exec defined(value) = @run js [(value !== undefined ? "true" : "")]
+
+>> File system checks (using shell)
+@exec fileExists(path) = @run [(test -f "@path" && echo "true" || echo "")]
+@exec dirExists(path) = @run [(test -d "@path" && echo "true" || echo "")]
+@exec pathExists(path) = @run [(test -e "@path" && echo "true" || echo "")]
+
+>> Clean API export
+@data module = {
+  >> Boolean conditions
+  isTrue: @isTrue,
+  isFalse: @isFalse,
+  not: @not,
+  
+  >> Comparisons
+  equals: @equals,
+  strictEquals: @strictEquals,
+  notEquals: @notEquals,
+  gt: @gt,
+  gte: @gte,
+  lt: @lt,
+  lte: @lte,
+  
+  >> String operations
+  contains: @contains,
+  startsWith: @startsWith,
+  endsWith: @endsWith,
+  matches: @matches,
+  isEmpty: @isEmpty,
+  notEmpty: @notEmpty,
+  
+  >> Array operations
+  includes: @includes,
+  hasLength: @hasLength,
+  hasMinLength: @hasMinLength,
+  
+  >> Type checking
+  isString: @isString,
+  isNumber: @isNumber,
+  isArray: @isArray,
+  isObject: @isObject,
+  
+  >> Logical operations
+  and: @and,
+  or: @or,
+  xor: @xor,
+  
+  >> Existence checks
+  exists: @exists,
+  defined: @defined,
+  
+  >> File system checks
+  fileExists: @fileExists,
+  dirExists: @dirExists,
+  pathExists: @pathExists
+}

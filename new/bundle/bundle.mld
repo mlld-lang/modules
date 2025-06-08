@@ -1,7 +1,7 @@
 ---
 author: mlld
-module: @mlld/fs
-description: Filesystem operations for directory contents as XML or Markdown
+module: @mlld/bundle
+description: Bundle operations for directory contents as XML or Markdown
 ---
 
 >> Convert filename to SCREAMING_SNAKE_CASE for XML tags
@@ -93,7 +93,7 @@ description: Filesystem operations for directory contents as XML or Markdown
 ]
 
 >> Clean API export
-@data fs = {
+@data bundle = {
   xml: @xml,
   md: @md,
   tree: @tree

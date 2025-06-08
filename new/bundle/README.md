@@ -1,11 +1,11 @@
-# @mlld/fs
+# @mlld/bundle
 
-Filesystem operations to format directory contents as XML or Markdown with proper structure and formatting.
+Bundle operations to format directory contents as XML or Markdown with proper structure and formatting.
 
 ## Installation
 
 ```mlld
-@import { fs } from @mlld/fs
+@import { bundle } from @mlld/bundle
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ Filesystem operations to format directory contents as XML or Markdown with prope
 Generate structured XML with SCREAMING_SNAKE_CASE tags:
 
 ```mlld
-@run xml_output = @fs.xml("./src")
+@run xml_output = @bundle.xml("./src")
 @add [[{{xml_output}}]]
 ```
 
@@ -38,7 +38,7 @@ Generate structured XML with SCREAMING_SNAKE_CASE tags:
 Generate clean Markdown with headers and code blocks:
 
 ```mlld
-@run md_output = @fs.md("./docs")
+@run md_output = @bundle.md("./docs")
 @add [[{{md_output}}]]
 ```
 
@@ -66,14 +66,14 @@ Welcome to our docs!
 
 ```mlld
 >> Directory tree structure
-@run structure = @fs.tree("./src")
+@run structure = @bundle.tree("./src")
 ```
 
 ## Use Cases
 
 ### Documentation Generation
 ```mlld
-@run api_docs = @fs.md("./api-docs")
+@run api_docs = @bundle.md("./api-docs")
 @add [[## API Documentation]]
 @add [[{{api_docs}}]]
 ```
@@ -81,7 +81,7 @@ Welcome to our docs!
 ### Code Review Context
 ```mlld
 @text pr_files = "./src/components"
-@run code_context = @fs.xml(@pr_files)
+@run code_context = @bundle.xml(@pr_files)
 >> Send to AI for review with full context
 @run review = @ai.claude.ask("Review this code structure: {{code_context}}")
 ```
@@ -89,7 +89,7 @@ Welcome to our docs!
 ### Project Structure Export
 ```mlld
 >> Export entire project as structured XML for AI analysis
-@run project_xml = @fs.xml(".")
+@run project_xml = @bundle.xml(".")
 @run analysis = @ai.llm.ask("You are a code analyst", "Analyze this project structure: {{project_xml}}")
 ```
 
@@ -108,6 +108,6 @@ Welcome to our docs!
 
 ## API Reference
 
-- `fs.xml(path)` - Generate XML structure with file contents
-- `fs.md(path)` - Generate Markdown structure with file contents  
-- `fs.tree(path)` - Show directory structure only
+- `bundle.xml(path)` - Generate XML structure with file contents
+- `bundle.md(path)` - Generate Markdown structure with file contents  
+- `bundle.tree(path)` - Show directory structure only

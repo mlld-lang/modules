@@ -1,0 +1,216 @@
+---
+author: mlld
+module: @mlld/http
+description: HTTP client using JavaScript fetch API for REST APIs and web requests
+version: 2.0.0
+---
+
+>> Basic HTTP methods using fetch
+@exec get(url) = @run js [(
+  fetch(url)
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+@exec post(url, data) = @run js [(
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof data === 'string' ? data : JSON.stringify(data)
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+@exec put(url, data) = @run js [(
+  fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof data === 'string' ? data : JSON.stringify(data)
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+@exec delete(url) = @run js [(
+  fetch(url, { method: 'DELETE' })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text || 'Deleted successfully';
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+@exec patch(url, data) = @run js [(
+  fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof data === 'string' ? data : JSON.stringify(data)
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+>> Authenticated requests
+@exec authGet(url, token) = @run js [(
+  fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+@exec authPost(url, token, data) = @run js [(
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: typeof data === 'string' ? data : JSON.stringify(data)
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+>> Advanced request with custom options
+@exec request(url, options) = @run js [(
+  fetch(url, options)
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .then(result => console.log(result))
+    .catch(error => console.error(`Error: ${error.message}`))
+)]
+
+>> Response-only versions (return data instead of printing)
+@exec getData(url) = @run js [(
+  fetch(url)
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.json();
+    })
+    .then(data => JSON.stringify(data))
+    .catch(error => { throw error; })
+)]
+
+@exec postData(url, data) = @run js [(
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof data === 'string' ? data : JSON.stringify(data)
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return response.json();
+    })
+    .then(data => JSON.stringify(data))
+    .catch(error => { throw error; })
+)]
+
+>> Clean API export
+@data module = {
+  >> Basic methods (print results)
+  get: @get,
+  post: @post,
+  put: @put,
+  patch: @patch,
+  delete: @delete,
+  
+  >> Authenticated requests
+  auth: {
+    get: @authGet,
+    post: @authPost
+  },
+  
+  >> Advanced
+  request: @request,
+  
+  >> Data-returning versions
+  data: {
+    get: @getData,
+    post: @postData
+  }
+}
