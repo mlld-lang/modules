@@ -1,8 +1,8 @@
 ---
-author: mlld
-module: @mlld/string
-description: String manipulation utilities for text processing and formatting
-version: 1.0.0
+name: string
+description: 
+author: adamavenir
+mlld-version: 1.0.0-rc-12
 ---
 
 >> Basic string operations

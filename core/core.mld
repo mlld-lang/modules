@@ -1,8 +1,8 @@
 ---
-author: mlld
-module: @mlld/core
-description: Core utilities for mlld including conditional helpers, type checking, and basic operations
-version: 1.0.0
+name: core
+description: 
+author: adamavenir
+mlld-version: 1.0.0-rc-12
 ---
 
 >> Truthy/falsy helpers for @when conditions

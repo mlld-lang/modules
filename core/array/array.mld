@@ -1,8 +1,8 @@
 ---
-author: mlld
-module: @mlld/array
-description: Array manipulation utilities for data processing and transformation
-version: 1.0.0
+name: array
+description: 
+author: adamavenir
+mlld-version: 1.0.0-rc-12
 ---
 
 >> Basic array operations

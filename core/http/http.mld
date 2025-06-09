@@ -1,8 +1,8 @@
 ---
-author: mlld
-module: @mlld/http
-description: HTTP client using JavaScript fetch API for REST APIs and web requests
-version: 2.0.0
+name: http
+description: 
+author: adamavenir
+mlld-version: 1.0.0-rc-12
 ---
 
 >> Basic HTTP methods using fetch

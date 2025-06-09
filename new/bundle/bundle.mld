@@ -1,7 +1,8 @@
 ---
-author: mlld
-module: @mlld/bundle
-description: Bundle operations for directory contents as XML or Markdown
+name: bundle
+description: 
+author: adamavenir
+mlld-version: 1.0.0-rc-12
 ---
 
 >> Convert filename to SCREAMING_SNAKE_CASE for XML tags
