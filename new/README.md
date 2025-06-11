@@ -1,7 +1,7 @@
 
-## Core Modules
+## New Modules
 
-These are intended to be fairly stable long-term.
+These are experiments.
 
 ### [array.mld.md](./core/array.mld.md)
 

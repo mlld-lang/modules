@@ -1,11 +1,93 @@
 ---
 name: http
-description: 
-author: adamavenir
-mlld-version: 1.0.0-rc-12
+author: mlld
+version: 1.0.0
+about: HTTP methods using fetch
+needs: ["js"]
+bugs: https://github.com/mlld-lang/modules/issues
+repo: https://github.com/mlld-lang/modules
+keywords: ["http", "api", "get", "put", "post", "delete", "rest"]
+license: CC0
+mlldVersion: "*"
 ---
 
->> Basic HTTP methods using fetch
+# @mlld/http
+
+HTTP methods using the fetch API for making REST calls. Provides both simple methods that print results and data-returning variants for processing.
+
+## tldr
+
+Quick HTTP requests with automatic JSON handling:
+
+```mlld
+@import { get, post, auth, data } from @mlld/http
+
+@run @get("https://api.github.com/users/octocat")
+@run @post("https://httpbin.org/post", {"message": "hello"})
+@run @auth.get("https://api.github.com/user", @token)
+
+@data userData = @data.get("https://api.github.com/users/octocat")
+@add [[User: {{userData.name}}]]
+```
+
+## docs
+
+### Basic HTTP Methods
+
+#### `get(url)`, `post(url, data)`, `put(url, data)`, `patch(url, data)`, `delete(url)`
+
+Standard HTTP methods that print formatted responses to console.
+
+```mlld
+@run @get("https://api.github.com/users/octocat")
+@run @post("https://httpbin.org/post", {"key": "value"})
+@run @delete("https://httpbin.org/delete")
+```
+
+### Authenticated Requests
+
+#### `auth.get(url, token)`, `auth.post(url, token, data)`
+
+HTTP methods with Bearer token authentication.
+
+```mlld
+@run @auth.get("https://api.github.com/user", @githubToken)
+@run @auth.post("https://api.github.com/user/repos", @token, {"name": "new-repo"})
+```
+
+### Advanced Requests
+
+#### `request(url, options)`
+
+Full control over fetch options.
+
+```mlld
+@data customOptions = {
+  "method": "POST",
+  "headers": {"Custom-Header": "value"},
+  "body": "raw data"
+}
+@run @request("https://httpbin.org/post", @customOptions)
+```
+
+### Data-Returning Methods
+
+#### `data.get(url)`, `data.post(url, data)`
+
+Return response data instead of printing, useful for processing responses.
+
+```mlld
+@data userData = @data.get("https://api.github.com/users/octocat")
+@data response = @data.post("https://httpbin.org/post", {"test": true})
+
+@add [[User: {{userData.name}} has {{userData.public_repos}} repos]]
+```
+
+## module
+
+All HTTP methods use fetch with automatic JSON parsing and error handling:
+
+```mlld-run
 @exec get(url) = @run js [(
   fetch(url)
     .then(response => {
@@ -103,7 +185,6 @@ mlld-version: 1.0.0-rc-12
     .catch(error => console.error(`Error: ${error.message}`))
 )]
 
->> Authenticated requests
 @exec authGet(url, token) = @run js [(
   fetch(url, {
     headers: { 'Authorization': `Bearer ${token}` }
@@ -147,7 +228,6 @@ mlld-version: 1.0.0-rc-12
     .catch(error => console.error(`Error: ${error.message}`))
 )]
 
->> Advanced request with custom options
 @exec request(url, options) = @run js [(
   fetch(url, options)
     .then(response => {
@@ -165,7 +245,6 @@ mlld-version: 1.0.0-rc-12
     .catch(error => console.error(`Error: ${error.message}`))
 )]
 
->> Response-only versions (return data instead of printing)
 @exec getData(url) = @run js [(
   fetch(url)
     .then(response => {
@@ -189,28 +268,28 @@ mlld-version: 1.0.0-rc-12
     .then(data => JSON.stringify(data))
     .catch(error => { throw error; })
 )]
+```
 
->> Clean API export
+This module uses a structured export to provide both individual methods and organized interfaces:
+
+```mlld-run
 @data module = {
-  >> Basic methods (print results)
   get: @get,
   post: @post,
   put: @put,
   patch: @patch,
   delete: @delete,
   
-  >> Authenticated requests
   auth: {
     get: @authGet,
     post: @authPost
   },
   
-  >> Advanced
   request: @request,
   
-  >> Data-returning versions
   data: {
     get: @getData,
     post: @postData
   }
 }
+```

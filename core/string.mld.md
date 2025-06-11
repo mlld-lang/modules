@@ -1,17 +1,138 @@
 ---
 name: string
-description: 
-author: adamavenir
-mlld-version: 1.0.0-rc-12
+author: mlld
+version: 1.0.0
+about: String operations
+needs: ["js"]
+bugs: https://github.com/mlld-lang/modules/issues
+repo: https://github.com/mlld-lang/modules
+keywords: ["length", "transformation", "camelCase", "snake_case", "kebab-case", "SCREAMING_SNAKE", "SNAKE-KEBAB", "substring", "slice", "split", "join", "pad", "replace", "starsWith", "endsWith", "escape", "unescape", "encode"]
+license: CC0
+mlldVersion: "*"
 ---
 
->> Basic string operations
+# @mlld/string
+
+String manipulation utilities for text processing, formatting, and validation. Useful for data cleaning, URL building, and text transformation workflows.
+
+## tldr
+
+Common string operations:
+
+```mlld
+@import { title, camelCase, split, join, trim, includes } from @mlld/string
+
+@text name = "john doe smith"
+@text formatted = @title(@name)
+@text slug = @camelCase(@formatted)
+
+@data words = @split(@name, " ")
+@text rejoined = @join(@words, "-")
+
+@when @includes(@name, "doe") => @add [[Contains 'doe']]
+@add [[Formatted: {{formatted}}]]
+```
+
+## docs
+
+### Basic Operations
+
+#### `length(str)`, `trim(str)`, `trimStart(str)`, `trimEnd(str)`
+
+Essential string utilities for length and whitespace handling.
+
+```mlld
+@data name = "  John Doe  "
+@add [[Length: {{@length(@name)}}]]
+@add [[Trimmed: '{{@trim(@name)}}']]
+```
+
+### Case Transformations
+
+#### `upper(str)`, `lower(str)`, `capitalize(str)`, `title(str)`
+
+Text case conversion for formatting.
+
+```mlld
+@text message = "hello world"
+@add [[Upper: {{@upper(@message)}}]]
+@add [[Title: {{@title(@message)}}]]
+@add [[Capitalized: {{@capitalize(@message)}}]]
+```
+
+#### `camelCase(str)`, `snakeCase(str)`, `kebabCase(str)`
+
+Identifier formatting for different naming conventions.
+
+```mlld
+@text phrase = "user full name"
+@add [[camelCase: {{@camelCase(@phrase)}}]]
+@add [[snake_case: {{@snakeCase(@phrase)}}]]
+@add [[kebab-case: {{@kebabCase(@phrase)}}]]
+```
+
+### Splitting and Joining
+
+#### `split(str, separator)`, `splitLines(str)`, `splitWords(str)`
+
+Break strings into arrays for processing.
+
+```mlld
+@data names = @split("alice,bob,charlie", ",")
+@data lines = @splitLines(@fileContent)
+@data words = @splitWords("The quick brown fox")
+```
+
+#### `join(array, separator)`, `joinLines(array)`
+
+Combine arrays back into strings.
+
+```mlld
+@text combined = @join(@names, " and ")
+@text document = @joinLines(@paragraphs)
+```
+
+### Search and Replace
+
+#### `includes(str, search)`, `startsWith(str, prefix)`, `endsWith(str, suffix)`
+
+String matching for conditional logic.
+
+```mlld
+@when @startsWith(@filename, "test_") => @add [[Test file detected]]
+@when @endsWith(@url, ".json") => @add [[JSON endpoint]]
+```
+
+#### `replace(str, search, replacement)`, `replaceAll(str, search, replacement)`
+
+Text substitution and cleaning.
+
+```mlld
+@text cleaned = @replaceAll(@input, " ", "-")
+@text updated = @replace(@template, "{{name}}", @userName)
+```
+
+### Validation
+
+#### `isEmpty(str)`, `isBlank(str)`, `isNumeric(str)`
+
+Content validation for data processing.
+
+```mlld
+@when @isEmpty(@userInput) => @add [[Input required]]
+@when @isNumeric(@value) => @add [[Valid number: {{@value}}]]
+```
+
+## module
+
+All string operations use JavaScript's native string methods with consistent behavior:
+
+```mlld-run
 @exec length(str) = @run js [(String(str).length)]
 @exec trim(str) = @run js [(String(str).trim())]
 @exec trimStart(str) = @run js [(String(str).trimStart())]
 @exec trimEnd(str) = @run js [(String(str).trimEnd())]
 
->> Case transformations
 @exec upper(str) = @run js [(String(str).toUpperCase())]
 @exec lower(str) = @run js [(String(str).toLowerCase())]
 @exec capitalize(str) = @run js [(
@@ -43,55 +164,33 @@ mlld-version: 1.0.0-rc-12
     .toLowerCase()
 )]
 
->> String splitting and joining
 @exec split(str, separator) = @run js [(JSON.stringify(String(str).split(separator || '')))]
 @exec splitLines(str) = @run js [(JSON.stringify(String(str).split(/\r?\n/)))]
 @exec splitWords(str) = @run js [(JSON.stringify(String(str).match(/\S+/g) || []))]
 @exec join(array, separator) = @run js [(Array.isArray(array) ? array.join(separator || '') : String(array))]
 @exec joinLines(array) = @run js [(Array.isArray(array) ? array.join('\n') : String(array))]
 
->> Substring operations
 @exec substring(str, start, end) = @run js [(String(str).substring(start, end))]
 @exec slice(str, start, end) = @run js [(String(str).slice(start, end))]
 @exec left(str, n) = @run js [(String(str).slice(0, n))]
 @exec right(str, n) = @run js [(String(str).slice(-n))]
-@exec mid(str, start, length) = @run js [(String(str).substr(start, length))]
 
->> Search and replace
 @exec indexOf(str, search) = @run js [(String(str).indexOf(search))]
-@exec lastIndexOf(str, search) = @run js [(String(str).lastIndexOf(search))]
 @exec includes(str, search) = @run js [(String(str).includes(search) ? "true" : "")]
 @exec startsWith(str, search) = @run js [(String(str).startsWith(search) ? "true" : "")]
 @exec endsWith(str, search) = @run js [(String(str).endsWith(search) ? "true" : "")]
 @exec replace(str, search, replacement) = @run js [(String(str).replace(search, replacement))]
 @exec replaceAll(str, search, replacement) = @run js [(String(str).replaceAll(search, replacement))]
-@exec replaceRegex(str, pattern, replacement) = @run js [(String(str).replace(new RegExp(pattern, 'g'), replacement))]
 
->> Padding and formatting
 @exec padStart(str, length, padChar) = @run js [(String(str).padStart(length, padChar || ' '))]
 @exec padEnd(str, length, padChar) = @run js [(String(str).padEnd(length, padChar || ' '))]
-@exec center(str, length, padChar) = @run js [(
-  const s = String(str);
-  const pad = padChar || ' ';
-  const totalPad = Math.max(0, length - s.length);
-  const padLeft = Math.floor(totalPad / 2);
-  const padRight = totalPad - padLeft;
-  pad.repeat(padLeft) + s + pad.repeat(padRight)
-)]
 @exec repeat(str, count) = @run js [(String(str).repeat(count))]
 
->> Character operations
-@exec charAt(str, index) = @run js [(String(str).charAt(index))]
 @exec reverse(str) = @run js [(String(str).split('').reverse().join(''))]
-
->> Validation and checking
 @exec isEmpty(str) = @run js [(String(str).length === 0 ? "true" : "")]
 @exec isBlank(str) = @run js [(String(str).trim().length === 0 ? "true" : "")]
 @exec isNumeric(str) = @run js [(!isNaN(str) && !isNaN(parseFloat(str)) ? "true" : "")]
-@exec isAlpha(str) = @run js [(/^[a-zA-Z]+$/.test(String(str)) ? "true" : "")]
-@exec isAlphanumeric(str) = @run js [(/^[a-zA-Z0-9]+$/.test(String(str)) ? "true" : "")]
 
->> Encoding and escaping
 @exec escape(str) = @run js [(
   String(str)
     .replace(/\\/g, '\\\\')
@@ -101,93 +200,6 @@ mlld-version: 1.0.0-rc-12
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t')
 )]
-@exec unescape(str) = @run js [(
-  String(str)
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\'/g, "'")
-    .replace(/\\"/g, '"')
-    .replace(/\\\\/g, '\\')
-)]
 @exec encodeUri(str) = @run js [(encodeURI(String(str)))]
-@exec decodeUri(str) = @run js [(decodeURI(String(str)))]
 @exec encodeUriComponent(str) = @run js [(encodeURIComponent(String(str)))]
-@exec decodeUriComponent(str) = @run js [(decodeURIComponent(String(str)))]
-
->> Template operations
-@exec template(template, data) = @run js [(
-  String(template).replace(/\{\{(\w+)\}\}/g, (match, key) => 
-    data && data[key] !== undefined ? data[key] : match
-  )
-)]
-
->> Clean API export
-@data module = {
-  >> Basic operations
-  length: @length,
-  trim: @trim,
-  trimStart: @trimStart,
-  trimEnd: @trimEnd,
-  
-  >> Case transformations
-  upper: @upper,
-  lower: @lower,
-  capitalize: @capitalize,
-  title: @title,
-  camelCase: @camelCase,
-  snakeCase: @snakeCase,
-  kebabCase: @kebabCase,
-  
-  >> Splitting and joining
-  split: @split,
-  splitLines: @splitLines,
-  splitWords: @splitWords,
-  join: @join,
-  joinLines: @joinLines,
-  
-  >> Substring operations
-  substring: @substring,
-  slice: @slice,
-  left: @left,
-  right: @right,
-  mid: @mid,
-  
-  >> Search and replace
-  indexOf: @indexOf,
-  lastIndexOf: @lastIndexOf,
-  includes: @includes,
-  startsWith: @startsWith,
-  endsWith: @endsWith,
-  replace: @replace,
-  replaceAll: @replaceAll,
-  replaceRegex: @replaceRegex,
-  
-  >> Padding and formatting
-  padStart: @padStart,
-  padEnd: @padEnd,
-  center: @center,
-  repeat: @repeat,
-  
-  >> Character operations
-  charAt: @charAt,
-  reverse: @reverse,
-  
-  >> Validation
-  isEmpty: @isEmpty,
-  isBlank: @isBlank,
-  isNumeric: @isNumeric,
-  isAlpha: @isAlpha,
-  isAlphanumeric: @isAlphanumeric,
-  
-  >> Encoding
-  escape: @escape,
-  unescape: @unescape,
-  encodeUri: @encodeUri,
-  decodeUri: @decodeUri,
-  encodeUriComponent: @encodeUriComponent,
-  decodeUriComponent: @decodeUriComponent,
-  
-  >> Templates
-  template: @template
-}
+```
