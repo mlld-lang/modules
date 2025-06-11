@@ -3,6 +3,8 @@
 @data coreFiles = @grabFiles("..", "core/**/*.mld.md")
 @data newFiles = @grabFiles("..", "new/**/*.mld.md")
 
+@add @newFiles
+
 ## Modules
 
 @text coreTldrs = foreach [../@coreFiles.path # tldr] as `### [@coreFiles.name](./@coreFiles.path)`

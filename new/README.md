@@ -1,4 +1,3 @@
-
 ## New Modules
 
 These are experiments.
@@ -126,6 +125,22 @@ Bundle your project files for AI analysis or documentation:
 @text docs_md = @md("./docs")
 @add [[Documentation structure:]]
 @add [[{{docs_md}}]]
+```
+
+---
+
+### [fix-relative-links.mld.md](./new/fix-relative-links.mld.md)
+
+Fix relative links when moving markdown content between directories:
+
+```mlld
+@import [fix-relative-links.mld.md]
+
+@text content = [[See the [docs](../docs/guide.md) for details.]]
+
+# Fix links: (content, from_dir, to_dir)
+@text fixed = @fixRelativeLinks(@content, "src/modules", "dist")
+# Result: "See the [docs](../src/docs/guide.md) for details."
 ```
 
 ---
