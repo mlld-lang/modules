@@ -1,7 +1,7 @@
 # Tests for @mlld/string module
 
-@import { eq, ok, notOk, deepEq } from @local/test
-@import { trim, toLowerCase, toUpperCase, split, join, replace, replaceAll, startsWith, endsWith, padStart, padEnd, slice, substring, indexOf, lastIndexOf, includes, repeat, charAt, charCodeAt } from @local/string
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/string.mld.md"
 
 ## Test trim
 @data test_trim_spaces = @eq(@trim("  hello world  "), "hello world")
@@ -54,7 +54,7 @@
 @data test_padEnd_string = @eq(@padEnd("hi", 5, "."), "hi...")
 @data test_padEnd_no_pad = @eq(@padEnd("hello", 3, "x"), "hello")
 
-## Test slice/substring
+## Test slice/substring"
 @data test_slice_positive = @eq(@slice("hello world", 0, 5), "hello")
 @data test_slice_negative = @eq(@slice("hello world", -5), "world")
 @data test_slice_middle = @eq(@slice("hello world", 6, 11), "world")

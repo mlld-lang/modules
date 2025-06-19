@@ -1,6 +1,6 @@
 # Simple test to verify test system works
 
-@import { eq, ok, notOk } from @local/test
+@import { * } from "../modules/test.mld.md"
 
 # Basic tests
 @data test_true_is_true = @ok(true)

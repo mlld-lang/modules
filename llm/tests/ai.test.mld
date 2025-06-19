@@ -1,7 +1,7 @@
 # Tests for @mlld/ai module
 
-@import { eq, ok, notOk, includes, deepEq } from @local/test
-@import { complete, embed, generateImage, transcribe, vision, models } from @local/ai
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/ai.mld.md"
 
 # Note: These tests verify the AI module functions exist and have correct signatures
 # Actual AI API calls would require API keys and incur costs, so we test structure only

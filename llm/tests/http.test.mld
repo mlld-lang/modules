@@ -1,7 +1,7 @@
 # Tests for @mlld/http module
 
-@import { eq, ok, notOk, deepEq, includes } from @local/test
-@import { get, post, put, patch, delete as del, auth, fetch, display, request } from @local/http
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/http.mld.md"
 
 # Note: These tests use httpbin.org, a free HTTP testing service
 # In a production environment, you might want to mock these calls
@@ -67,7 +67,7 @@
 ## Test error handling (using invalid endpoint)
 # Note: This might not work as expected since errors might throw
 # In a real test environment, we'd need try-catch support
-@data test_http_methods_exist = @ok(@get && @post && @put && @patch && @del)
+@data test_http_methods_exist = @ok(@get && @post && @put && @patch && @delete)
 @data test_auth_methods_exist = @ok(@auth.get && @auth.post)
 @data test_fetch_methods_exist = @ok(@fetch.get && @fetch.post && @fetch.put && @fetch.patch && @fetch.delete)
 

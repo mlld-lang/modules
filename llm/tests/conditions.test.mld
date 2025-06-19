@@ -1,7 +1,7 @@
 # Tests for @mlld/conditions module
 
-@import { eq, ok, notOk } from @local/test
-@import { and, or, not, iff, exists } from @local/conditions
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/conditions.mld.md"
 
 ## Test and
 @data test_and_true_true = @ok(@and(true, true))
@@ -61,14 +61,14 @@
 @data test_exists_null = @notOk(@exists(null))
 @data test_exists_undefined = @notOk(@exists(undefined))
 
-## Test complex conditions
+## Test complex conditions"
 # Testing De Morgan's laws
 @data a = true
 @data b = false
 @data test_demorgan_1 = @eq(@not(@and(@a, @b)), @or(@not(@a), @not(@b)))
 @data test_demorgan_2 = @eq(@not(@or(@a, @b)), @and(@not(@a), @not(@b)))
 
-# Testing chained conditions
+# Testing chained conditions"
 @data x = 5
 @data y = 10
 @data z = 15

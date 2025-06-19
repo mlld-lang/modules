@@ -1,7 +1,7 @@
 # Tests for @mlld/grab module
 
-@import { eq, ok, notOk, includes, deepEq } from @local/test
-@import { grab, grabJson, grabCsv, grabHtml, grabXml, grabMd } from @local/grab
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/grab.mld.md"
 
 # Create test files for grab operations
 @text htmlContent = [[

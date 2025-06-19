@@ -1,6 +1,6 @@
 # Simple tests for core modules to demonstrate test system
 
-@import { eq, ok, notOk, deepEq, len } from @local/test
+@import { * } from "../modules/test.mld.md"
 
 ## Test basic string operations
 @text hello = "Hello"

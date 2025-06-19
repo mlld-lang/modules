@@ -1,7 +1,7 @@
 # Tests for @mlld/fix-relative-links module
 
-@import { eq, ok, includes } from @local/test
-@import { fixRelativeLinks } from @local/fix-relative-links
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/fix-relative-links.mld.md"
 
 ## Test basic relative link fixing
 @text markdownWithLinks = [[

@@ -1,7 +1,7 @@
 # Tests for @mlld/bundle module
 
-@import { eq, ok, notOk, includes, deepEq } from @local/test
-@import { bundle, bundleWithDeps, analyze, tree } from @local/bundle
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/bundle.mld.md"
 
 # Create test mlld files for bundling
 @text mainFile = [[

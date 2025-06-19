@@ -1,7 +1,7 @@
 # Tests for @mlld/array module
 
-@import { eq, deepEq, ok, notOk, includes, len } from @local/test
-@import { filter, map, reduce, sum, avg, pluck, includes as arrIncludes, unique, flatten, groupBy } from @local/array
+@import { * } from "../modules/test.mld.md"
+@import { * } from "../modules/array.mld.md"
 
 ## Test filter
 @data items = [
@@ -15,7 +15,7 @@
 @data test_filter_correct_length = @eq(@len(@fruits), 2)
 @data test_filter_correct_items = @deepEq(@pluck(@fruits, "name"), ["apple", "banana"])
 
-# Test filter with empty array
+# Test filter with empty array"
 @data emptyResult = @filter([], "key", "value")
 @data test_filter_empty_array = @deepEq(@emptyResult, [])
 
@@ -68,10 +68,10 @@
 @data test_pluck_missing = @deepEq(@missing, [undefined, undefined, undefined])
 
 ## Test includes (array version)
-@data hasApple = @arrIncludes(@pluck(@items, "name"), "apple")
+@data hasApple = @includes(@pluck(@items, "name"), "apple")
 @data test_includes_found = @ok(@hasApple)
 
-@data hasOrange = @arrIncludes(@pluck(@items, "name"), "orange")
+@data hasOrange = @includes(@pluck(@items, "name"), "orange")
 @data test_includes_not_found = @notOk(@hasOrange)
 
 ## Test unique
