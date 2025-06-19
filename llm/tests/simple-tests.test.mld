@@ -1,0 +1,37 @@
+# Simple tests for core modules to demonstrate test system
+
+@import { eq, ok, notOk, deepEq, len } from @local/test
+
+## Test basic string operations
+@text hello = "Hello"
+@text world = "World"
+@text combined = "Hello World"
+@data test_string_concat = @eq("@hello @world", @combined)
+@data test_string_length = @eq(@len(@combined), 11)
+
+## Test array operations  
+@data nums = [1, 2, 3, 4, 5]
+@data test_array_length = @eq(@len(@nums), 5)
+@data test_array_access = @eq(@nums.2, 3)
+
+# Test array with exec
+@exec double(n) = javascript [(return n * 2)]
+@data test_exec_double = @eq(@double(5), 10)
+
+## Test object operations
+@data user = {"name": "Alice", "age": 30, "active": true}
+@data test_object_field = @eq(@user.name, "Alice")
+@data test_object_boolean = @ok(@user.active)
+@data test_object_number = @eq(@user.age, 30)
+
+## Test conditionals
+@data condition = true
+@data test_condition_truthy = @ok(@condition)
+@data test_condition_negated = @notOk(!@condition)
+
+## Test deep equality
+@data obj1 = {"a": 1, "b": [2, 3]}
+@data obj2 = {"a": 1, "b": [2, 3]}
+@data obj3 = {"a": 1, "b": [2, 4]}
+@data test_deepEq_same = @deepEq(@obj1, @obj2)
+@data test_deepEq_different = @notOk(@deepEq(@obj1, @obj3))

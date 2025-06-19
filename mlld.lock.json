@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "imports": {},
+  "config": {
+    "resolvers": {
+      "registries": [
+        {
+          "prefix": "@local/",
+          "resolver": "LOCAL",
+          "type": "input",
+          "priority": 20,
+          "config": {
+            "basePath": "./llm/modules"
+          }
+        }
+      ]
+    }
+  },
+  "security": {
+    "trustedDomains": [
+      "raw.githubusercontent.com",
+      "gist.githubusercontent.com",
+      "api.github.com"
+    ]
+  }
+}

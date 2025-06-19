@@ -1,0 +1,86 @@
+# Tests for @mlld/string module
+
+@import { eq, ok, notOk, deepEq } from @local/test
+@import { trim, toLowerCase, toUpperCase, split, join, replace, replaceAll, startsWith, endsWith, padStart, padEnd, slice, substring, indexOf, lastIndexOf, includes, repeat, charAt, charCodeAt } from @local/string
+
+## Test trim
+@data test_trim_spaces = @eq(@trim("  hello world  "), "hello world")
+@data test_trim_tabs = @eq(@trim("\thello\t"), "hello")
+@data test_trim_newlines = @eq(@trim("\nhello\n"), "hello")
+@data test_trim_mixed = @eq(@trim(" \t\nhello world\n\t "), "hello world")
+@data test_trim_empty = @eq(@trim("   "), "")
+
+## Test case conversion
+@data test_toLowerCase = @eq(@toLowerCase("Hello WORLD"), "hello world")
+@data test_toLowerCase_mixed = @eq(@toLowerCase("HeLLo WoRLd 123"), "hello world 123")
+@data test_toUpperCase = @eq(@toUpperCase("Hello world"), "HELLO WORLD")
+@data test_toUpperCase_mixed = @eq(@toUpperCase("hello WORLD 123"), "HELLO WORLD 123")
+
+## Test split
+@data test_split_spaces = @deepEq(@split("hello world test", " "), ["hello", "world", "test"])
+@data test_split_comma = @deepEq(@split("a,b,c", ","), ["a", "b", "c"])
+@data test_split_empty = @deepEq(@split("", ","), [""])
+@data test_split_no_delimiter = @deepEq(@split("hello", ","), ["hello"])
+
+## Test join
+@data test_join_spaces = @eq(@join(["hello", "world"], " "), "hello world")
+@data test_join_comma = @eq(@join(["a", "b", "c"], ","), "a,b,c")
+@data test_join_empty = @eq(@join([], ","), "")
+@data test_join_single = @eq(@join(["hello"], ","), "hello")
+
+## Test replace
+@data test_replace_first = @eq(@replace("hello hello", "hello", "hi"), "hi hello")
+@data test_replace_not_found = @eq(@replace("hello world", "foo", "bar"), "hello world")
+@data test_replace_empty = @eq(@replace("hello", "hello", ""), "")
+
+## Test replaceAll
+@data test_replaceAll_multiple = @eq(@replaceAll("hello hello hello", "hello", "hi"), "hi hi hi")
+@data test_replaceAll_not_found = @eq(@replaceAll("hello world", "foo", "bar"), "hello world")
+@data test_replaceAll_pattern = @eq(@replaceAll("a.b.c.d", ".", "-"), "a-b-c-d")
+
+## Test startsWith/endsWith
+@data test_startsWith_true = @ok(@startsWith("hello world", "hello"))
+@data test_startsWith_false = @notOk(@startsWith("hello world", "world"))
+@data test_startsWith_empty = @ok(@startsWith("hello", ""))
+@data test_endsWith_true = @ok(@endsWith("hello world", "world"))
+@data test_endsWith_false = @notOk(@endsWith("hello world", "hello"))
+@data test_endsWith_empty = @ok(@endsWith("hello", ""))
+
+## Test padding
+@data test_padStart_number = @eq(@padStart("5", 3, "0"), "005")
+@data test_padStart_string = @eq(@padStart("hi", 5, "."), "...hi")
+@data test_padStart_no_pad = @eq(@padStart("hello", 3, "x"), "hello")
+@data test_padEnd_number = @eq(@padEnd("5", 3, "0"), "500")
+@data test_padEnd_string = @eq(@padEnd("hi", 5, "."), "hi...")
+@data test_padEnd_no_pad = @eq(@padEnd("hello", 3, "x"), "hello")
+
+## Test slice/substring
+@data test_slice_positive = @eq(@slice("hello world", 0, 5), "hello")
+@data test_slice_negative = @eq(@slice("hello world", -5), "world")
+@data test_slice_middle = @eq(@slice("hello world", 6, 11), "world")
+@data test_substring_basic = @eq(@substring("hello world", 0, 5), "hello")
+@data test_substring_swap = @eq(@substring("hello world", 5, 0), "hello")
+
+## Test indexOf/lastIndexOf
+@data test_indexOf_found = @eq(@indexOf("hello world hello", "hello"), 0)
+@data test_indexOf_not_found = @eq(@indexOf("hello world", "foo"), -1)
+@data test_indexOf_second = @eq(@indexOf("hello world hello", "hello", 1), 12)
+@data test_lastIndexOf_found = @eq(@lastIndexOf("hello world hello", "hello"), 12)
+@data test_lastIndexOf_not_found = @eq(@lastIndexOf("hello world", "foo"), -1)
+
+## Test includes
+@data test_includes_true = @ok(@includes("hello world", "world"))
+@data test_includes_false = @notOk(@includes("hello world", "foo"))
+@data test_includes_empty = @ok(@includes("hello", ""))
+
+## Test repeat
+@data test_repeat_basic = @eq(@repeat("ha", 3), "hahaha")
+@data test_repeat_zero = @eq(@repeat("test", 0), "")
+@data test_repeat_one = @eq(@repeat("x", 1), "x")
+
+## Test charAt/charCodeAt
+@data test_charAt_first = @eq(@charAt("hello", 0), "h")
+@data test_charAt_last = @eq(@charAt("hello", 4), "o")
+@data test_charAt_out_of_bounds = @eq(@charAt("hello", 10), "")
+@data test_charCodeAt_h = @eq(@charCodeAt("hello", 0), 104)
+@data test_charCodeAt_space = @eq(@charCodeAt("a b", 1), 32)

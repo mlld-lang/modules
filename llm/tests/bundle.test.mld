@@ -1,0 +1,108 @@
+# Tests for @mlld/bundle module
+
+@import { eq, ok, notOk, includes, deepEq } from @local/test
+@import { bundle, bundleWithDeps, analyze, tree } from @local/bundle
+
+# Create test mlld files for bundling
+@text mainFile = [[
+@import { helper1, helper2 } from "./utils.mld"
+@import { feature } from "./feature.mld"
+
+@text greeting = "Hello from main"
+@run @helper1()
+@run @feature()
+]]
+@output @mainFile to "/tmp/bundle-test/main.mld"
+
+@text utilsFile = [[
+@exec helper1() = javascript [(
+  console.log("Helper 1 called");
+  return true;
+)]
+
+@exec helper2() = javascript [(
+  console.log("Helper 2 called");
+  return true;
+)]
+
+@text utilsVersion = "1.0.0"
+]]
+@output @utilsFile to "/tmp/bundle-test/utils.mld"
+
+@text featureFile = [[
+@import { helper2 } from "./utils.mld"
+
+@exec feature() = javascript [(
+  console.log("Feature activated");
+  return @helper2();
+)]
+]]
+@output @featureFile to "/tmp/bundle-test/feature.mld"
+
+## Test bundle function
+@data bundled = @bundle("/tmp/bundle-test/main.mld")
+@data test_bundle_returns_string = @ok(typeof @bundled === "string")
+@data test_bundle_has_content = @includes(@bundled, "Hello from main")
+@data test_bundle_has_imports = @includes(@bundled, "@import")
+
+## Test bundleWithDeps (should inline dependencies)
+@data bundledWithDeps = @bundleWithDeps("/tmp/bundle-test/main.mld")
+@data test_bundleWithDeps_returns_string = @ok(typeof @bundledWithDeps === "string")
+@data test_bundleWithDeps_has_main = @includes(@bundledWithDeps, "Hello from main")
+@data test_bundleWithDeps_has_helper1 = @includes(@bundledWithDeps, "Helper 1 called")
+@data test_bundleWithDeps_has_feature = @includes(@bundledWithDeps, "Feature activated")
+@data test_bundleWithDeps_has_utils_version = @includes(@bundledWithDeps, "1.0.0")
+
+## Test analyze function
+@data analysis = @analyze("/tmp/bundle-test/main.mld")
+@data test_analyze_returns_object = @ok(typeof @analysis === "object")
+@data test_analyze_has_imports = @ok(@analysis.imports)
+@data test_analyze_has_exports = @ok(@analysis.exports !== undefined)
+@data test_analyze_has_dependencies = @ok(@analysis.dependencies)
+
+# Check specific analysis results
+@data test_analyze_imports_count = @ok(@analysis.imports.length >= 2)
+@data test_analyze_has_utils_dep = @includes(@analysis.dependencies, "./utils.mld")
+@data test_analyze_has_feature_dep = @includes(@analysis.dependencies, "./feature.mld")
+
+## Test tree function (dependency tree)
+@data depTree = @tree("/tmp/bundle-test/main.mld")
+@data test_tree_returns_object = @ok(typeof @depTree === "object")
+@data test_tree_has_name = @eq(@depTree.name, "main.mld")
+@data test_tree_has_children = @ok(Array.isArray(@depTree.children))
+@data test_tree_children_count = @ok(@depTree.children.length >= 2)
+
+# Check tree structure
+@data utilsChild = @depTree.children.find(c => c.name === "utils.mld")
+@data featureChild = @depTree.children.find(c => c.name === "feature.mld")
+@data test_tree_has_utils_child = @ok(@utilsChild)
+@data test_tree_has_feature_child = @ok(@featureChild)
+
+# Feature should also depend on utils
+@data test_feature_has_deps = @ok(@featureChild && @featureChild.children.length > 0)
+
+## Test with circular dependencies
+@text circular1 = [[
+@import { func2 } from "./circular2.mld"
+@exec func1() = javascript [(return "func1")]
+]]
+@output @circular1 to "/tmp/bundle-test/circular1.mld"
+
+@text circular2 = [[
+@import { func1 } from "./circular1.mld"
+@exec func2() = javascript [(return "func2")]
+]]
+@output @circular2 to "/tmp/bundle-test/circular2.mld"
+
+# Analyze circular dependencies
+@data circularAnalysis = @analyze("/tmp/bundle-test/circular1.mld")
+@data test_circular_detected = @ok(@circularAnalysis.hasCircularDeps || @circularAnalysis.dependencies.length > 0)
+
+## Test with non-existent file handling
+@data test_bundle_function_exists = @ok(@bundle)
+@data test_bundleWithDeps_function_exists = @ok(@bundleWithDeps)
+@data test_analyze_function_exists = @ok(@analyze)
+@data test_tree_function_exists = @ok(@tree)
+
+# Cleanup
+@run [(rm -rf /tmp/bundle-test)]

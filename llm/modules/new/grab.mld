@@ -1,0 +1,377 @@
+# grab Module
+
+Scan directories for files with optional frontmatter parsing using gray-matter.
+
+@metadata {
+  "author": "mlld",
+  "version": "2.0.0",
+  "description": "Directory scanner with frontmatter support using gray-matter",
+  "needs": ["node"]
+}
+
+## Core Functions
+
+@exec grab(searchPath, pattern, options) = node [(
+  const fs = require('fs');
+  const path = require('path');
+  const matter = require('gray-matter');
+  const glob = require('glob');
+  
+  // Default parameters
+  const dir = searchPath || '.';
+  const filePattern = pattern || '**/*.md';
+  const opts = options || {};
+  
+  // Default options
+  const config = {
+    includeFrontmatter: opts.includeFrontmatter !== false,
+    includeContent: opts.includeContent || false,
+    contentPreview: opts.contentPreview || 50,
+    nodir: opts.nodir !== false,
+    ignore: opts.ignore || [],
+    ...opts
+  };
+  
+  try {
+    // Find files using glob
+    const files = glob.sync(filePattern, { 
+      cwd: dir,
+      nodir: config.nodir,
+      ignore: config.ignore
+    });
+    
+    // Process each file
+    const results = files.map(file => {
+      const fullPath = path.join(dir, file);
+      const stat = fs.statSync(fullPath);
+      
+      const result = {
+        path: fullPath,
+        dir: path.dirname(fullPath),
+        name: path.basename(file),
+        ext: path.extname(file),
+        size: stat.size,
+        modified: stat.mtime.toISOString()
+      };
+      
+      // Parse frontmatter if requested
+      if (config.includeFrontmatter && !stat.isDirectory()) {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const parsed = matter(content);
+          
+          result.fm = parsed.data;
+          
+          if (config.includeContent) {
+            result.content = parsed.content;
+          } else if (config.contentPreview > 0) {
+            const preview = parsed.content.trim()
+              .split('\n')[0]
+              .substring(0, config.contentPreview);
+            result.preview = preview + (preview.length < parsed.content.length ? '...' : '');
+          }
+        } catch (e) {
+          // If file can't be read as text, skip frontmatter
+          result.fm = null;
+        }
+      }
+      
+      return result;
+    });
+    
+    return results;
+  } catch (err) {
+    console.error('Error in grab:', err.message);
+    return [];
+  }
+)]
+
+@exec filterByFrontmatter(files, field, value) = node [(
+  if (!Array.isArray(files)) {
+    console.error('filterByFrontmatter: files must be an array');
+    return [];
+  }
+  
+  return files.filter(file => {
+    if (!file.fm) return false;
+    
+    // Support nested field access (e.g., "author.name")
+    const fields = field.split('.');
+    let current = file.fm;
+    
+    for (const f of fields) {
+      if (current && typeof current === 'object' && f in current) {
+        current = current[f];
+      } else {
+        return false;
+      }
+    }
+    
+    // If value is provided, check equality
+    if (value !== undefined) {
+      return current === value;
+    }
+    
+    // Otherwise just check if field exists and is truthy
+    return !!current;
+  });
+)]
+
+@exec extractField(files, field) = node [(
+  if (!Array.isArray(files)) {
+    console.error('extractField: files must be an array');
+    return [];
+  }
+  
+  const values = [];
+  
+  files.forEach(file => {
+    if (!file.fm) return;
+    
+    // Support nested field access
+    const fields = field.split('.');
+    let current = file.fm;
+    
+    for (const f of fields) {
+      if (current && typeof current === 'object' && f in current) {
+        current = current[f];
+      } else {
+        return;
+      }
+    }
+    
+    if (current !== undefined) {
+      values.push(current);
+    }
+  });
+  
+  return values;
+)]
+
+@exec uniqueValues(files, field) = node [(
+  if (!Array.isArray(files)) {
+    console.error('uniqueValues: files must be an array');
+    return [];
+  }
+  
+  const allValues = [];
+  
+  files.forEach(file => {
+    if (!file.fm) return;
+    
+    // Support nested field access
+    const fields = field.split('.');
+    let current = file.fm;
+    
+    for (const f of fields) {
+      if (current && typeof current === 'object' && f in current) {
+        current = current[f];
+      } else {
+        return;
+      }
+    }
+    
+    if (Array.isArray(current)) {
+      allValues.push(...current);
+    } else if (current !== undefined) {
+      allValues.push(current);
+    }
+  });
+  
+  return [...new Set(allValues)];
+)]
+
+@exec sortByField(files, field, order) = node [(
+  if (!Array.isArray(files)) {
+    console.error('sortByField: files must be an array');
+    return files;
+  }
+  
+  const sortOrder = order || 'asc';
+  
+  return [...files].sort((a, b) => {
+    // Extract field values
+    const getFieldValue = (file) => {
+      if (!file.fm) return undefined;
+      
+      const fields = field.split('.');
+      let current = file.fm;
+      
+      for (const f of fields) {
+        if (current && typeof current === 'object' && f in current) {
+          current = current[f];
+        } else {
+          return undefined;
+        }
+      }
+      
+      return current;
+    };
+    
+    const aVal = getFieldValue(a);
+    const bVal = getFieldValue(b);
+    
+    // Handle undefined values
+    if (aVal === undefined && bVal === undefined) return 0;
+    if (aVal === undefined) return 1;
+    if (bVal === undefined) return -1;
+    
+    // Compare values
+    let result = 0;
+    if (aVal < bVal) result = -1;
+    else if (aVal > bVal) result = 1;
+    
+    return sortOrder === 'desc' ? -result : result;
+  });
+)]
+
+@exec groupByField(files, field) = node [(
+  if (!Array.isArray(files)) {
+    console.error('groupByField: files must be an array');
+    return {};
+  }
+  
+  const groups = {};
+  
+  files.forEach(file => {
+    if (!file.fm) {
+      groups['_no_frontmatter'] = groups['_no_frontmatter'] || [];
+      groups['_no_frontmatter'].push(file);
+      return;
+    }
+    
+    // Extract field value
+    const fields = field.split('.');
+    let current = file.fm;
+    
+    for (const f of fields) {
+      if (current && typeof current === 'object' && f in current) {
+        current = current[f];
+      } else {
+        current = undefined;
+        break;
+      }
+    }
+    
+    const key = current === undefined ? '_no_value' : String(current);
+    groups[key] = groups[key] || [];
+    groups[key].push(file);
+  });
+  
+  return groups;
+)]
+
+## Example Usage
+
+To use this module in your mlld files:
+
+```mlld
+@import { grab, filterByFrontmatter, uniqueValues, sortByField } from @mlld/grab
+
+# Basic usage - scan current directory for markdown files
+@data files = @grab()
+
+# Custom pattern and directory
+@data docs = @grab("./docs", "**/*.{md,mdx}")
+
+# Include content preview
+@data posts = @grab("./posts", "*.md", { "contentPreview": 100 })
+
+# Filter by frontmatter
+@data published = @filterByFrontmatter(@files, "published", true)
+
+# Extract all unique tags
+@data allTags = @uniqueValues(@files, "tags")
+
+# Sort by date
+@data recentPosts = @sortByField(@files, "date", "desc")
+
+# Show results
+@run node [(
+  console.log(`Found ${files.length} files`);
+  console.log(`Published: ${published.length}`);
+  console.log(`Tags: ${allTags.join(', ')}`);
+)]
+```
+
+## Advanced Examples
+
+### Building a Blog Index
+
+```mlld
+@import { grab, filterByFrontmatter, sortByField, groupByField } from @mlld/grab
+
+# Get all blog posts
+@data posts = @grab("./posts", "*.md")
+
+# Filter only published posts
+@data publishedPosts = @filterByFrontmatter(@posts, "published", true)
+
+# Sort by date (newest first)
+@data sortedPosts = @sortByField(@publishedPosts, "date", "desc")
+
+# Group by category
+@data postsByCategory = @groupByField(@sortedPosts, "category")
+
+# Generate index
+@run node [(
+  console.log('# Blog Posts\n');
+  
+  for (const [category, posts] of Object.entries(postsByCategory)) {
+    console.log(`## ${category === '_no_value' ? 'Uncategorized' : category}\n`);
+    
+    posts.forEach(post => {
+      const date = new Date(post.fm.date).toLocaleDateString();
+      console.log(`- [${post.fm.title}](${post.path}) - ${date}`);
+    });
+    
+    console.log('');
+  }
+)]
+```
+
+### Finding Files by Author
+
+```mlld
+@import { grab, filterByFrontmatter, extractField } from @mlld/grab
+
+@data files = @grab(".", "**/*.md")
+@data authorFiles = @filterByFrontmatter(@files, "author", "Alice")
+@data titles = @extractField(@authorFiles, "title")
+
+Files by Alice:
+@run node [(
+  titles.forEach(title => console.log(`- ${title}`));
+)]
+```
+
+### Tag Cloud Generation
+
+```mlld
+@import { grab, uniqueValues } from @mlld/grab
+
+@data files = @grab("./content", "**/*.md")
+@data allTags = @uniqueValues(@files, "tags")
+
+@run node [(
+  // Count tag occurrences
+  const tagCounts = {};
+  
+  files.forEach(file => {
+    if (file.fm && file.fm.tags) {
+      file.fm.tags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+    }
+  });
+  
+  // Sort by count
+  const sortedTags = Object.entries(tagCounts)
+    .sort((a, b) => b[1] - a[1]);
+  
+  console.log('## Popular Tags\n');
+  sortedTags.forEach(([tag, count]) => {
+    console.log(`- ${tag} (${count})`);
+  });
+)]
+```

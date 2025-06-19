@@ -1,19 +1,19 @@
 ---
 name: grab
 author: mlld
-version: 1.0.0
-about: Directory grabning utilities
-needs: ["node", "glob", "gray-matter"]
+version: 2.0.0
+about: Directory scanning utilities with frontmatter support
+needs: ["node"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
-keywords: ["frontmatter", "grab", "directory", "files"]
+keywords: ["frontmatter", "grab", "directory", "files", "glob", "gray-matter"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=1.4.1"
 ---
 
-# @mlld/grabfm
+# @mlld/grab
 
-Directory grabning utilities that return structured data about files and directories, including frontmatter parsing.
+Directory scanning utilities that return structured data about files and directories, including frontmatter parsing using gray-matter.
 
 ## tldr
 
@@ -58,9 +58,10 @@ Recursively grab directories using glob patterns.
 Directory grabning capabilities:
 
 ```mlld-run
-@exec grabDir(path, pattern) = @run node [(
+@exec grabDir(path, pattern) = node [(
   const fs = require('fs');
   const path_mod = require('path');
+  const matter = require('gray-matter');
   
   const searchPath = path || '.';
   const searchPattern = pattern || '*';
@@ -79,72 +80,79 @@ Directory grabning capabilities:
         // Basic pattern matching (supports * wildcard)
         const regex = new RegExp('^' + searchPattern.replace(/\*/g, '.*') + '$');
         if (regex.test(file)) {
+          let fm = null;
+          
+          // Try to parse frontmatter
+          try {
+            const content = fs.readFileSync(fullPath, 'utf8');
+            const parsed = matter(content);
+            if (parsed.data && Object.keys(parsed.data).length > 0) {
+              fm = parsed.data;
+            }
+          } catch (e) {
+            // File might not be text or readable
+          }
+          
           results.push({
             path: fullPath,
             dir: searchPath,
             name: file,
-            fm: null // TODO: Add frontmatter parsing
+            fm: fm
           });
         }
       }
     }
   } catch (err) {
-    console.error('Error grabning directory:', err.message);
+    console.error('Error scanning directory:', err.message);
+    return [];
   }
   
-  console.log(JSON.stringify(results, null, 2));
+  return results; // Return the array directly!
 )]
 
-@exec grabFiles(basePath, globPattern) = @run node [(
+@exec grabFiles(basePath, globPattern) = node [(
   const fs = require('fs');
   const path_mod = require('path');
+  const glob = require('glob');
+  const matter = require('gray-matter');
   
   const base = basePath || '.';
   const pattern = globPattern || '**/*';
   
-  // For mlld modules, we can use a simple recursive grabner
-  // since we don't have glob available by default
-  function grabRecursive(dir, results = []) {
-    try {
-      const files = fs.readdirSync(dir);
-      
-      for (const file of files) {
-        const fullPath = path_mod.join(dir, file);
-        const stat = fs.statSync(fullPath);
-        
-        if (stat.isDirectory()) {
-          // Recurse into subdirectories
-          grabRecursive(fullPath, results);
-        } else if (stat.isFile()) {
-          // Calculate relative path from base
-          const relativePath = path_mod.relative(base, fullPath);
-          
-          // Simple pattern matching for common cases
-          // Handle **/*.ext patterns
-          if (pattern.includes('**')) {
-            const ext = pattern.split('**/')[1];
-            if (ext && ext.startsWith('*')) {
-              const extension = ext.substring(1);
-              if (relativePath.endsWith(extension)) {
-                results.push({
-                  path: relativePath,
-                  dir: path_mod.dirname(relativePath),
-                  name: file,
-                  fm: null // TODO: Add frontmatter parsing
-                });
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      // Silently skip directories we can't read
-    }
+  try {
+    // Now we can use the real glob module!
+    const files = glob.sync(pattern, {
+      cwd: base,
+      nodir: true
+    });
     
-    return results;
+    const results = files.map(relativePath => {
+      const fullPath = path_mod.join(base, relativePath);
+      let fm = null;
+      
+      // Try to parse frontmatter
+      try {
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const parsed = matter(content);
+        if (parsed.data && Object.keys(parsed.data).length > 0) {
+          fm = parsed.data;
+        }
+      } catch (e) {
+        // File might not be text or readable
+      }
+      
+      return {
+        path: relativePath,
+        dir: path_mod.dirname(relativePath),
+        name: path_mod.basename(relativePath),
+        fm: fm
+      };
+    });
+    
+    return results; // Return the array directly!
+  } catch (err) {
+    console.error('Error scanning files:', err.message);
+    return [];
   }
-  
-  const results = grabRecursive(base);
-  console.log(JSON.stringify(results));
 )]
 ```

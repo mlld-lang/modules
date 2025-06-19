@@ -1,19 +1,19 @@
 ---
 name: array
 author: mlld
-version: 1.0.0
-about: Array operations
+version: 2.0.0
+about: Array operations with native return values
 needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["arrays", "lodash", "filter", "map", "find", "includes", "math", "range", "zip", "range", "chunk"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=1.4.1"
 ---
 
 # @mlld/array
 
-Array operations for data processing, filtering, and transformation. Useful for working with collections, processing JSON data, and data analysis workflows.
+Array operations for data processing, filtering, and transformation with native JavaScript return values. Version 2.0 leverages mlld 1.4.1+ return value support for cleaner data handling.
 
 ## tldr
 
@@ -128,107 +128,91 @@ Create and modify arrays.
 
 ## module
 
-All array operations preserve data types and handle edge cases safely:
+All array operations return native JavaScript values and handle edge cases safely. Boolean operations return actual booleans, numeric operations return numbers, and array operations return arrays or objects:
 
 ```mlld-run
-@exec length(array) = @run js [(Array.isArray(array) ? array.length : 0)]
-@exec first(array) = @run js [(Array.isArray(array) && array.length > 0 ? JSON.stringify(array[0]) : "")]
-@exec last(array) = @run js [(Array.isArray(array) && array.length > 0 ? JSON.stringify(array[array.length - 1]) : "")]
-@exec at(array, index) = @run js [(Array.isArray(array) ? JSON.stringify(array[index]) : "")]
-@exec slice(array, start, end) = @run js [(JSON.stringify(Array.isArray(array) ? array.slice(start, end) : []))]
+@exec length(array) = @run js [(return Array.isArray(array) ? array.length : 0)]
+@exec first(array) = @run js [(return Array.isArray(array) && array.length > 0 ? array[0] : null)]
+@exec last(array) = @run js [(return Array.isArray(array) && array.length > 0 ? array[array.length - 1] : null)]
+@exec at(array, index) = @run js [(return Array.isArray(array) ? array[index] : null)]
+@exec slice(array, start, end) = @run js [(return Array.isArray(array) ? array.slice(start, end) : [])]
 
-@exec reverse(array) = @run js [(JSON.stringify(Array.isArray(array) ? array.slice().reverse() : []))]
-@exec sort(array) = @run js [(JSON.stringify(Array.isArray(array) ? array.slice().sort() : []))]
+@exec reverse(array) = @run js [(return Array.isArray(array) ? array.slice().reverse() : [])]
+@exec sort(array) = @run js [(return Array.isArray(array) ? array.slice().sort() : [])]
 @exec sortBy(array, key) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.slice().sort((a, b) => {
-          const aVal = a[key];
-          const bVal = b[key];
-          if (aVal < bVal) return -1;
-          if (aVal > bVal) return 1;
-          return 0;
-        })
-      : []
-  )
+  return Array.isArray(array) 
+    ? array.slice().sort((a, b) => {
+        const aVal = a[key];
+        const bVal = b[key];
+        if (aVal < bVal) return -1;
+        if (aVal > bVal) return 1;
+        return 0;
+      })
+    : []
 )]
-@exec unique(array) = @run js [(JSON.stringify(Array.isArray(array) ? [...new Set(array)] : []))]
+@exec unique(array) = @run js [(return Array.isArray(array) ? [...new Set(array)] : [])]
 
 @exec filter(array, key, value) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.filter(item => item[key] == value)
-      : []
-  )
+  return Array.isArray(array) 
+    ? array.filter(item => item[key] == value)
+    : []
 )]
 @exec filterGreater(array, key, value) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.filter(item => Number(item[key]) > Number(value))
-      : []
-  )
+  return Array.isArray(array) 
+    ? array.filter(item => Number(item[key]) > Number(value))
+    : []
 )]
 
 @exec pluck(array, key) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.map(item => item[key])
-      : []
-  )
+  return Array.isArray(array) 
+    ? array.map(item => item[key])
+    : []
 )]
 
 @exec find(array, key, value) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.find(item => item[key] == value) || null
-      : null
-  )
+  return Array.isArray(array) 
+    ? array.find(item => item[key] == value) || null
+    : null
 )]
 @exec includes(array, value) = @run js [(
-  Array.isArray(array) && array.includes(value) ? "true" : ""
+  return Array.isArray(array) && array.includes(value)
 )]
 
 @exec sum(array, key) = @run js [(
-  Array.isArray(array) 
+  return Array.isArray(array) 
     ? array.reduce((sum, item) => sum + Number(key ? item[key] : item), 0)
     : 0
 )]
 @exec avg(array, key) = @run js [(
-  Array.isArray(array) && array.length > 0
+  return Array.isArray(array) && array.length > 0
     ? array.reduce((sum, item) => sum + Number(key ? item[key] : item), 0) / array.length
     : 0
 )]
 
 @exec groupBy(array, key) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.reduce((groups, item) => {
-          const group = String(item[key]);
-          if (!groups[group]) groups[group] = [];
-          groups[group].push(item);
-          return groups;
-        }, {})
-      : {}
-  )
+  return Array.isArray(array) 
+    ? array.reduce((groups, item) => {
+        const group = String(item[key]);
+        if (!groups[group]) groups[group] = [];
+        groups[group].push(item);
+        return groups;
+      }, {})
+    : {}
 )]
 
 @exec push(array, value) = @run js [(
-  JSON.stringify([...(Array.isArray(array) ? array : []), value])
+  return [...(Array.isArray(array) ? array : []), value]
 )]
 @exec remove(array, index) = @run js [(
-  JSON.stringify(
-    Array.isArray(array) 
-      ? array.filter((_, i) => i !== Number(index))
-      : []
-  )
+  return Array.isArray(array) 
+    ? array.filter((_, i) => i !== Number(index))
+    : []
 )]
 
 @exec range(start, end, step) = @run js [(
-  JSON.stringify(
-    Array.from(
-      { length: Math.ceil((end - start) / (step || 1)) },
-      (_, i) => start + i * (step || 1)
-    )
+  return Array.from(
+    { length: Math.ceil((end - start) / (step || 1)) },
+    (_, i) => start + i * (step || 1)
   )
 )]
 ```

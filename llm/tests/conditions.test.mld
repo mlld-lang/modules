@@ -1,0 +1,76 @@
+# Tests for @mlld/conditions module
+
+@import { eq, ok, notOk } from @local/test
+@import { and, or, not, iff, exists } from @local/conditions
+
+## Test and
+@data test_and_true_true = @ok(@and(true, true))
+@data test_and_true_false = @notOk(@and(true, false))
+@data test_and_false_true = @notOk(@and(false, true))
+@data test_and_false_false = @notOk(@and(false, false))
+
+# Test and with truthy/falsy values
+@data test_and_truthy = @ok(@and("hello", 1))
+@data test_and_falsy = @notOk(@and("hello", 0))
+@data test_and_null = @notOk(@and(true, null))
+
+## Test or
+@data test_or_true_true = @ok(@or(true, true))
+@data test_or_true_false = @ok(@or(true, false))
+@data test_or_false_true = @ok(@or(false, true))
+@data test_or_false_false = @notOk(@or(false, false))
+
+# Test or with truthy/falsy values
+@data test_or_truthy = @ok(@or("", "hello"))
+@data test_or_falsy = @notOk(@or("", 0))
+@data test_or_null = @ok(@or(null, "value"))
+
+## Test not
+@data test_not_true = @notOk(@not(true))
+@data test_not_false = @ok(@not(false))
+
+# Test not with truthy/falsy values
+@data test_not_string = @notOk(@not("hello"))
+@data test_not_empty_string = @ok(@not(""))
+@data test_not_zero = @ok(@not(0))
+@data test_not_one = @notOk(@not(1))
+@data test_not_null = @ok(@not(null))
+@data test_not_undefined = @ok(@not(undefined))
+
+## Test iff (if and only if)
+@data test_iff_true_true = @ok(@iff(true, true))
+@data test_iff_true_false = @notOk(@iff(true, false))
+@data test_iff_false_true = @notOk(@iff(false, true))
+@data test_iff_false_false = @ok(@iff(false, false))
+
+# Test iff with truthy/falsy values
+@data test_iff_truthy_truthy = @ok(@iff("hello", "world"))
+@data test_iff_truthy_falsy = @notOk(@iff("hello", ""))
+@data test_iff_falsy_falsy = @ok(@iff(0, null))
+
+## Test exists
+@data test_exists_value = @ok(@exists("hello"))
+@data test_exists_number = @ok(@exists(42))
+@data test_exists_zero = @ok(@exists(0))
+@data test_exists_empty_string = @ok(@exists(""))
+@data test_exists_false = @ok(@exists(false))
+@data test_exists_empty_array = @ok(@exists([]))
+@data test_exists_empty_object = @ok(@exists({}))
+
+# Test exists with null/undefined
+@data test_exists_null = @notOk(@exists(null))
+@data test_exists_undefined = @notOk(@exists(undefined))
+
+## Test complex conditions
+# Testing De Morgan's laws
+@data a = true
+@data b = false
+@data test_demorgan_1 = @eq(@not(@and(@a, @b)), @or(@not(@a), @not(@b)))
+@data test_demorgan_2 = @eq(@not(@or(@a, @b)), @and(@not(@a), @not(@b)))
+
+# Testing chained conditions
+@data x = 5
+@data y = 10
+@data z = 15
+@data test_chained_and = @ok(@and(@and(@x < @y, @y < @z), @x < @z))
+@data test_chained_or = @ok(@or(@or(@x > 10, @y > 10), @z > 10))

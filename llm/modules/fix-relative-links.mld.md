@@ -1,19 +1,19 @@
 ---
 name: fix-relative-links
 author: mlld
-version: 1.0.0
+version: 2.0.0
 about: Fix relative markdown links based on context
 needs: ["node"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["markdown", "relative", "links", "paths", "pipeline"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=1.4.1"
 ---
 
 # @mlld/fix-relative-links
 
-Pipeline transformer that adjusts relative paths in markdown links to be correct for different output contexts.
+Pipeline transformer that adjusts relative paths in markdown links to be correct for different output contexts. Version 2.0 uses return values for seamless pipeline integration.
 
 ## tldr
 
@@ -42,11 +42,13 @@ Parameters:
 - `sourceDir`: Where the content was written (its current context)
 - `destDir`: Where the content is moving to (its new context)
 
+Returns: The markdown content with all relative links adjusted for the new context.
+
 **Bottom line:** A link like `../docs/guide.md` means different things depending on which directory you're in. This function preserves what the link *points to*, not just the link text.
 
 ### Usage in Pipelines
 
-This module is designed to work as a pipeline transformer:
+This module is designed to work as a pipeline transformer with mlld's built-in pipeline support:
 
 ```mlld
 # Generate content and fix paths in one operation
@@ -54,14 +56,22 @@ This module is designed to work as a pipeline transformer:
   pipeline: [@fixRelativeLinks(@input, "templates", "output/docs")]
 }
 
-# Or use with other transformers
-@exec processDoc(content) = @run [echo "@content"] with {
+# Or use with other transformers and built-ins
+@exec processDoc(content, srcDir, destDir) = @run [echo "@content"] with {
   pipeline: [
-    @replaceVars(@input),
-    @fixRelativeLinks(@input, "src", "dist"),
-    @addFooter(@input)
+    @fixRelativeLinks(@input, @srcDir, @destDir),
+    @JSON(@input)  # Use built-in JSON transformer
   ]
 }
+```
+
+### Direct Usage
+
+You can also use it directly to process content:
+
+```mlld
+@data processedContent = @fixRelativeLinks(@rawContent, "src", "dist")
+@add @processedContent
 ```
 
 ### Examples
@@ -153,6 +163,6 @@ See the [main docs](../../README.md) for more.
     }
   });
   
-  console.log(result);
+  return result;
 )]
 ```
