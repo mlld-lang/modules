@@ -164,5 +164,5 @@ See the [main docs](../../README.md) for more.
   });
   
   return result;
-)]
+}
 ```

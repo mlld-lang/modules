@@ -1,0 +1,106 @@
+---
+description: Real-world usage patterns with mlld v2
+---
+
+# Real-World Usage Patterns
+
+Common patterns developers will use in practice.
+
+## Data Validation Pattern
+
+/import { isEmail, isUrl } from @local/string
+/import { equals } from @local/test
+
+/var @userEmail = "test@example.com"
+/var @userWebsite = "https://example.com"
+
+/when @isEmail(@userEmail) => show `✓ Valid email: @userEmail`
+/when @isUrl(@userWebsite) => show `✓ Valid URL: @userWebsite`
+
+>> Test invalid inputs
+/var @badEmail = "not-an-email"
+/when !@isEmail(@badEmail) => show `✗ Invalid email detected: @badEmail`
+
+## Configuration Processing
+
+/import { fileExists } from @local/fs
+/import { get } from @local/conditions
+
+>> Mock a config object (in real use, this might come from a file)
+/var @config = {
+  "app": {
+    "name": "MyApp",
+    "version": "2.0.0",
+    "features": {
+      "darkMode": true,
+      "analytics": false
+    }
+  }
+}
+
+/var @appName = @get(@config, "app.name", "Unknown App")
+/var @darkModeEnabled = @get(@config, "app.features.darkMode", false)
+
+/show `\nApp: @appName`
+/when @darkModeEnabled => show `Dark mode is enabled`
+
+## Array Data Processing
+
+/import { filter, pluck, sum, avg, groupBy } from @local/array
+
+/var @sales = [
+  { "product": "laptop", "category": "electronics", "price": 1200, "quantity": 2 },
+  { "product": "mouse", "category": "electronics", "price": 25, "quantity": 5 },
+  { "product": "notebook", "category": "office", "price": 5, "quantity": 20 },
+  { "product": "pen", "category": "office", "price": 2, "quantity": 50 }
+]
+
+>> Group by category
+/var @byCategory = @groupBy(@sales, "category")
+/show `\nSales by category:`
+/show @byCategory
+
+>> Calculate electronics revenue
+/var @electronics = @filter(@sales, "category", "electronics")
+/var @electronicsPrices = @pluck(@electronics, "price")
+/var @electronicsTotal = @sum(@electronicsPrices)
+/show `\nElectronics total value: $@electronicsTotal`
+
+## HTTP API Integration (Mock)
+
+/show `\n## API Integration Pattern`
+/show `Note: Real HTTP calls would use @local/http module`
+
+>> Mock API response
+/var @apiResponse = {
+  "status": "success",
+  "data": {
+    "users": [
+      { "id": 1, "name": "Alice", "active": true },
+      { "id": 2, "name": "Bob", "active": false },
+      { "id": 3, "name": "Charlie", "active": true }
+    ]
+  }
+}
+
+/import { filter, pluck } from @local/array
+/import { get } from @local/conditions
+
+/var @users = @get(@apiResponse, "data.users", [])
+/var @activeUsers = @filter(@users, "active", true)
+/var @activeNames = @pluck(@activeUsers, "name")
+
+/show `Active users: @activeNames`
+
+## Error Handling Pattern
+
+/import { either } from @local/conditions
+/import { isEmpty } from @local/test
+
+/var @input = ""
+/var @default = "Default Value"
+/var @result = @either(@input, @default)
+
+/show `\nUsing either for defaults: '@result'`
+
+/show `\n✅ Real-world patterns test complete!`

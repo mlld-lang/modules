@@ -1,10 +1,10 @@
-# Tests for @mlld/grab module
+>> Tests for @mlld/grab module
 
-@import { eq, ok, notOk, includes, deepEq } from @local/test
-@import { grab, grabJson, grabCsv, grabHtml, grabXml, grabMd } from @local/grab
+/import { * } from "../modules/test.mld.md"
+/import { * } from "../modules/grab.mld.md"
 
-# Create test files for grab operations
-@text htmlContent = [[
+>>  Create test files for grab operations
+/var @htmlContent = [[
 <html>
   <head><title>Test Page</title></head>
   <body>
@@ -18,35 +18,35 @@
     </div>
   </body>
 </html>
-]]
+]
 @output @htmlContent to "/tmp/test.html"
 
-@text jsonContent = [[{
+/var @jsonContent = [[{
   "name": "Test",
   "items": [1, 2, 3],
   "nested": {
     "value": "deep"
   }
-}]]
+}]
 @output @jsonContent to "/tmp/test.json"
 
-@text csvContent = [[name,age,city
+/var @csvContent = [[name,age,city
 Alice,30,New York
 Bob,25,San Francisco
-Charlie,35,Chicago]]
+Charlie,35,Chicago]
 @output @csvContent to "/tmp/test.csv"
 
-@text xmlContent = [[<?xml version="1.0"?>
+/var @xmlContent = [[<?xml version="1.0"?>
 <root>
   <item id="1">First</item>
   <item id="2">Second</item>
   <nested>
     <value>Deep Value</value>
   </nested>
-</root>]]
+</root>]
 @output @xmlContent to "/tmp/test.xml"
 
-@text mdContent = [[# Test Document
+/var @mdContent = [[# Test Document
 
 This is a **test** document with [links](https://example.com).
 
@@ -57,69 +57,69 @@ This is a **test** document with [links](https://example.com).
 
 ## Section 2
 
-Some text here.]]
+Some text here.]
 @output @mdContent to "/tmp/test.md"
 
 ## Test basic grab (plain text)
-@data textResult = @grab("https://httpbin.org/robots.txt")
-@data test_grab_returns_string = @ok(typeof @textResult === "string")
-@data test_grab_has_content = @includes(@textResult, "User-agent")
+/var @textResult = @grab("https://httpbin.org/robots.txt")
+/var @test_grab_returns_string = @ok(typeof @textResult === "string")
+/var @test_grab_has_content = @includes(@textResult, "User-agent")
 
 ## Test grabJson
-@data jsonResult = @grabJson("file:///tmp/test.json")
-@data test_grabJson_returns_object = @ok(typeof @jsonResult === "object")
-@data test_grabJson_name = @eq(@jsonResult.name, "Test")
-@data test_grabJson_array = @deepEq(@jsonResult.items, [1, 2, 3])
-@data test_grabJson_nested = @eq(@jsonResult.nested.value, "deep")
+/var @jsonResult = @grabJson("file:///tmp/test.json")
+/var @test_grabJson_returns_object = @ok(typeof @jsonResult === "object")
+/var @test_grabJson_name = @eq(@jsonResult.name, "Test")
+/var @test_grabJson_array = @deepEq(@jsonResult.items, [1, 2, 3])
+/var @test_grabJson_nested = @eq(@jsonResult.nested.value, "deep")
 
 ## Test grabCsv
-@data csvResult = @grabCsv("file:///tmp/test.csv")
-@data test_grabCsv_returns_array = @ok(Array.isArray(@csvResult))
-@data test_grabCsv_length = @eq(@csvResult.length, 3)
-@data test_grabCsv_first_row = @eq(@csvResult[0].name, "Alice")
-@data test_grabCsv_age_number = @eq(@csvResult[1].age, "25")
+/var @csvResult = @grabCsv("file:///tmp/test.csv")
+/var @test_grabCsv_returns_array = @ok(Array.isArray(@csvResult))
+/var @test_grabCsv_length = @eq(@csvResult.length, 3)
+/var @test_grabCsv_first_row = @eq(@csvResult[0].name, "Alice")
+/var @test_grabCsv_age_number = @eq(@csvResult[1].age, "25")
 
 ## Test grabHtml with selectors
-@data h1Text = @grabHtml("file:///tmp/test.html", "h1")
-@data test_grabHtml_h1 = @eq(@h1Text, "Hello World")
+/var @h1Text = @grabHtml("file:///tmp/test.html", "h1")
+/var @test_grabHtml_h1 = @eq(@h1Text, "Hello World")
 
-@data pText = @grabHtml("file:///tmp/test.html", "p.intro")
-@data test_grabHtml_class = @eq(@pText, "This is a test paragraph.")
+/var @pText = @grabHtml("file:///tmp/test.html", "p.intro")
+/var @test_grabHtml_class = @eq(@pText, "This is a test paragraph.")
 
-@data liTexts = @grabHtml("file:///tmp/test.html", "li", { all: true })
-@data test_grabHtml_all = @ok(Array.isArray(@liTexts))
-@data test_grabHtml_all_length = @eq(@liTexts.length, 2)
-@data test_grabHtml_all_content = @deepEq(@liTexts, ["Item 1", "Item 2"])
+/var @liTexts = @grabHtml("file:///tmp/test.html", "li", { all: true })
+/var @test_grabHtml_all = @ok(Array.isArray(@liTexts))
+/var @test_grabHtml_all_length = @eq(@liTexts.length, 2)
+/var @test_grabHtml_all_content = @deepEq(@liTexts, ["Item 1", "Item 2"])
 
 ## Test grabXml with XPath
-@data xmlFirstItem = @grabXml("file:///tmp/test.xml", "//item[1]")
-@data test_grabXml_xpath = @eq(@xmlFirstItem, "First")
+/var @xmlFirstItem = @grabXml("file:///tmp/test.xml", "//item[1]")
+/var @test_grabXml_xpath = @eq(@xmlFirstItem, "First")
 
-@data xmlNestedValue = @grabXml("file:///tmp/test.xml", "//nested/value")
-@data test_grabXml_nested = @eq(@xmlNestedValue, "Deep Value")
+/var @xmlNestedValue = @grabXml("file:///tmp/test.xml", "//nested/value")
+/var @test_grabXml_nested = @eq(@xmlNestedValue, "Deep Value")
 
-@data xmlAllItems = @grabXml("file:///tmp/test.xml", "//item", { all: true })
-@data test_grabXml_all = @deepEq(@xmlAllItems, ["First", "Second"])
+/var @xmlAllItems = @grabXml("file:///tmp/test.xml", "//item", { all: true })
+/var @test_grabXml_all = @deepEq(@xmlAllItems, ["First", "Second"])
 
 ## Test grabMd
-@data mdResult = @grabMd("file:///tmp/test.md")
-@data test_grabMd_returns_object = @ok(typeof @mdResult === "object")
-@data test_grabMd_has_children = @ok(Array.isArray(@mdResult.children))
-@data test_grabMd_type = @eq(@mdResult.type, "root")
+/var @mdResult = @grabMd("file:///tmp/test.md")
+/var @test_grabMd_returns_object = @ok(typeof @mdResult === "object")
+/var @test_grabMd_has_children = @ok(Array.isArray(@mdResult.children))
+/var @test_grabMd_type = @eq(@mdResult.type, "root")
 
-# Extract heading from markdown AST
-@data firstChild = @mdResult.children[0]
-@data test_grabMd_first_is_heading = @eq(@firstChild.type, "heading")
-@data test_grabMd_heading_depth = @eq(@firstChild.depth, 1)
+>>  Extract heading from markdown AST
+/var @firstChild = @mdResult.children[0}
+/var @test_grabMd_first_is_heading = @eq(@firstChild.type, "heading")
+/var @test_grabMd_heading_depth = @eq(@firstChild.depth, 1)
 
 ## Test error handling with non-existent file
-# Note: These might throw errors, so we're just testing the functions exist
-@data test_grab_function_exists = @ok(@grab)
-@data test_grabJson_function_exists = @ok(@grabJson)
-@data test_grabCsv_function_exists = @ok(@grabCsv)
-@data test_grabHtml_function_exists = @ok(@grabHtml)
-@data test_grabXml_function_exists = @ok(@grabXml)
-@data test_grabMd_function_exists = @ok(@grabMd)
+>>  Note: These might throw errors, so we're just testing the functions exist
+/var @test_grab_function_exists = @ok(@grab)
+/var @test_grabJson_function_exists = @ok(@grabJson)
+/var @test_grabCsv_function_exists = @ok(@grabCsv)
+/var @test_grabHtml_function_exists = @ok(@grabHtml)
+/var @test_grabXml_function_exists = @ok(@grabXml)
+/var @test_grabMd_function_exists = @ok(@grabMd)
 
-# Cleanup test files
-@run [(rm -f /tmp/test.html /tmp/test.json /tmp/test.csv /tmp/test.xml /tmp/test.md)]
+>>  Cleanup test files
+@run [(rm -f /tmp/test.html /tmp/test.json /tmp/test.csv /tmp/test.xml /tmp/test.md)}

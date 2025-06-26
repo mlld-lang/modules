@@ -1,102 +1,102 @@
-# Tests for @mlld/array module
+>> Tests for @mlld/array module
 
-@import { eq, deepEq, ok, notOk, includes, len } from @local/test
-@import { filter, map, reduce, sum, avg, pluck, includes as arrIncludes, unique, flatten, groupBy } from @local/array
+/import { * } from "../modules/test.mld.md"
+/import { * } from "../modules/array.mld.md"
 
 ## Test filter
-@data items = [
+/var @items = [
   {"name": "apple", "price": 1.50, "category": "fruit"},
   {"name": "banana", "price": 0.75, "category": "fruit"},
   {"name": "carrot", "price": 2.00, "category": "vegetable"}
-]
+}
 
-@data fruits = @filter(@items, "category", "fruit")
-@data test_filter_returns_array = @ok(Array.isArray(@fruits))
-@data test_filter_correct_length = @eq(@len(@fruits), 2)
-@data test_filter_correct_items = @deepEq(@pluck(@fruits, "name"), ["apple", "banana"])
+/var @fruits = @filter(@items, "category", "fruit")
+/var @test_filter_returns_array = @ok(Array.isArray(@fruits))
+/var @test_filter_correct_length = @eq(@len(@fruits), 2)
+/var @test_filter_correct_items = @deepEq(@pluck(@fruits, "name"), ["apple", "banana"])
 
-# Test filter with empty array
-@data emptyResult = @filter([], "key", "value")
-@data test_filter_empty_array = @deepEq(@emptyResult, [])
+>> Test filter with empty array
+/var @emptyResult = @filter([], "key", "value")
+/var @test_filter_empty_array = @deepEq(@emptyResult, [])
 
 ## Test map
-@exec double(n) = javascript [(return n * 2)]
-@data numbers = [1, 2, 3, 4, 5]
-@data doubled = @map(@numbers, @double)
-@data test_map_doubles_numbers = @deepEq(@doubled, [2, 4, 6, 8, 10])
+/exe @double(n) = js {return @n * 2}
+/var @numbers = [1, 2, 3, 4, 5}
+/var @doubled = @map(@numbers, @double)
+/var @test_map_doubles_numbers = @deepEq(@doubled, [2, 4, 6, 8, 10])
 
-# Test map with objects
-@exec getName(obj) = javascript [(return obj.name)]
-@data names = @map(@items, @getName)
-@data test_map_extracts_names = @deepEq(@names, ["apple", "banana", "carrot"])
+>> Test map with objects
+/exe @getName(obj) = js {return @obj.name}
+/var @names = @map(@items, @getName)
+/var @test_map_extracts_names = @deepEq(@names, ["apple", "banana", "carrot"])
 
 ## Test reduce
-@exec sumReducer(acc, val) = javascript [(return acc + val)]
-@data sumResult = @reduce(@numbers, @sumReducer, 0)
-@data test_reduce_sum = @eq(@sumResult, 15)
+/exe @sumReducer(acc, val) = js {return @acc + @val}
+/var @sumResult = @reduce(@numbers, @sumReducer, 0)
+/var @test_reduce_sum = @eq(@sumResult, 15)
 
-# Test reduce with object accumulator
-@exec countByCategory(acc, item) = javascript [(
-  acc[item.category] = (acc[item.category] || 0) + 1;
-  return acc;
-)]
-@data categoryCounts = @reduce(@items, @countByCategory, {})
-@data test_reduce_counts = @deepEq(@categoryCounts, {"fruit": 2, "vegetable": 1})
+>> Test reduce with object accumulator
+/exe @countByCategory(acc, item) = js {
+  @acc[@item.category] = (@acc[@item.category] || 0) + 1;
+  return @acc;
+}
+/var @categoryCounts = @reduce(@items, @countByCategory, {})
+/var @test_reduce_counts = @deepEq(@categoryCounts, {"fruit": 2, "vegetable": 1})
 
 ## Test sum
-@data priceSum = @sum(@items, "price")
-@data test_sum_prices = @eq(@priceSum, 4.25)
+/var @priceSum = @sum(@items, "price")
+/var @test_sum_prices = @eq(@priceSum, 4.25)
 
-# Test sum with array of numbers
-@data numberSum = @sum(@numbers)
-@data test_sum_numbers = @eq(@numberSum, 15)
+>> Test sum with array of numbers
+/var @numberSum = @sum(@numbers)
+/var @test_sum_numbers = @eq(@numberSum, 15)
 
 ## Test avg
-@data priceAvg = @avg(@items, "price")
-@data test_avg_prices = @ok(@priceAvg > 1.41 && @priceAvg < 1.42)  # ~1.416667
+/var @priceAvg = @avg(@items, "price")
+/var @test_avg_prices = @ok(@priceAvg > 1.41 && @priceAvg < 1.42)  >> ~1.416667
 
-# Test avg with array of numbers
-@data numberAvg = @avg(@numbers)
-@data test_avg_numbers = @eq(@numberAvg, 3)
+>> Test avg with array of numbers
+/var @numberAvg = @avg(@numbers)
+/var @test_avg_numbers = @eq(@numberAvg, 3)
 
 ## Test pluck
-@data categories = @pluck(@items, "category")
-@data test_pluck_categories = @deepEq(@categories, ["fruit", "fruit", "vegetable"])
+/var @categories = @pluck(@items, "category")
+/var @test_pluck_categories = @deepEq(@categories, ["fruit", "fruit", "vegetable"])
 
-# Test pluck with missing field
-@data missing = @pluck(@items, "nonexistent")
-@data test_pluck_missing = @deepEq(@missing, [undefined, undefined, undefined])
+>> Test pluck with missing field
+/var @missing = @pluck(@items, "nonexistent")
+/var @test_pluck_missing = @deepEq(@missing, [undefined, undefined, undefined])
 
 ## Test includes (array version)
-@data hasApple = @arrIncludes(@pluck(@items, "name"), "apple")
-@data test_includes_found = @ok(@hasApple)
+/var @hasApple = @includes(@pluck(@items, "name"), "apple")
+/var @test_includes_found = @ok(@hasApple)
 
-@data hasOrange = @arrIncludes(@pluck(@items, "name"), "orange")
-@data test_includes_not_found = @notOk(@hasOrange)
+/var @hasOrange = @includes(@pluck(@items, "name"), "orange")
+/var @test_includes_not_found = @notOk(@hasOrange)
 
 ## Test unique
-@data duplicates = ["a", "b", "a", "c", "b", "d"]
-@data uniqueItems = @unique(@duplicates)
-@data test_unique_removes_duplicates = @deepEq(@uniqueItems, ["a", "b", "c", "d"])
+/var @duplicates = ["a", "b", "a", "c", "b", "d"}
+/var @uniqueItems = @unique(@duplicates)
+/var @test_unique_removes_duplicates = @deepEq(@uniqueItems, ["a", "b", "c", "d"])
 
-# Test unique with numbers
-@data numberDupes = [1, 2, 3, 2, 4, 3, 5]
-@data uniqueNumbers = @unique(@numberDupes)
-@data test_unique_numbers = @deepEq(@uniqueNumbers, [1, 2, 3, 4, 5])
+>> Test unique with numbers
+/var @numberDupes = [1, 2, 3, 2, 4, 3, 5}
+/var @uniqueNumbers = @unique(@numberDupes)
+/var @test_unique_numbers = @deepEq(@uniqueNumbers, [1, 2, 3, 4, 5])
 
 ## Test flatten
-@data nested = [[1, 2], [3, 4], [5]]
-@data flat = @flatten(@nested)
-@data test_flatten_simple = @deepEq(@flat, [1, 2, 3, 4, 5])
+/var @nested = [[1, 2], [3, 4], [5]
+/var @flat = @flatten(@nested)
+/var @test_flatten_simple = @deepEq(@flat, [1, 2, 3, 4, 5])
 
-# Test flatten with mixed nesting
-@data mixedNested = [1, [2, 3], [[4]], 5]
-@data mixedFlat = @flatten(@mixedNested)
-@data test_flatten_mixed = @deepEq(@mixedFlat, [1, 2, 3, [4], 5])
+>> Test flatten with mixed nesting
+/var @mixedNested = [1, [2, 3], [[4]], 5}
+/var @mixedFlat = @flatten(@mixedNested)
+/var @test_flatten_mixed = @deepEq(@mixedFlat, [1, 2, 3, [4], 5])
 
 ## Test groupBy
-@data grouped = @groupBy(@items, "category")
-@data test_groupBy_has_fruit = @ok(@grouped.fruit)
-@data test_groupBy_has_vegetable = @ok(@grouped.vegetable)
-@data test_groupBy_fruit_count = @eq(@len(@grouped.fruit), 2)
-@data test_groupBy_vegetable_count = @eq(@len(@grouped.vegetable), 1)
+/var @grouped = @groupBy(@items, "category")
+/var @test_groupBy_has_fruit = @ok(@grouped.fruit)
+/var @test_groupBy_has_vegetable = @ok(@grouped.vegetable)
+/var @test_groupBy_fruit_count = @eq(@len(@grouped.fruit), 2)
+/var @test_groupBy_vegetable_count = @eq(@len(@grouped.vegetable), 1)

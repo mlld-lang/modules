@@ -1,0 +1,56 @@
+---
+description: Test pipeline operator with module functions
+---
+
+# Pipeline Operator Tests
+
+Testing the v2 pipeline operator `|` with module functions.
+
+## String Pipeline
+
+/import { trim, upper, replace } from @local/string
+
+/var @messy = "  hello world  "
+/var @cleaned = @trim(@messy) | @upper
+/show `Original: '@messy'`
+/show `Cleaned: @cleaned`
+
+>> Test chaining multiple operations
+/var @email = "  John.Doe@EXAMPLE.COM  "
+/var @normalized = @trim(@email) | @lower
+/show `Normalized email: @normalized`
+
+## Array Pipeline with Log
+
+/import { filter, pluck, sum } from @local/array
+/import { log, logVerbose } from @local/log
+
+/var @products = [
+  { "name": "laptop", "price": 1200, "inStock": true },
+  { "name": "mouse", "price": 25, "inStock": false },
+  { "name": "keyboard", "price": 75, "inStock": true }
+]
+
+/show `\nProcessing products with pipeline logging:`
+/var @inStockPrices = @filter(@products, "inStock", true) | @log | @pluck(@INPUT, "price")
+/show `In-stock prices: @inStockPrices`
+
+/var @total = @sum(@inStockPrices)
+/show `Total value of in-stock items: $@total`
+
+## Command Pipeline with Built-in Transformers
+
+/show `\nTesting command pipeline with transformers:`
+/var @jsonData = run {echo '{"users": ["alice", "bob", "charlie"]}'} | @JSON
+/show `Parsed JSON: @jsonData`
+
+## Mixed Pipeline
+
+/import { upper } from @local/string
+/import { map } from @local/array
+
+/var @names = ["alice", "bob", "charlie"]
+/var @shouting = @map(@names, @upper)
+/show `\nSHOUTING NAMES: @shouting`
+
+/show `\n✅ Pipeline tests complete!`

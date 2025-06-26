@@ -1,88 +1,21 @@
-# Tests for @mlld/fs module
+>> Tests for @mlld/fs module
 
-@import { eq, ok, notOk, includes } from @local/test
-@import { readFile, writeFile, exists, mkdir, rm, ls, stat, isFile, isDirectory, copyFile, moveFile, chmod, readdir, glob } from @local/fs
+/import { * } from "../modules/test.mld.md"
+/import { * } from "../modules/fs.mld.md"
 
-# Create a test directory
-@data testDir = "/tmp/mlld-fs-test"
-@run @mkdir(@testDir)
+## Test fileExists
+>> Test with files that should exist on most systems
+/var @test_file_exists_etc_hosts = @ok(@fileExists("/etc/hosts"))
+/var @test_file_exists_not_found = @notOk(@fileExists("/tmp/definitely-does-not-exist-12345.txt"))
 
-## Test writeFile and readFile
-@data testFile = "/tmp/mlld-fs-test/test.txt"
-@data testContent = "Hello, mlld!"
-@run @writeFile(@testFile, @testContent)
-@data readContent = @readFile(@testFile)
-@data test_write_read_file = @eq(@readContent, @testContent)
+## Test dirExists  
+>> Test with directories that should exist on most systems
+/var @test_dir_exists_tmp = @ok(@dirExists("/tmp"))
+/var @test_dir_exists_root = @ok(@dirExists("/"))
+/var @test_dir_exists_not_found = @notOk(@dirExists("/tmp/definitely-does-not-exist-12345"))
 
-## Test exists
-@data test_exists_file = @ok(@exists(@testFile))
-@data test_exists_dir = @ok(@exists(@testDir))
-@data test_exists_not_found = @notOk(@exists("/tmp/mlld-fs-test/nonexistent.txt"))
-
-## Test stat
-@data fileStat = @stat(@testFile)
-@data test_stat_has_size = @ok(@fileStat.size > 0)
-@data test_stat_has_mode = @ok(@fileStat.mode)
-@data test_stat_has_mtime = @ok(@fileStat.mtime)
-
-## Test isFile and isDirectory
-@data test_isFile_true = @ok(@isFile(@testFile))
-@data test_isFile_false = @notOk(@isFile(@testDir))
-@data test_isDirectory_true = @ok(@isDirectory(@testDir))
-@data test_isDirectory_false = @notOk(@isDirectory(@testFile))
-
-## Test mkdir with subdirectory
-@data subDir = "/tmp/mlld-fs-test/subdir"
-@run @mkdir(@subDir)
-@data test_mkdir_created = @ok(@exists(@subDir))
-@data test_mkdir_is_dir = @ok(@isDirectory(@subDir))
-
-## Test copyFile
-@data copyDest = "/tmp/mlld-fs-test/copy.txt"
-@run @copyFile(@testFile, @copyDest)
-@data test_copy_exists = @ok(@exists(@copyDest))
-@data copiedContent = @readFile(@copyDest)
-@data test_copy_content = @eq(@copiedContent, @testContent)
-
-## Test moveFile
-@data moveDest = "/tmp/mlld-fs-test/moved.txt"
-@run @moveFile(@copyDest, @moveDest)
-@data test_move_exists = @ok(@exists(@moveDest))
-@data test_move_source_gone = @notOk(@exists(@copyDest))
-@data movedContent = @readFile(@moveDest)
-@data test_move_content = @eq(@movedContent, @testContent)
-
-## Test readdir
-@data dirContents = @readdir(@testDir)
-@data test_readdir_has_files = @ok(@dirContents.length >= 3)
-@data test_readdir_has_test_file = @includes(@dirContents, "test.txt")
-@data test_readdir_has_subdir = @includes(@dirContents, "subdir")
-@data test_readdir_has_moved = @includes(@dirContents, "moved.txt")
-
-## Test glob
-# Create a few more files for glob testing
-@run @writeFile("/tmp/mlld-fs-test/file1.txt", "content1")
-@run @writeFile("/tmp/mlld-fs-test/file2.txt", "content2")
-@run @writeFile("/tmp/mlld-fs-test/data.json", "{}")
-
-@data txtFiles = @glob("/tmp/mlld-fs-test/*.txt")
-@data test_glob_txt_count = @ok(@txtFiles.length >= 4)
-@data test_glob_has_test = @ok(@txtFiles.some(f => f.endsWith("test.txt")))
-@data test_glob_has_file1 = @ok(@txtFiles.some(f => f.endsWith("file1.txt")))
-
-@data allFiles = @glob("/tmp/mlld-fs-test/*")
-@data test_glob_all_count = @ok(@allFiles.length >= 5)
-
-## Test chmod (basic test - just verify it doesn't error)
-@run @chmod(@testFile, "644")
-@data statAfterChmod = @stat(@testFile)
-@data test_chmod_executed = @ok(@statAfterChmod.mode)
-
-## Test rm
-# Remove individual files
-@run @rm(@testFile)
-@data test_rm_file_gone = @notOk(@exists(@testFile))
-
-# Remove directory with contents
-@run @rm(@testDir, { recursive: true })
-@data test_rm_dir_gone = @notOk(@exists(@testDir))
+## Test pathExists
+>>  Should work for both files and directories
+/var @test_path_exists_tmp = @ok(@pathExists("/tmp"))
+/var @test_path_exists_etc = @ok(@pathExists("/etc"))
+/var @test_path_exists_not_found = @notOk(@pathExists("/definitely/does/not/exist"))

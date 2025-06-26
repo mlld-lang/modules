@@ -1,0 +1,53 @@
+---
+description: List all available test scripts
+---
+
+# Available mlld v2 Test Scripts
+
+Run these tests from the modules directory using:
+```bash
+cd /Users/adam/dev/mlld/modules
+mlld-v2 run <script-name>
+```
+
+## Test Scripts
+
+1. **01-basic-imports** - Test basic module imports and functions
+   - Tests: string, array, test, fs modules
+   - Verifies: Basic imports work with @local/ prefix
+
+2. **02-pipeline-tests** - Test pipeline operator functionality
+   - Tests: Pipeline operator `|` with module functions
+   - Verifies: Data flows correctly through pipelines
+
+3. **03-real-world-patterns** - Common real-world usage patterns
+   - Tests: Data validation, config processing, API mocking
+   - Verifies: Modules work for typical use cases
+
+4. **04-edge-cases** - Edge case and error handling
+   - Tests: Empty inputs, unicode, type coercion
+   - Verifies: Modules handle edge cases gracefully
+
+## Running All Tests
+
+To run all tests in sequence:
+```bash
+cd /Users/adam/dev/mlld/modules
+mlld-v2 run 01-basic-imports
+mlld-v2 run 02-pipeline-tests
+mlld-v2 run 03-real-world-patterns
+mlld-v2 run 04-edge-cases
+```
+
+## Module Test Files
+
+You can also run the module-specific test files directly:
+```bash
+cd /Users/adam/dev/mlld/modules/llm/tests
+mlld-v2 string.test.mld
+mlld-v2 array.test.mld
+mlld-v2 conditions.test.mld
+# etc.
+```
+
+/show `\n✅ Test listing complete!`

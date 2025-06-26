@@ -1,4 +1,4 @@
-@import [../new/grab.mld.md]
+@import { grabFiles } from ../modules/fm-dir.mld.md
 
 @data coreFiles = @grabFiles("..", "core/**/*.mld.md")
 @data newFiles = @grabFiles("..", "new/**/*.mld.md")

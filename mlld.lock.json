@@ -1,9 +1,11 @@
 {
   "version": "1.0.0",
   "imports": {},
+  "modules": {},
+  "cache": {},
   "config": {
     "resolvers": {
-      "registries": [
+      "prefixes": [
         {
           "prefix": "@local/",
           "resolver": "LOCAL",
@@ -14,7 +16,8 @@
           }
         }
       ]
-    }
+    },
+    "scriptDir": "llm/run"
   },
   "security": {
     "trustedDomains": [

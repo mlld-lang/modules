@@ -194,7 +194,7 @@ Bundle implementation using shell utilities:
   else
     echo "Error: Directory not found: $path"
   fi
-)]
+}
 
 @exec md(path) = @run sh [(
   # Generate Markdown representation of directory structure
@@ -261,7 +261,7 @@ Bundle implementation using shell utilities:
   else
     echo "Error: Directory not found: $path"
   fi
-)]
+}
 
 @exec tree(path) = @run sh [(
   # Show directory tree structure
@@ -310,7 +310,7 @@ Bundle implementation using shell utilities:
       echo "Error: Path not found: $path"
     fi
   fi
-)]
+}
 
 @data module = {
   xml: @xml,

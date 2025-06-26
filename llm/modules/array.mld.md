@@ -20,21 +20,21 @@ Array operations for data processing, filtering, and transformation with native 
 Process data arrays with powerful operations:
 
 ```mlld
-@import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
+/import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
 
-@data users = [
+/var @users = [
   {"name": "alice", "age": 30, "dept": "engineering"},
   {"name": "bob", "age": 25, "dept": "design"},
   {"name": "charlie", "age": 35, "dept": "engineering"}
 ]
 
-@data engineers = @filter(@users, "dept", "engineering")
-@data sortedByAge = @sortBy(@users, "age")
-@data names = @pluck(@users, "name")
-@data totalAge = @sum(@users, "age")
+/var @engineers = @filter(@users, "dept", "engineering")
+/var @sortedByAge = @sortBy(@users, "age")
+/var @names = @pluck(@users, "name")
+/var @totalAge = @sum(@users, "age")
 
-@add [[Engineers: {{engineers}}]]
-@add [[Total age: {{totalAge}}]]
+/show [[Engineers: {{engineers}}]]
+/show [[Total age: {{totalAge}}]]
 ```
 
 ## docs
@@ -46,10 +46,10 @@ Process data arrays with powerful operations:
 Essential array access and information.
 
 ```mlld
-@data items = ["apple", "banana", "cherry"]
-@add [[Count: {{@length(@items)}}]]
-@add [[First: {{@first(@items)}}]]
-@add [[Last: {{@last(@items)}}]]
+/var @items = ["apple", "banana", "cherry"]
+/show [[Count: {{@length(@items)}}]]
+/show [[First: {{@first(@items)}}]]
+/show [[Last: {{@last(@items)}}]]
 ```
 
 ### Transformation
@@ -59,12 +59,12 @@ Essential array access and information.
 Array reordering and deduplication.
 
 ```mlld
-@data numbers = [3, 1, 4, 1, 5]
-@data sorted = @sort(@numbers)
-@data deduplicated = @unique(@numbers)
+/var @numbers = [3, 1, 4, 1, 5]
+/var @sorted = @sort(@numbers)
+/var @deduplicated = @unique(@numbers)
 
-@data people = [{"name": "bob", "age": 25}, {"name": "alice", "age": 30}]
-@data byAge = @sortBy(@people, "age")
+/var @people = [{"name": "bob", "age": 25}, {"name": "alice", "age": 30}]
+/var @byAge = @sortBy(@people, "age")
 ```
 
 ### Filtering
@@ -74,14 +74,14 @@ Array reordering and deduplication.
 Extract subsets based on conditions.
 
 ```mlld
-@data products = [
+/var @products = [
   {"name": "laptop", "price": 1000},
   {"name": "mouse", "price": 25},
   {"name": "keyboard", "price": 75}
 ]
 
-@data expensive = @filterGreater(@products, "price", 50)
-@data peripherals = @filter(@products, "category", "accessory")
+/var @expensive = @filterGreater(@products, "price", 50)
+/var @peripherals = @filter(@products, "category", "accessory")
 ```
 
 ### Data Extraction
@@ -91,9 +91,9 @@ Extract subsets based on conditions.
 Extract specific values from objects.
 
 ```mlld
-@data users = [{"id": 1, "name": "alice"}, {"id": 2, "name": "bob"}]
-@data names = @pluck(@users, "name")
-@data alice = @find(@users, "name", "alice")
+/var @users = [{"id": 1, "name": "alice"}, {"id": 2, "name": "bob"}]
+/var @names = @pluck(@users, "name")
+/var @alice = @find(@users, "name", "alice")
 ```
 
 ### Aggregation
@@ -103,15 +103,15 @@ Extract specific values from objects.
 Calculate statistics and group data.
 
 ```mlld
-@data sales = [
+/var @sales = [
   {"region": "north", "amount": 100},
   {"region": "south", "amount": 150},
   {"region": "north", "amount": 200}
 ]
 
-@data total = @sum(@sales, "amount")
-@data average = @avg(@sales, "amount")
-@data byRegion = @groupBy(@sales, "region")
+/var @total = @sum(@sales, "amount")
+/var @average = @avg(@sales, "amount")
+/var @byRegion = @groupBy(@sales, "region")
 ```
 
 ### Array Building
@@ -121,9 +121,9 @@ Calculate statistics and group data.
 Create and modify arrays.
 
 ```mlld
-@data numbers = @range(1, 10, 2)
-@data extended = @push(@numbers, 11)
-@data shortened = @remove(@extended, 0)
+/var @numbers = @range(1, 10, 2)
+/var @extended = @push(@numbers, 11)
+/var @shortened = @remove(@extended, 0)
 ```
 
 ## module
@@ -131,88 +131,91 @@ Create and modify arrays.
 All array operations return native JavaScript values and handle edge cases safely. Boolean operations return actual booleans, numeric operations return numbers, and array operations return arrays or objects:
 
 ```mlld-run
-@exec length(array) = @run js [(return Array.isArray(array) ? array.length : 0)]
-@exec first(array) = @run js [(return Array.isArray(array) && array.length > 0 ? array[0] : null)]
-@exec last(array) = @run js [(return Array.isArray(array) && array.length > 0 ? array[array.length - 1] : null)]
-@exec at(array, index) = @run js [(return Array.isArray(array) ? array[index] : null)]
-@exec slice(array, start, end) = @run js [(return Array.isArray(array) ? array.slice(start, end) : [])]
+/exe @length(array) = js {(return Array.isArray(@array) ? @array.length : 0)}
+/exe @first(array) = js {(return Array.isArray(@array) && @array.length > 0 ? @array[0] : null)}
+/exe @last(array) = js {(return Array.isArray(@array) && @array.length > 0 ? @array[@array.length - 1] : null)}
+/exe @at(array, index) = js {(return Array.isArray(@array) ? @array[@index] : null)}
+/exe @slice(array, start, end) = js {(return Array.isArray(@array) ? @array.slice(@start, @end) : [])}
 
-@exec reverse(array) = @run js [(return Array.isArray(array) ? array.slice().reverse() : [])]
-@exec sort(array) = @run js [(return Array.isArray(array) ? array.slice().sort() : [])]
-@exec sortBy(array, key) = @run js [(
-  return Array.isArray(array) 
-    ? array.slice().sort((a, b) => {
-        const aVal = a[key];
-        const bVal = b[key];
+/exe @reverse(array) = js {(return Array.isArray(@array) ? @array.slice().reverse() : [])}
+/exe @sort(array) = js {(return Array.isArray(@array) ? @array.slice().sort() : [])}
+/exe @sortBy(array, key) = js {(
+  return Array.isArray(@array) 
+    ? @array.slice().sort((a, b) => {
+        const aVal = a[@key];
+        const bVal = b[@key];
         if (aVal < bVal) return -1;
         if (aVal > bVal) return 1;
         return 0;
       })
     : []
-)]
-@exec unique(array) = @run js [(return Array.isArray(array) ? [...new Set(array)] : [])]
+)}
+/exe @unique(array) = js {(return Array.isArray(@array) ? [...new Set(@array)] : [])}
 
-@exec filter(array, key, value) = @run js [(
-  return Array.isArray(array) 
-    ? array.filter(item => item[key] == value)
+/exe @filter(array, key, value) = js {(
+  return Array.isArray(@array) 
+    ? @array.filter(item => item[@key] == @value)
     : []
-)]
-@exec filterGreater(array, key, value) = @run js [(
-  return Array.isArray(array) 
-    ? array.filter(item => Number(item[key]) > Number(value))
+)}
+/exe @filterGreater(array, key, value) = js {(
+  return Array.isArray(@array) 
+    ? @array.filter(item => Number(item[@key]) > Number(@value))
     : []
-)]
+)}
 
-@exec pluck(array, key) = @run js [(
-  return Array.isArray(array) 
-    ? array.map(item => item[key])
+/exe @pluck(array, key) = js {(
+  return Array.isArray(@array) 
+    ? @array.map(item => item[@key])
     : []
-)]
+)}
 
-@exec find(array, key, value) = @run js [(
-  return Array.isArray(array) 
-    ? array.find(item => item[key] == value) || null
+/exe @find(array, key, value) = js {(
+  return Array.isArray(@array) 
+    ? @array.find(item => item[@key] == @value) || null
     : null
-)]
-@exec includes(array, value) = @run js [(
-  return Array.isArray(array) && array.includes(value)
-)]
+)}
+/exe @includes(array, value) = js {(
+  return Array.isArray(@array) && @array.includes(@value)
+)}
 
-@exec sum(array, key) = @run js [(
-  return Array.isArray(array) 
-    ? array.reduce((sum, item) => sum + Number(key ? item[key] : item), 0)
+/exe @sum(array, key) = js {(
+  return Array.isArray(@array) 
+    ? @array.reduce((sum, item) => sum + Number(@key ? item[@key] : item), 0)
     : 0
-)]
-@exec avg(array, key) = @run js [(
-  return Array.isArray(array) && array.length > 0
-    ? array.reduce((sum, item) => sum + Number(key ? item[key] : item), 0) / array.length
+)}
+/exe @avg(array, key) = js {(
+  return Array.isArray(@array) && @array.length > 0
+    ? @array.reduce((sum, item) => sum + Number(@key ? item[@key] : item), 0) / @array.length
     : 0
-)]
+)}
 
-@exec groupBy(array, key) = @run js [(
-  return Array.isArray(array) 
-    ? array.reduce((groups, item) => {
-        const group = String(item[key]);
+/exe @groupBy(array, key) = js {(
+  return Array.isArray(@array) 
+    ? @array.reduce((groups, item) => {
+        const group = String(item[@key]);
         if (!groups[group]) groups[group] = [];
         groups[group].push(item);
         return groups;
       }, {})
     : {}
-)]
+)}
 
-@exec push(array, value) = @run js [(
-  return [...(Array.isArray(array) ? array : []), value]
-)]
-@exec remove(array, index) = @run js [(
-  return Array.isArray(array) 
-    ? array.filter((_, i) => i !== Number(index))
+/exe @push(array, value) = js {(
+  return [...(Array.isArray(@array) ? @array : []), @value]
+)}
+/exe @remove(array, index) = js {(
+  return Array.isArray(@array) 
+    ? @array.filter((_, i) => i !== Number(@index))
     : []
-)]
+)}
 
-@exec range(start, end, step) = @run js [(
+/exe @range(start, end, step) = js {(
   return Array.from(
-    { length: Math.ceil((end - start) / (step || 1)) },
-    (_, i) => start + i * (step || 1)
+    { length: Math.ceil((@end - @start) / (@step || 1)) },
+    (_, i) => @start + i * (@step || 1)
   )
-)]
+)}
+
+>> Shadow environment to make functions available to each other
+/exe js = { length, first, last, at, slice, reverse, sort, sortBy, unique, filter, filterGreater, pluck, find, includes, sum, avg, groupBy, push, remove, range }
 ```

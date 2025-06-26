@@ -20,14 +20,14 @@ HTTP methods using the fetch API for making REST calls. All methods now return n
 Quick HTTP requests with automatic JSON handling:
 
 ```mlld
-@import { get, post, auth, fetch } from @mlld/http
+/import { http } from @mlld/http
 
-@run @get("https://api.github.com/users/octocat")
-@run @post("https://httpbin.org/post", {"message": "hello"})
-@run @auth.get("https://api.github.com/user", @token)
+/run @http.get("https://api.github.com/users/octocat")
+/run @http.post("https://httpbin.org/post", {"message": "hello"})
+/run @http.auth.get("https://api.github.com/user", @token)
 
-@data userData = @fetch.get("https://api.github.com/users/octocat")
-@add [[User: {{userData.name}}]]
+/var @userData = @http.fetch.get("https://api.github.com/users/octocat")
+/show [[User: {{userData.name}}]]
 ```
 
 ## docs
@@ -39,9 +39,9 @@ Quick HTTP requests with automatic JSON handling:
 Standard HTTP methods that print formatted responses to console.
 
 ```mlld
-@run @get("https://api.github.com/users/octocat")
-@run @post("https://httpbin.org/post", {"key": "value"})
-@run @delete("https://httpbin.org/delete")
+/run @http.get("https://api.github.com/users/octocat")
+/run @http.post("https://httpbin.org/post", {"key": "value"})
+/run @http.delete("https://httpbin.org/delete")
 ```
 
 ### Authenticated Requests
@@ -51,8 +51,8 @@ Standard HTTP methods that print formatted responses to console.
 HTTP methods with Bearer token authentication.
 
 ```mlld
-@run @auth.get("https://api.github.com/user", @githubToken)
-@run @auth.post("https://api.github.com/user/repos", @token, {"name": "new-repo"})
+/run @http.auth.get("https://api.github.com/user", @githubToken)
+/run @http.auth.post("https://api.github.com/user/repos", @token, {"name": "new-repo"})
 ```
 
 ### Advanced Requests
@@ -62,12 +62,12 @@ HTTP methods with Bearer token authentication.
 Full control over fetch options.
 
 ```mlld
-@data customOptions = {
+/var @customOptions = {
   "method": "POST",
   "headers": {"Custom-Header": "value"},
   "body": "raw data"
 }
-@run @request("https://httpbin.org/post", @customOptions)
+/run @request("https://httpbin.org/post", @customOptions)
 ```
 
 ### Fetch Methods (Data-Returning)
@@ -77,11 +77,11 @@ Full control over fetch options.
 Return response data as native JavaScript objects for easy processing.
 
 ```mlld
-@data userData = @fetch.get("https://api.github.com/users/octocat")
-@data response = @fetch.post("https://httpbin.org/post", {"test": true})
+/var @userData = @fetch.get("https://api.github.com/users/octocat")
+/var @response = @fetch.post("https://httpbin.org/post", {"test": true})
 
-@add [[User: {{userData.name}} has {{userData.public_repos}} repos]]
-@add [[Posted data echo: {{response.json.test}}]]
+/show [[User: {{userData.name}} has {{userData.public_repos}} repos]]
+/show [[Posted data echo: {{response.json.test}}]]
 ```
 
 ### Display Methods
@@ -91,8 +91,8 @@ Return response data as native JavaScript objects for easy processing.
 Format and display HTTP responses with pretty printing.
 
 ```mlld
-@run @display.get("https://api.github.com/users/octocat")
-@run @display.post("https://httpbin.org/post", {"message": "hello"})
+/run @display.get("https://api.github.com/users/octocat")
+/run @display.post("https://httpbin.org/post", {"message": "hello"})
 ```
 
 ## module
@@ -100,8 +100,8 @@ Format and display HTTP responses with pretty printing.
 All HTTP methods use fetch with automatic JSON parsing and native return values. Display methods format output for readability:
 
 ```mlld-run
-@exec get(url) = @run js [(
-  fetch(url)
+/exe @get(url) = js {(
+  fetch(@url)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -116,13 +116,13 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP GET failed: ${error.message}`);
     })
-)]
+)}
 
-@exec post(url, data) = @run js [(
-  fetch(url, {
+/exe @post(url, data) = js {(
+  fetch(@url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -138,13 +138,13 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP POST failed: ${error.message}`);
     })
-)]
+)}
 
-@exec put(url, data) = @run js [(
-  fetch(url, {
+/exe @put(url, data) = js {(
+  fetch(@url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -160,10 +160,10 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP PUT failed: ${error.message}`);
     })
-)]
+)}
 
-@exec delete(url) = @run js [(
-  fetch(url, { method: 'DELETE' })
+/exe @delete(url) = js {(
+  fetch(@url, { method: 'DELETE' })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -178,13 +178,13 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP DELETE failed: ${error.message}`);
     })
-)]
+)}
 
-@exec patch(url, data) = @run js [(
-  fetch(url, {
+/exe @patch(url, data) = js {(
+  fetch(@url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -200,11 +200,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP PATCH failed: ${error.message}`);
     })
-)]
+)}
 
-@exec authGet(url, token) = @run js [(
-  fetch(url, {
-    headers: { 'Authorization': `Bearer ${token}` }
+/exe @authGet(url, token) = js {(
+  fetch(@url, {
+    headers: { 'Authorization': `Bearer ${@token}` }
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -220,16 +220,16 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP GET (auth) failed: ${error.message}`);
     })
-)]
+)}
 
-@exec authPost(url, token, data) = @run js [(
-  fetch(url, {
+/exe @authPost(url, token, data) = js {(
+  fetch(@url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${@token}`,
       'Content-Type': 'application/json'
     },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -245,10 +245,10 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP POST (auth) failed: ${error.message}`);
     })
-)]
+)}
 
-@exec request(url, options) = @run js [(
-  fetch(url, options)
+/exe @request(url, options) = js {(
+  fetch(@url, @options)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -263,58 +263,58 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => {
       throw new Error(`HTTP request failed: ${error.message}`);
     })
-)]
+)}
 
-@exec getData(url) = @run js [(
-  fetch(url)
+/exe @getData(url) = js {(
+  fetch(@url)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.json();
     })
     .catch(error => { throw error; })
-)]
+)}
 
-@exec postData(url, data) = @run js [(
-  fetch(url, {
+/exe @postData(url, data) = js {(
+  fetch(@url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.json();
     })
     .catch(error => { throw error; })
-)]
+)}
 
-@exec putData(url, data) = @run js [(
-  fetch(url, {
+/exe @putData(url, data) = js {(
+  fetch(@url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.json();
     })
     .catch(error => { throw error; })
-)]
+)}
 
-@exec patchData(url, data) = @run js [(
-  fetch(url, {
+/exe @patchData(url, data) = js {(
+  fetch(@url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.json();
     })
     .catch(error => { throw error; })
-)]
+)}
 
-@exec deleteData(url) = @run js [(
-  fetch(url, {
+/exe @deleteData(url) = js {(
+  fetch(@url, {
     method: 'DELETE'
   })
     .then(response => {
@@ -322,14 +322,14 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
       return response.json();
     })
     .catch(error => { throw error; })
-)]
+)}
 ```
 
 Display methods for formatted output:
 
 ```mlld-run
-@exec displayGet(url) = @run js [(
-  fetch(url)
+/exe @displayGet(url) = js {(
+  fetch(@url)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -348,13 +348,13 @@ Display methods for formatted output:
       console.error(`Error: ${error.message}`);
       throw error;
     })
-)]
+)}
 
-@exec displayPost(url, data) = @run js [(
-  fetch(url, {
+/exe @displayPost(url, data) = js {(
+  fetch(@url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof data === 'string' ? data : JSON.stringify(data)
+    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -374,13 +374,16 @@ Display methods for formatted output:
       console.error(`Error: ${error.message}`);
       throw error;
     })
-)]
+)}
+
+>> Shadow environment to make functions available to each other
+/exe js = { get, post, put, patch, delete: deleteData, authGet, authPost, request, getData, postData, putData, patchData, deleteData, displayGet, displayPost }
 ```
 
 This module uses a structured export to provide both individual methods and organized interfaces:
 
 ```mlld-run
-@data module = {
+/var @http = {
   get: @get,
   post: @post,
   put: @put,

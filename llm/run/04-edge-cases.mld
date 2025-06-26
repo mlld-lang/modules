@@ -1,0 +1,97 @@
+---
+description: Edge case testing for mlld v2 modules
+---
+
+# Edge Case Testing
+
+Testing how modules handle edge cases and unusual inputs.
+
+## String Edge Cases
+
+/import { trim, upper, lower, capitalize, split, replace } from @local/string
+
+/show `## String Edge Cases\n`
+
+>> Empty string
+/var @empty = ""
+/show `Empty string upper: '@upper(@empty)'`
+/show `Empty string trim: '@trim(@empty)'`
+
+>> Unicode and special characters
+/var @unicode = "Hello 世界 🌍"
+/show `Unicode upper: @upper(@unicode)`
+
+>> Multiple spaces
+/var @spaces = "  multiple   spaces   here  "
+/var @cleaned = @trim(@spaces)
+/var @normalized = @replace(@cleaned, "  ", " ")
+/show `Normalized spaces: '@normalized'`
+
+>> Null-ish values (if supported)
+/var @nullString = "null"
+/show `String 'null' capitalized: @capitalize(@nullString)`
+
+## Array Edge Cases
+
+/import { first, last, sum, avg, filter, chunk } from @local/array
+
+/show `\n## Array Edge Cases\n`
+
+>> Empty array
+/var @emptyArr = []
+/show `Empty array first: @first(@emptyArr)`
+/show `Empty array sum: @sum(@emptyArr)`
+/show `Empty array avg: @avg(@emptyArr)`
+
+>> Single element
+/var @single = [42]
+/show `Single element array first: @first(@single)`
+/show `Single element array last: @last(@single)`
+/show `Single element array avg: @avg(@single)`
+
+>> Mixed types (numbers as strings)
+/var @mixed = ["1", "2", "3"]
+/show `String numbers sum: @sum(@mixed)`
+
+>> Chunking edge cases
+/var @toChunk = [1, 2, 3, 4, 5]
+/show `Chunk by 2: @chunk(@toChunk, 2)`
+/show `Chunk by 10 (larger than array): @chunk(@toChunk, 10)`
+
+## Conditional Edge Cases
+
+/import { equals, isEmpty, contains } from @local/test
+/import { either, when } from @local/conditions
+
+/show `\n## Conditional Edge Cases\n`
+
+>> Falsy values
+/var @zero = 0
+/var @false = false
+/var @emptyStr = ""
+
+/when @equals(@zero, 0) => show `✓ Zero equals check works`
+/when !@isEmpty(@zero) => show `✓ Zero is not empty`
+/when @isEmpty(@emptyStr) => show `✓ Empty string is empty`
+
+>> Type coercion
+/var @stringFive = "5"
+/var @numberFive = 5
+/when !@equals(@stringFive, @numberFive) => show `✓ String "5" !== Number 5`
+
+## Pipeline Edge Cases
+
+/import { upper } from @local/string
+/import { log } from @local/log
+
+/show `\n## Pipeline Edge Cases\n`
+
+>> Empty string through pipeline
+/var @emptyPiped = @trim("") | @upper
+/show `Empty string piped: '@emptyPiped'`
+
+>> Null-ish through pipeline with logging
+/var @edgeCase = "  " | @trim | @log | @upper
+/show `Whitespace only result: '@edgeCase'`
+
+/show `\n✅ Edge case tests complete!`

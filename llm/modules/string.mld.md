@@ -20,17 +20,17 @@ String manipulation utilities for text processing, formatting, and validation. U
 Common string operations:
 
 ```mlld
-@import { title, camelCase, split, join, trim, includes } from @mlld/string
+/import { title, camelCase, split, join, trim, includes } from @mlld/string
 
-@text name = "john doe smith"
-@text formatted = @title(@name)
-@text slug = @camelCase(@formatted)
+/var @name = "john doe smith"
+/var @formatted = @title(@name)
+/var @slug = @camelCase(@formatted)
 
-@data words = @split(@name, " ")
-@text rejoined = @join(@words, "-")
+/var @words = @split(@name, " ")
+/var @rejoined = @join(@words, "-")
 
-@when @includes(@name, "doe") => @add [[Contains 'doe']]
-@add [[Formatted: {{formatted}}]]
+/when @includes(@name, "doe") => /show [[Contains 'doe']]
+/show [[Formatted: {{formatted}}]]
 ```
 
 ## docs
@@ -42,9 +42,9 @@ Common string operations:
 Essential string utilities for length and whitespace handling.
 
 ```mlld
-@data name = "  John Doe  "
-@add [[Length: {{@length(@name)}}]]
-@add [[Trimmed: '{{@trim(@name)}}']]
+/var @name = "  John Doe  "
+/show [[Length: {{@length(@name)}}]]
+/show [[Trimmed: '{{@trim(@name)}}']]
 ```
 
 ### Case Transformations
@@ -54,10 +54,10 @@ Essential string utilities for length and whitespace handling.
 Text case conversion for formatting.
 
 ```mlld
-@text message = "hello world"
-@add [[Upper: {{@upper(@message)}}]]
-@add [[Title: {{@title(@message)}}]]
-@add [[Capitalized: {{@capitalize(@message)}}]]
+/var @message = "hello world"
+/show [[Upper: {{@upper(@message)}}]]
+/show [[Title: {{@title(@message)}}]]
+/show [[Capitalized: {{@capitalize(@message)}}]]
 ```
 
 #### `camelCase(str)`, `snakeCase(str)`, `kebabCase(str)`
@@ -65,10 +65,10 @@ Text case conversion for formatting.
 Identifier formatting for different naming conventions.
 
 ```mlld
-@text phrase = "user full name"
-@add [[camelCase: {{@camelCase(@phrase)}}]]
-@add [[snake_case: {{@snakeCase(@phrase)}}]]
-@add [[kebab-case: {{@kebabCase(@phrase)}}]]
+/var @phrase = "user full name"
+/show [[camelCase: {{@camelCase(@phrase)}}]]
+/show [[snake_case: {{@snakeCase(@phrase)}}]]
+/show [[kebab-case: {{@kebabCase(@phrase)}}]]
 ```
 
 ### Splitting and Joining
@@ -78,9 +78,9 @@ Identifier formatting for different naming conventions.
 Break strings into arrays for processing.
 
 ```mlld
-@data names = @split("alice,bob,charlie", ",")
-@data lines = @splitLines(@fileContent)
-@data words = @splitWords("The quick brown fox")
+/var @names = @split("alice,bob,charlie", ",")
+/var @lines = @splitLines(@fileContent)
+/var @words = @splitWords("The quick brown fox")
 ```
 
 #### `join(array, separator)`, `joinLines(array)`
@@ -88,8 +88,8 @@ Break strings into arrays for processing.
 Combine arrays back into strings.
 
 ```mlld
-@text combined = @join(@names, " and ")
-@text document = @joinLines(@paragraphs)
+/var @combined = @join(@names, " and ")
+/var @document = @joinLines(@paragraphs)
 ```
 
 ### Search and Replace
@@ -99,8 +99,8 @@ Combine arrays back into strings.
 String matching for conditional logic.
 
 ```mlld
-@when @startsWith(@filename, "test_") => @add [[Test file detected]]
-@when @endsWith(@url, ".json") => @add [[JSON endpoint]]
+/when @startsWith(@filename, "test_") => /show [[Test file detected]]
+/when @endsWith(@url, ".json") => /show [[JSON endpoint]]
 ```
 
 #### `replace(str, search, replacement)`, `replaceAll(str, search, replacement)`
@@ -108,8 +108,8 @@ String matching for conditional logic.
 Text substitution and cleaning.
 
 ```mlld
-@text cleaned = @replaceAll(@input, " ", "-")
-@text updated = @replace(@template, "{{name}}", @userName)
+/var @cleaned = @replaceAll(@input, " ", "-")
+/var @updated = @replace(@template, "{{name}}", @userName)
 ```
 
 ### Validation
@@ -119,8 +119,8 @@ Text substitution and cleaning.
 Content validation for data processing.
 
 ```mlld
-@when @isEmpty(@userInput) => @add [[Input required]]
-@when @isNumeric(@value) => @add [[Valid number: {{@value}}]]
+/when @isEmpty(@userInput) => /show [[Input required]]
+/when @isNumeric(@value) => /show [[Valid number: {{@value}}]]
 ```
 
 ## module
@@ -128,78 +128,81 @@ Content validation for data processing.
 All string operations use JavaScript's native string methods with consistent behavior:
 
 ```mlld-run
-@exec length(str) = @run js [(String(str).length)]
-@exec trim(str) = @run js [(String(str).trim())]
-@exec trimStart(str) = @run js [(String(str).trimStart())]
-@exec trimEnd(str) = @run js [(String(str).trimEnd())]
+/exe @length(str) = js {(String(@str).length)}
+/exe @trim(str) = js {(String(@str).trim())}
+/exe @trimStart(str) = js {(String(@str).trimStart())}
+/exe @trimEnd(str) = js {(String(@str).trimEnd())}
 
-@exec upper(str) = @run js [(String(str).toUpperCase())]
-@exec lower(str) = @run js [(String(str).toLowerCase())]
-@exec capitalize(str) = @run js [(
-  const s = String(str);
+/exe @upper(str) = js {(String(@str).toUpperCase())}
+/exe @lower(str) = js {(String(@str).toLowerCase())}
+/exe @capitalize(str) = js {(
+  const s = String(@str);
   s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
-)]
-@exec title(str) = @run js [(
-  String(str).split(' ').map(word => 
+)}
+/exe @title(str) = js {(
+  String(@str).split(' ').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   ).join(' ')
-)]
-@exec camelCase(str) = @run js [(
-  String(str)
+)}
+/exe @camelCase(str) = js {(
+  String(@str)
     .replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase())
     .replace(/^[A-Z]/, chr => chr.toLowerCase())
-)]
-@exec snakeCase(str) = @run js [(
-  String(str)
+)}
+/exe @snakeCase(str) = js {(
+  String(@str)
     .replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
     .replace(/^_/, '')
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .toLowerCase()
-)]
-@exec kebabCase(str) = @run js [(
-  String(str)
+)}
+/exe @kebabCase(str) = js {(
+  String(@str)
     .replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
     .replace(/^-/, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .toLowerCase()
-)]
+)}
 
-@exec split(str, separator) = @run js [(JSON.stringify(String(str).split(separator || '')))]
-@exec splitLines(str) = @run js [(JSON.stringify(String(str).split(/\r?\n/)))]
-@exec splitWords(str) = @run js [(JSON.stringify(String(str).match(/\S+/g) || []))]
-@exec join(array, separator) = @run js [(Array.isArray(array) ? array.join(separator || '') : String(array))]
-@exec joinLines(array) = @run js [(Array.isArray(array) ? array.join('\n') : String(array))]
+/exe @split(str, separator) = js {(JSON.stringify(String(@str).split(@separator || '')))}
+/exe @splitLines(str) = js {(JSON.stringify(String(@str).split(/\r?\n/)))}
+/exe @splitWords(str) = js {(JSON.stringify(String(@str).match(/\S+/g) || []))}
+/exe @join(array, separator) = js {(Array.isArray(@array) ? @array.join(@separator || '') : String(@array))}
+/exe @joinLines(array) = js {(Array.isArray(@array) ? @array.join('\n') : String(@array))}
 
-@exec substring(str, start, end) = @run js [(String(str).substring(start, end))]
-@exec slice(str, start, end) = @run js [(String(str).slice(start, end))]
-@exec left(str, n) = @run js [(String(str).slice(0, n))]
-@exec right(str, n) = @run js [(String(str).slice(-n))]
+/exe @substring(str, start, end) = js {(String(@str).substring(@start, @end))}
+/exe @slice(str, start, end) = js {(String(@str).slice(@start, @end))}
+/exe @left(str, n) = js {(String(@str).slice(0, @n))}
+/exe @right(str, n) = js {(String(@str).slice(-@n))}
 
-@exec indexOf(str, search) = @run js [(String(str).indexOf(search))]
-@exec includes(str, search) = @run js [(String(str).includes(search) ? "true" : "")]
-@exec startsWith(str, search) = @run js [(String(str).startsWith(search) ? "true" : "")]
-@exec endsWith(str, search) = @run js [(String(str).endsWith(search) ? "true" : "")]
-@exec replace(str, search, replacement) = @run js [(String(str).replace(search, replacement))]
-@exec replaceAll(str, search, replacement) = @run js [(String(str).replaceAll(search, replacement))]
+/exe @indexOf(str, search) = js {(String(@str).indexOf(@search))}
+/exe @includes(str, search) = js {(String(@str).includes(@search) ? "true" : "")}
+/exe @startsWith(str, search) = js {(String(@str).startsWith(@search) ? "true" : "")}
+/exe @endsWith(str, search) = js {(String(@str).endsWith(@search) ? "true" : "")}
+/exe @replace(str, search, replacement) = js {(String(@str).replace(@search, @replacement))}
+/exe @replaceAll(str, search, replacement) = js {(String(@str).replaceAll(@search, @replacement))}
 
-@exec padStart(str, length, padChar) = @run js [(String(str).padStart(length, padChar || ' '))]
-@exec padEnd(str, length, padChar) = @run js [(String(str).padEnd(length, padChar || ' '))]
-@exec repeat(str, count) = @run js [(String(str).repeat(count))]
+/exe @padStart(str, length, padChar) = js {(String(@str).padStart(@length, @padChar || ' '))}
+/exe @padEnd(str, length, padChar) = js {(String(@str).padEnd(@length, @padChar || ' '))}
+/exe @repeat(str, count) = js {(String(@str).repeat(@count))}
 
-@exec reverse(str) = @run js [(String(str).split('').reverse().join(''))]
-@exec isEmpty(str) = @run js [(String(str).length === 0 ? "true" : "")]
-@exec isBlank(str) = @run js [(String(str).trim().length === 0 ? "true" : "")]
-@exec isNumeric(str) = @run js [(!isNaN(str) && !isNaN(parseFloat(str)) ? "true" : "")]
+/exe @reverse(str) = js {(String(@str).split('').reverse().join(''))}
+/exe @isEmpty(str) = js {(String(@str).length === 0 ? "true" : "")}
+/exe @isBlank(str) = js {(String(@str).trim().length === 0 ? "true" : "")}
+/exe @isNumeric(str) = js {(!isNaN(@str) && !isNaN(parseFloat(@str)) ? "true" : "")}
 
-@exec escape(str) = @run js [(
-  String(str)
+/exe @escape(str) = js {(
+  String(@str)
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/'/g, "\\'")
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t')
-)]
-@exec encodeUri(str) = @run js [(encodeURI(String(str)))]
-@exec encodeUriComponent(str) = @run js [(encodeURIComponent(String(str)))]
+)}
+/exe @encodeUri(str) = js {(encodeURI(String(@str)))}
+/exe @encodeUriComponent(str) = js {(encodeURIComponent(String(@str)))}
+
+>> Shadow environment to make functions available to each other
+/exe js = { length, trim, trimStart, trimEnd, upper, lower, capitalize, title, camelCase, snakeCase, kebabCase, split, splitLines, splitWords, join, joinLines, substring, slice, left, right, indexOf, includes, startsWith, endsWith, replace, replaceAll, padStart, padEnd, repeat, reverse, isEmpty, isBlank, isNumeric, escape, encodeUri, encodeUriComponent }
 ```

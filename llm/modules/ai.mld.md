@@ -97,8 +97,8 @@ Generate code with OpenAI Codex or similar.
 Convert diagrams or images to code.
 
 ```mlld
-@text implementation = @codex.media("Convert this flowchart to Python code", "algorithm.png")
-@add [[{{implementation}}]]
+/var @implementation = @codex.media("Convert this flowchart to Python code", "algorithm.png")
+/show [[{{implementation}}]]
 ```
 
 ## module
@@ -106,68 +106,62 @@ Convert diagrams or images to code.
 Wrappers for popular AI CLI tools:
 
 ```mlld-run
-@exec claude_ask(prompt) = @run sh [(
+/exe @claude_ask(prompt) = run {
   # Requires claude CLI tool installed
-  claude-code "$prompt" 2>/dev/null || echo "Error: claude CLI not found. Install from https://github.com/anthropics/claude-code"
-)]
+  claude-code "@prompt" 2>/dev/null || echo "Error: claude CLI not found. Install from https://github.com/anthropics/claude-code"
+}
 
-@exec llm_ask(system, prompt) = @run sh [(
+/exe @llm_ask(system, prompt) = run {
   # Requires llm CLI tool installed
-  llm -s "$system" "$prompt" 2>/dev/null || echo "Error: llm CLI not found. Install with: pip install llm"
-)]
+  llm -s "@system" "@prompt" 2>/dev/null || echo "Error: llm CLI not found. Install with: pip install llm"
+}
 
-@exec llm_media(system, prompt, media) = @run sh [(
+/exe @llm_media(system, prompt, media) = run {
   # LLM with media attachment
-  if [ -f "$media" ]; then
-    llm -s "$system" -a "$media" "$prompt" 2>/dev/null || echo "Error: llm CLI not found or media file missing"
+  if [ -f "@media" ]; then
+    llm -s "@system" -a "@media" "@prompt" 2>/dev/null || echo "Error: llm CLI not found or media file missing"
   else
-    echo "Error: Media file not found: $media"
+    echo "Error: Media file not found: @media"
   fi
-)]
+}
 
-@exec llm_tools(system, prompt, tools) = @run sh [(
+/exe @llm_tools(system, prompt, tools) = run {
   # LLM with tools enabled
-  llm -s "$system" --tools "$tools" "$prompt" 2>/dev/null || echo "Error: llm CLI not found or tools not available"
-)]
+  llm -s "@system" --tools "@tools" "@prompt" 2>/dev/null || echo "Error: llm CLI not found or tools not available"
+}
 
-@exec llm_all(system, prompt, parameters) = @run sh [(
+/exe @llm_all(system, prompt, parameters) = run {
   # LLM with custom parameters
-  llm -s "$system" $parameters "$prompt" 2>/dev/null || echo "Error: llm CLI not found"
-)]
+  llm -s "@system" @parameters "@prompt" 2>/dev/null || echo "Error: llm CLI not found"
+}
 
-@exec codex_ask(prompt) = @run sh [(
+/exe @codex_ask(prompt) = run {
   # Requires codex or compatible CLI
-  codex "$prompt" 2>/dev/null || llm -m gpt-4 "$prompt" 2>/dev/null || echo "Error: codex CLI not found. Using llm as fallback."
-)]
+  codex "@prompt" 2>/dev/null || llm -m gpt-4 "@prompt" 2>/dev/null || echo "Error: codex CLI not found. Using llm as fallback."
+}
 
-@exec codex_media(prompt, media) = @run sh [(
+/exe @codex_media(prompt, media) = run {
   # Codex with media input
-  if [ -f "$media" ]; then
-    codex -a "$media" "$prompt" 2>/dev/null || llm -m gpt-4-vision -a "$media" "$prompt" 2>/dev/null || echo "Error: codex CLI not found or media file missing"
+  if [ -f "@media" ]; then
+    codex -a "@media" "@prompt" 2>/dev/null || llm -m gpt-4-vision -a "@media" "@prompt" 2>/dev/null || echo "Error: codex CLI not found or media file missing"
   else
-    echo "Error: Media file not found: $media"
+    echo "Error: Media file not found: @media"
   fi
-)]
+}
 
-@data claude = {
+/var @claude = {
   ask: @claude_ask
 }
 
-@data llm = {
+/var @llm = {
   ask: @llm_ask,
   media: @llm_media,
   tools: @llm_tools,
   all: @llm_all
 }
 
-@data codex = {
+/var @codex = {
   ask: @codex_ask,
   media: @codex_media
-}
-
-@data module = {
-  claude: @claude,
-  llm: @llm,
-  codex: @codex
 }
 ```

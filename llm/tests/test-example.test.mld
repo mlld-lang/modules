@@ -1,19 +1,19 @@
-# Simple test to verify test system works
+>>  Simple test to verify test system works
 
-@import { eq, ok, notOk } from @local/test
+/import { * } from "../modules/test.mld.md"
 
-# Basic tests
-@data test_true_is_true = @ok(true)
-@data test_false_is_false = @notOk(false)
-@data test_numbers_equal = @eq(1 + 1, 2)
-@data test_strings_equal = @eq("hello", "hello")
+>>  Basic tests
+/var @test_true_is_true = @ok(true)
+/var @test_false_is_false = @notOk(false)
+/var @test_numbers_equal = @eq(1 + 1, 2)
+/var @test_strings_equal = @eq("hello", "hello")
 
-# Test with arrays
-@data arr = [1, 2, 3]
-@data test_array_length = @eq(@arr.length, 3)
-@data test_array_first = @eq(@arr.0, 1)
+>> Test with arrays
+/var @arr = [1, 2, 3}
+/var @test_array_length = @eq(@arr.length, 3)
+/var @test_array_first = @eq(@arr.0, 1)
 
-# Test with objects  
-@data obj = {"name": "test", "value": 42}
-@data test_object_name = @eq(@obj.name, "test")
-@data test_object_value = @eq(@obj.value, 42)
+>> Test with objects  
+/var @obj = {"name": "test", "value": 42}
+/var @test_object_name = @eq(@obj.name, "test")
+/var @test_object_value = @eq(@obj.value, 42)

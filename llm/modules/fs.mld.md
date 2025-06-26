@@ -20,11 +20,11 @@ File system operations for checking the existence of files, directories, and pat
 Provides basic file system checks that return truthy/falsy values for use with `@when` conditions:
 
 ```mlld
-@import { fileExists, dirExists, pathExists } from @mlld/fs
+/import { fileExists, dirExists, pathExists } from @mlld/fs
 
-@when @fileExists("config.json") => @add [[Config file found!]]
-@when @dirExists("src") => @add [[Source directory exists]]
-@when @pathExists("README.md") => @add [[README is available]]
+/when @fileExists("config.json") => /show [[Config file found!]]
+/when @dirExists("src") => /show [[Source directory exists]]
+/when @pathExists("README.md") => /show [[README is available]]
 ```
 
 ## docs
@@ -34,7 +34,7 @@ Provides basic file system checks that return truthy/falsy values for use with `
 Check if a regular file exists at the given path.
 
 ```mlld
-@when @fileExists("package.json") => @add [[NPM project detected]]
+/when @fileExists("package.json") => /show [[NPM project detected]]
 ```
 
 Returns `"true"` if the file exists, empty string otherwise.
@@ -44,7 +44,7 @@ Returns `"true"` if the file exists, empty string otherwise.
 Check if a directory exists at the given path.
 
 ```mlld
-@when @dirExists("node_modules") => @add [[Dependencies installed]]
+/when @dirExists("node_modules") => /show [[Dependencies installed]]
 ```
 
 Returns `"true"` if the directory exists, empty string otherwise.
@@ -54,7 +54,7 @@ Returns `"true"` if the directory exists, empty string otherwise.
 Check if any file system object (file, directory, symlink, etc.) exists at the given path.
 
 ```mlld
-@when @pathExists(".git") => @add [[Git repository]]
+/when @pathExists(".git") => /show [[Git repository]]
 ```
 
 Returns `"true"` if anything exists at the path, empty string otherwise.
@@ -64,8 +64,8 @@ Returns `"true"` if anything exists at the path, empty string otherwise.
 These functions use shell commands to check file system state and return "true" or empty string for use in conditionals:
 
 ```mlld-run
-@exec fileExists(path) = @run [(test -f "@path" && echo "true" || echo "")]
-@exec dirExists(path) = @run [(test -d "@path" && echo "true" || echo "")]
-@exec pathExists(path) = @run [(test -e "@path" && echo "true" || echo "")]
+/exe @fileExists(path) = run {test -f "@path" && echo "true" || echo ""}
+/exe @dirExists(path) = run {test -d "@path" && echo "true" || echo ""}
+/exe @pathExists(path) = run {test -e "@path" && echo "true" || echo ""}
 ```
 

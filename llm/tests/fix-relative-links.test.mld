@@ -1,83 +1,83 @@
-# Tests for @mlld/fix-relative-links module
+>> Tests for @mlld/fix-relative-links module
 
-@import { eq, ok, includes } from @local/test
-@import { fixRelativeLinks } from @local/fix-relative-links
+/import { * } from "../modules/test.mld.md"
+/import { * } from "../modules/fix-relative-links.mld.md"
 
 ## Test basic relative link fixing
-@text markdownWithLinks = [[
-# Test Document
+/var @markdownWithLinks = [[
+>> Test Document
 
 Here's a [relative link](./docs/guide.md) and an [image](../images/logo.png).
 
 Also check the [absolute link](/root/file.md) and [external link](https://example.com).
 
 ![Alt text](./assets/image.jpg)
-]]
+]
 
-@data fixed = @fixRelativeLinks(@markdownWithLinks, ".", "https://github.com/user/repo/blob/main")
-@data test_fixed_is_string = @ok(typeof @fixed === "string")
-@data test_fixed_has_github_link = @includes(@fixed, "https://github.com/user/repo/blob/main/docs/guide.md")
-@data test_fixed_has_image_link = @includes(@fixed, "https://github.com/user/repo/blob/main/assets/image.jpg")
-@data test_fixed_preserves_external = @includes(@fixed, "https://example.com")
+/var @fixed = @fixRelativeLinks(@markdownWithLinks, ".", "https://github.com/user/repo/blob/main")
+/var @test_fixed_is_string = @ok(typeof @fixed === "string")
+/var @test_fixed_has_github_link = @includes(@fixed, "https://github.com/user/repo/blob/main/docs/guide.md")
+/var @test_fixed_has_image_link = @includes(@fixed, "https://github.com/user/repo/blob/main/assets/image.jpg")
+/var @test_fixed_preserves_external = @includes(@fixed, "https://example.com")
 
 ## Test with subdirectory base
-@text subDirMarkdown = [[
+/var @subDirMarkdown = [[
 See [parent file](../README.md) and [sibling](./sibling.md).
-]]
+]
 
-@data fixedSubDir = @fixRelativeLinks(@subDirMarkdown, "docs", "https://github.com/user/repo/blob/main")
-@data test_subdir_parent_link = @includes(@fixedSubDir, "https://github.com/user/repo/blob/main/README.md")
-@data test_subdir_sibling_link = @includes(@fixedSubDir, "https://github.com/user/repo/blob/main/docs/sibling.md")
+/var @fixedSubDir = @fixRelativeLinks(@subDirMarkdown, "docs", "https://github.com/user/repo/blob/main")
+/var @test_subdir_parent_link = @includes(@fixedSubDir, "https://github.com/user/repo/blob/main/README.md")
+/var @test_subdir_sibling_link = @includes(@fixedSubDir, "https://github.com/user/repo/blob/main/docs/sibling.md")
 
 ## Test with nested paths
-@text nestedMarkdown = [[
+/var @nestedMarkdown = [[
 Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md).
-]]
+]
 
-@data fixedNested = @fixRelativeLinks(@nestedMarkdown, "src/components", "https://example.com/base")
-@data test_nested_deep_link = @includes(@fixedNested, "https://example.com/base/src/components/sub/folder/file.md")
-@data test_nested_up_over_link = @includes(@fixedNested, "https://example.com/base/other/doc.md")
+/var @fixedNested = @fixRelativeLinks(@nestedMarkdown, "src/components", "https://example.com/base")
+/var @test_nested_deep_link = @includes(@fixedNested, "https://example.com/base/src/components/sub/folder/file.md")
+/var @test_nested_up_over_link = @includes(@fixedNested, "https://example.com/base/other/doc.md")
 
 ## Test preservation of non-relative links
-@text mixedLinks = [[
+/var @mixedLinks = [[
 - [External](https://google.com)
 - [Protocol](ftp://server.com/file)
 - [Anchor](#section)
 - [Absolute](/absolute/path.md)
 - [Relative](./relative.md)
-]]
+]
 
-@data fixedMixed = @fixRelativeLinks(@mixedLinks, ".", "https://base.url")
-@data test_preserves_https = @includes(@fixedMixed, "https://google.com")
-@data test_preserves_ftp = @includes(@fixedMixed, "ftp://server.com/file")
-@data test_preserves_anchor = @includes(@fixedMixed, "#section")
-@data test_fixes_absolute = @includes(@fixedMixed, "https://base.url/absolute/path.md")
-@data test_fixes_relative = @includes(@fixedMixed, "https://base.url/relative.md")
+/var @fixedMixed = @fixRelativeLinks(@mixedLinks, ".", "https://base.url")
+/var @test_preserves_https = @includes(@fixedMixed, "https://google.com")
+/var @test_preserves_ftp = @includes(@fixedMixed, "ftp://server.com/file")
+/var @test_preserves_anchor = @includes(@fixedMixed, "#section")
+/var @test_fixes_absolute = @includes(@fixedMixed, "https://base.url/absolute/path.md")
+/var @test_fixes_relative = @includes(@fixedMixed, "https://base.url/relative.md")
 
 ## Test with images
-@text imageMarkdown = [[
+/var @imageMarkdown = [[
 ![Logo](./logo.png)
 ![External](https://cdn.example.com/image.jpg)
 ![Parent](../assets/banner.jpg)
-]]
+]
 
-@data fixedImages = @fixRelativeLinks(@imageMarkdown, "docs", "https://repo.url")
-@data test_fixes_image_relative = @includes(@fixedImages, "https://repo.url/docs/logo.png")
-@data test_preserves_image_external = @includes(@fixedImages, "https://cdn.example.com/image.jpg")
-@data test_fixes_image_parent = @includes(@fixedImages, "https://repo.url/assets/banner.jpg")
+/var @fixedImages = @fixRelativeLinks(@imageMarkdown, "docs", "https://repo.url")
+/var @test_fixes_image_relative = @includes(@fixedImages, "https://repo.url/docs/logo.png")
+/var @test_preserves_image_external = @includes(@fixedImages, "https://cdn.example.com/image.jpg")
+/var @test_fixes_image_parent = @includes(@fixedImages, "https://repo.url/assets/banner.jpg")
 
 ## Test edge cases
-@text emptyMarkdown = ""
-@data fixedEmpty = @fixRelativeLinks(@emptyMarkdown, ".", "https://base.url")
-@data test_empty_returns_empty = @eq(@fixedEmpty, "")
+/var @emptyMarkdown = ""
+/var @fixedEmpty = @fixRelativeLinks(@emptyMarkdown, ".", "https://base.url")
+/var @test_empty_returns_empty = @eq(@fixedEmpty, "")
 
-@text noLinksMarkdown = "Just plain text with no links at all."
-@data fixedNoLinks = @fixRelativeLinks(@noLinksMarkdown, ".", "https://base.url")
-@data test_no_links_unchanged = @eq(@fixedNoLinks, @noLinksMarkdown)
+/var @noLinksMarkdown = "Just plain text with no links at all."
+/var @fixedNoLinks = @fixRelativeLinks(@noLinksMarkdown, ".", "https://base.url")
+/var @test_no_links_unchanged = @eq(@fixedNoLinks, @noLinksMarkdown)
 
 ## Test complex markdown structure
-@text complexMarkdown = [[
-# Documentation
+/var @complexMarkdown = [[
+>>  Documentation
 
 Check out:
 - The [API docs](./api/index.md)
@@ -89,11 +89,11 @@ This [link](./in-code.md) should not be changed
 ```
 
 > Quote with [reference](./quote-ref.md)
-]]
+]
 
-@data fixedComplex = @fixRelativeLinks(@complexMarkdown, "docs", "https://project.com")
-@data test_complex_api_link = @includes(@fixedComplex, "https://project.com/docs/api/index.md")
-@data test_complex_examples_link = @includes(@fixedComplex, "https://project.com/examples/basic.md")
-@data test_complex_guide_link = @includes(@fixedComplex, "https://project.com/docs/guide/getting-started.md")
-@data test_complex_quote_link = @includes(@fixedComplex, "https://project.com/docs/quote-ref.md")
-# Note: Links in code blocks should ideally not be changed, but this might depend on implementation
+/var @fixedComplex = @fixRelativeLinks(@complexMarkdown, "docs", "https://project.com")
+/var @test_complex_api_link = @includes(@fixedComplex, "https://project.com/docs/api/index.md")
+/var @test_complex_examples_link = @includes(@fixedComplex, "https://project.com/examples/basic.md")
+/var @test_complex_guide_link = @includes(@fixedComplex, "https://project.com/docs/guide/getting-started.md")
+/var @test_complex_quote_link = @includes(@fixedComplex, "https://project.com/docs/quote-ref.md")
+>>  Note: Links in code blocks should ideally not be changed, but this might depend on implementation

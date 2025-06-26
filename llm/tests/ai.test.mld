@@ -1,48 +1,48 @@
-# Tests for @mlld/ai module
+>> Tests for @mlld/ai module
 
-@import { eq, ok, notOk, includes, deepEq } from @local/test
-@import { complete, embed, generateImage, transcribe, vision, models } from @local/ai
+/import { * } from "@local/test"
+/import { * } from "@local/ai"
 
-# Note: These tests verify the AI module functions exist and have correct signatures
-# Actual AI API calls would require API keys and incur costs, so we test structure only
+>>  Note: These tests verify the AI module functions exist and have correct signatures
+>>  Actual AI API calls would require API keys and incur costs, so we test structure only
 
 ## Test that all main functions exist
-@data test_complete_exists = @ok(@complete)
-@data test_embed_exists = @ok(@embed)
-@data test_generateImage_exists = @ok(@generateImage)
-@data test_transcribe_exists = @ok(@transcribe)
-@data test_vision_exists = @ok(@vision)
-@data test_models_exists = @ok(@models)
+/var @test_complete_exists = @ok(@complete)
+/var @test_embed_exists = @ok(@embed)
+/var @test_generateImage_exists = @ok(@generateImage)
+/var @test_transcribe_exists = @ok(@transcribe)
+/var @test_vision_exists = @ok(@vision)
+/var @test_models_exists = @ok(@models)
 
 ## Test models structure
-@data test_models_is_object = @ok(typeof @models === "object")
-@data test_models_has_gpt4 = @ok(@models.gpt4)
-@data test_models_has_gpt35 = @ok(@models.gpt35)
-@data test_models_has_claude = @ok(@models.claude)
-@data test_models_has_embedding = @ok(@models.embedding)
-@data test_models_has_whisper = @ok(@models.whisper)
-@data test_models_has_dalle = @ok(@models.dalle)
+/var @test_models_is_object = @ok(typeof @models === "object")
+/var @test_models_has_gpt4 = @ok(@models.gpt4)
+/var @test_models_has_gpt35 = @ok(@models.gpt35)
+/var @test_models_has_claude = @ok(@models.claude)
+/var @test_models_has_embedding = @ok(@models.embedding)
+/var @test_models_has_whisper = @ok(@models.whisper)
+/var @test_models_has_dalle = @ok(@models.dalle)
 
 ## Test model name values
-@data test_gpt4_model_name = @eq(@models.gpt4, "gpt-4")
-@data test_gpt35_model_name = @eq(@models.gpt35, "gpt-3.5-turbo")
-@data test_claude_model_name = @eq(@models.claude, "claude-3-opus-20240229")
-@data test_embedding_model_name = @eq(@models.embedding, "text-embedding-3-small")
-@data test_whisper_model_name = @eq(@models.whisper, "whisper-1")
-@data test_dalle_model_name = @eq(@models.dalle, "dall-e-3")
+/var @test_gpt4_model_name = @eq(@models.gpt4, "gpt-4")
+/var @test_gpt35_model_name = @eq(@models.gpt35, "gpt-3.5-turbo")
+/var @test_claude_model_name = @eq(@models.claude, "claude-3-opus-20240229")
+/var @test_embedding_model_name = @eq(@models.embedding, "text-embedding-3-small")
+/var @test_whisper_model_name = @eq(@models.whisper, "whisper-1")
+/var @test_dalle_model_name = @eq(@models.dalle, "dall-e-3")
 
 ## Test function signatures (by checking they're functions)
-@data test_complete_is_function = @eq(typeof @complete, "function")
-@data test_embed_is_function = @eq(typeof @embed, "function")
-@data test_generateImage_is_function = @eq(typeof @generateImage, "function")
-@data test_transcribe_is_function = @eq(typeof @transcribe, "function")
-@data test_vision_is_function = @eq(typeof @vision, "function")
+/var @test_complete_is_function = @eq(typeof @complete, "function")
+/var @test_embed_is_function = @eq(typeof @embed, "function")
+/var @test_generateImage_is_function = @eq(typeof @generateImage, "function")
+/var @test_transcribe_is_function = @eq(typeof @transcribe, "function")
+/var @test_vision_is_function = @eq(typeof @vision, "function")
 
-# Test that we can create mock calls (without actually calling APIs)
-# This verifies the parameter structure is correct
+>> Test that we can create mock calls (without actually calling APIs)
+>>  This verifies the parameter structure is correct
 
 ## Test complete parameters
-@exec mockComplete() = javascript [(
+/exe @mockComplete() = js {(
   // Test that complete can be called with proper parameters
   const prompt = "Test prompt";
   const options = {
@@ -52,11 +52,11 @@
   };
   // Would call: @complete(prompt, options)
   return true;
-)]
-@data test_complete_params = @ok(@mockComplete())
+)}
+/var @test_complete_params = @ok(@mockComplete())
 
 ## Test embed parameters
-@exec mockEmbed() = javascript [(
+/exe @mockEmbed() = js {(
   // Test embed parameter structure
   const text = "Text to embed";
   const options = {
@@ -64,11 +64,11 @@
   };
   // Would call: @embed(text, options)
   return true;
-)]
-@data test_embed_params = @ok(@mockEmbed())
+)}
+/var @test_embed_params = @ok(@mockEmbed())
 
 ## Test generateImage parameters
-@exec mockGenerateImage() = javascript [(
+/exe @mockGenerateImage() = js {(
   // Test generateImage parameter structure
   const prompt = "A beautiful sunset";
   const options = {
@@ -78,11 +78,11 @@
   };
   // Would call: @generateImage(prompt, options)
   return true;
-)]
-@data test_generateImage_params = @ok(@mockGenerateImage())
+)}
+/var @test_generateImage_params = @ok(@mockGenerateImage())
 
 ## Test vision parameters
-@exec mockVision() = javascript [(
+/exe @mockVision() = js {(
   // Test vision parameter structure
   const imageUrl = "https://example.com/image.jpg";
   const prompt = "What's in this image?";
@@ -91,11 +91,11 @@
   };
   // Would call: @vision(imageUrl, prompt, options)
   return true;
-)]
-@data test_vision_params = @ok(@mockVision())
+)}
+/var @test_vision_params = @ok(@mockVision())
 
 ## Test transcribe parameters
-@exec mockTranscribe() = javascript [(
+/exe @mockTranscribe() = js {(
   // Test transcribe parameter structure
   const audioPath = "/path/to/audio.mp3";
   const options = {
@@ -104,5 +104,5 @@
   };
   // Would call: @transcribe(audioPath, options)
   return true;
-)]
-@data test_transcribe_params = @ok(@mockTranscribe())
+)}
+/var @test_transcribe_params = @ok(@mockTranscribe())

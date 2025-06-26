@@ -1,0 +1,9 @@
+# Hello Script
+
+A simple mlld script example.
+
+/var @greeting = "Hello from mlld script!"
+/var @timestamp = [[Script run at: {{TIME}}]]
+
+/show @greeting
+/show @timestamp

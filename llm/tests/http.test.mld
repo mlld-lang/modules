@@ -1,58 +1,58 @@
-# Tests for @mlld/http module
+>> Tests for @mlld/http module
 
-@import { eq, ok, notOk, deepEq, includes } from @local/test
-@import { get, post, put, patch, delete as del, auth, fetch, display, request } from @local/http
+/import { * } from "../modules/test.mld.md"
+/import { * } from "../modules/http.mld.md"
 
-# Note: These tests use httpbin.org, a free HTTP testing service
-# In a production environment, you might want to mock these calls
+>>  Note: These tests use httpbin.org, a free HTTP testing service
+>>  In a production environment, you might want to mock these calls
 
 ## Test fetch.get (returns native objects)
-@data getResponse = @fetch.get("https://httpbin.org/get")
-@data test_fetch_get_returns_object = @ok(typeof @getResponse === "object")
-@data test_fetch_get_has_url = @includes(@getResponse.url, "httpbin.org/get")
-@data test_fetch_get_has_headers = @ok(@getResponse.headers)
+/var @getResponse = @fetch.get("https://httpbin.org/get")
+/var @test_fetch_get_returns_object = @ok(typeof @getResponse === "object")
+/var @test_fetch_get_has_url = @includes(@getResponse.url, "httpbin.org/get")
+/var @test_fetch_get_has_headers = @ok(@getResponse.headers)
 
 ## Test fetch.post with JSON data
-@data postData = {"test": "value", "number": 42}
-@data postResponse = @fetch.post("https://httpbin.org/post", @postData)
-@data test_fetch_post_returns_object = @ok(typeof @postResponse === "object")
-@data test_fetch_post_echo_correct = @deepEq(@postResponse.json, @postData)
-@data test_fetch_post_method = @eq(@postResponse.method, "POST")
+/var @postData = {"test": "value", "number": 42}
+/var @postResponse = @fetch.post("https://httpbin.org/post", @postData)
+/var @test_fetch_post_returns_object = @ok(typeof @postResponse === "object")
+/var @test_fetch_post_echo_correct = @deepEq(@postResponse.json, @postData)
+/var @test_fetch_post_method = @eq(@postResponse.method, "POST")
 
 ## Test fetch.put
-@data putData = {"updated": true}
-@data putResponse = @fetch.put("https://httpbin.org/put", @putData)
-@data test_fetch_put_returns_object = @ok(typeof @putResponse === "object")
-@data test_fetch_put_echo_correct = @deepEq(@putResponse.json, @putData)
-@data test_fetch_put_method = @eq(@putResponse.method, "PUT")
+/var @putData = {"updated": true}
+/var @putResponse = @fetch.put("https://httpbin.org/put", @putData)
+/var @test_fetch_put_returns_object = @ok(typeof @putResponse === "object")
+/var @test_fetch_put_echo_correct = @deepEq(@putResponse.json, @putData)
+/var @test_fetch_put_method = @eq(@putResponse.method, "PUT")
 
 ## Test fetch.patch
-@data patchData = {"patched": true}
-@data patchResponse = @fetch.patch("https://httpbin.org/patch", @patchData)
-@data test_fetch_patch_returns_object = @ok(typeof @patchResponse === "object")
-@data test_fetch_patch_echo_correct = @deepEq(@patchResponse.json, @patchData)
-@data test_fetch_patch_method = @eq(@patchResponse.method, "PATCH")
+/var @patchData = {"patched": true}
+/var @patchResponse = @fetch.patch("https://httpbin.org/patch", @patchData)
+/var @test_fetch_patch_returns_object = @ok(typeof @patchResponse === "object")
+/var @test_fetch_patch_echo_correct = @deepEq(@patchResponse.json, @patchData)
+/var @test_fetch_patch_method = @eq(@patchResponse.method, "PATCH")
 
 ## Test fetch.delete
-@data deleteResponse = @fetch.delete("https://httpbin.org/delete")
-@data test_fetch_delete_returns_object = @ok(typeof @deleteResponse === "object")
-@data test_fetch_delete_method = @eq(@deleteResponse.method, "DELETE")
+/var @deleteResponse = @fetch.delete("https://httpbin.org/delete")
+/var @test_fetch_delete_returns_object = @ok(typeof @deleteResponse === "object")
+/var @test_fetch_delete_method = @eq(@deleteResponse.method, "DELETE")
 
 ## Test auth methods (with mock token)
-@data mockToken = "test-token-12345"
-@data authGetResponse = @auth.get("https://httpbin.org/bearer", @mockToken)
-@data test_auth_get_authenticated = @ok(@authGetResponse.authenticated)
-@data test_auth_get_token_correct = @eq(@authGetResponse.token, @mockToken)
+/var @mockToken = "test-token-12345"
+/var @authGetResponse = @auth.get("https://httpbin.org/bearer", @mockToken)
+/var @test_auth_get_authenticated = @ok(@authGetResponse.authenticated)
+/var @test_auth_get_token_correct = @eq(@authGetResponse.token, @mockToken)
 
 ## Test auth.post
-@data authPostData = {"secure": "data"}
-@data authPostResponse = @auth.post("https://httpbin.org/bearer", @mockToken, @authPostData)
-@data test_auth_post_authenticated = @ok(@authPostResponse.authenticated)
-@data test_auth_post_has_token = @eq(@authPostResponse.token, @mockToken)
+/var @authPostData = {"secure": "data"}
+/var @authPostResponse = @auth.post("https://httpbin.org/bearer", @mockToken, @authPostData)
+/var @test_auth_post_authenticated = @ok(@authPostResponse.authenticated)
+/var @test_auth_post_has_token = @eq(@authPostResponse.token, @mockToken)
 
 ## Test custom request
-@data customBody = {"custom": "request"}
-@data customOptions = {
+/var @customBody = {"custom": "request"}
+/var @customOptions = {
   "method": "POST",
   "headers": {
     "Content-Type": "application/json",
@@ -60,18 +60,18 @@
   },
   "body": @customBody
 }
-@data customResponse = @request("https://httpbin.org/post", @customOptions)
-@data test_custom_request_header = @eq(@customResponse.headers["X-Custom-Header"], "test-value")
-@data test_custom_request_data = @deepEq(@customResponse.json, {"custom": "request"})
+/var @customResponse = @request("https://httpbin.org/post", @customOptions)
+/var @test_custom_request_header = @eq(@customResponse.headers["X-Custom-Header"], "test-value")
+/var @test_custom_request_data = @deepEq(@customResponse.json, {"custom": "request"})
 
 ## Test error handling (using invalid endpoint)
-# Note: This might not work as expected since errors might throw
-# In a real test environment, we'd need try-catch support
-@data test_http_methods_exist = @ok(@get && @post && @put && @patch && @del)
-@data test_auth_methods_exist = @ok(@auth.get && @auth.post)
-@data test_fetch_methods_exist = @ok(@fetch.get && @fetch.post && @fetch.put && @fetch.patch && @fetch.delete)
+>>  Note: This might not work as expected since errors might throw
+>>  In a real test environment, we'd need try-catch support
+/var @test_http_methods_exist = @ok(@get && @post && @put && @patch && @delete)
+/var @test_auth_methods_exist = @ok(@auth.get && @auth.post)
+/var @test_fetch_methods_exist = @ok(@fetch.get && @fetch.post && @fetch.put && @fetch.patch && @fetch.delete)
 
 ## Test response headers access
-@data headersResponse = @fetch.get("https://httpbin.org/response-headers?Test-Header=test-value")
-@data test_response_headers_accessible = @ok(@headersResponse["Test-Header"])
-@data test_response_headers_value = @eq(@headersResponse["Test-Header"], "test-value")
+/var @headersResponse = @fetch.get("https://httpbin.org/response-headers?Test-Header=test-value")
+/var @test_response_headers_accessible = @ok(@headersResponse["Test-Header"])
+/var @test_response_headers_value = @eq(@headersResponse["Test-Header"], "test-value")
