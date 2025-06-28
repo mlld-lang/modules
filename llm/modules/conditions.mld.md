@@ -148,41 +148,41 @@ Check for null/undefined values.
 These functions convert various conditions to empty/non-empty strings for mlld's `/when` directive:
 
 ```mlld-run
-/exe @isTrue(value) = js {(@value === true || @value === "true" || @value === "1" || @value === 1 ? "true" : "")}
-/exe @isFalse(value) = js {(@value === false || @value === "false" || @value === "0" || @value === 0 || @value === "" || @value === null || @value === undefined ? "true" : "")}
-/exe @not(value) = js {(@value === "" || @value === false || @value === "false" || @value === "0" || @value === 0 || @value === null || @value === undefined ? "true" : "")}
+/exe @isTrue(@value) = js {(value === true || value === "true" || value === "1" || value === 1 ? "true" : "")}
+/exe @isFalse(@value) = js {(value === false || value === "false" || value === "0" || value === 0 || value === "" || value === null || value === undefined ? "true" : "")}
+/exe @not(@value) = js {(value === "" || value === false || value === "false" || value === "0" || value === 0 || value === null || value === undefined ? "true" : "")}
 
-/exe @equals(a, b) = js {(@a == @b ? "true" : "")}
-/exe @strictEquals(a, b) = js {(@a === @b ? "true" : "")}
-/exe @notEquals(a, b) = js {(@a != @b ? "true" : "")}
+/exe @equals(@a, @b) = js {(a == b ? "true" : "")}
+/exe @strictEquals(@a, @b) = js {(a === b ? "true" : "")}
+/exe @notEquals(@a, @b) = js {(a != b ? "true" : "")}
 
-/exe @gt(a, b) = js {(Number(@a) > Number(@b) ? "true" : "")}
-/exe @gte(a, b) = js {(Number(@a) >= Number(@b) ? "true" : "")}
-/exe @lt(a, b) = js {(Number(@a) < Number(@b) ? "true" : "")}
-/exe @lte(a, b) = js {(Number(@a) <= Number(@b) ? "true" : "")}
+/exe @gt(@a, @b) = js {(Number(a) > Number(b) ? "true" : "")}
+/exe @gte(@a, @b) = js {(Number(a) >= Number(b) ? "true" : "")}
+/exe @lt(@a, @b) = js {(Number(a) < Number(b) ? "true" : "")}
+/exe @lte(@a, @b) = js {(Number(a) <= Number(b) ? "true" : "")}
 
-/exe @contains(str, substring) = js {(String(@str).includes(String(@substring)) ? "true" : "")}
-/exe @startsWith(str, prefix) = js {(String(@str).startsWith(String(@prefix)) ? "true" : "")}
-/exe @endsWith(str, suffix) = js {(String(@str).endsWith(String(@suffix)) ? "true" : "")}
-/exe @matches(str, pattern) = js {(new RegExp(@pattern).test(String(@str)) ? "true" : "")}
-/exe @isEmpty(value) = js {(@value === "" || @value === null || @value === undefined || (Array.isArray(@value) && @value.length === 0) || (typeof @value === "object" && Object.keys(@value).length === 0) ? "true" : "")}
-/exe @notEmpty(value) = js {(@value !== "" && @value !== null && @value !== undefined && !(Array.isArray(@value) && @value.length === 0) && !(typeof @value === "object" && Object.keys(@value).length === 0) ? "true" : "")}
+/exe @contains(@str, @substring) = js {(String(str).includes(String(substring)) ? "true" : "")}
+/exe @startsWith(@str, @prefix) = js {(String(str).startsWith(String(prefix)) ? "true" : "")}
+/exe @endsWith(@str, @suffix) = js {(String(str).endsWith(String(suffix)) ? "true" : "")}
+/exe @matches(@str, @pattern) = js {(new RegExp(pattern).test(String(str)) ? "true" : "")}
+/exe @isEmpty(@value) = js {(value === "" || value === null || value === undefined || (Array.isArray(value) && value.length === 0) || (typeof value === "object" && Object.keys(value).length === 0) ? "true" : "")}
+/exe @notEmpty(@value) = js {(value !== "" && value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0) && !(typeof value === "object" && Object.keys(value).length === 0) ? "true" : "")}
 
-/exe @includes(array, item) = js {(Array.isArray(@array) && @array.includes(@item) ? "true" : "")}
-/exe @hasLength(array, length) = js {(Array.isArray(@array) && @array.length === Number(@length) ? "true" : "")}
-/exe @hasMinLength(array, minLength) = js {(Array.isArray(@array) && @array.length >= Number(@minLength) ? "true" : "")}
+/exe @includes(@array, @item) = js {(Array.isArray(array) && array.includes(item) ? "true" : "")}
+/exe @hasLength(@array, @length) = js {(Array.isArray(array) && array.length === Number(length) ? "true" : "")}
+/exe @hasMinLength(@array, @minLength) = js {(Array.isArray(array) && array.length >= Number(minLength) ? "true" : "")}
 
-/exe @isString(value) = js {(typeof @value === "string" ? "true" : "")}
-/exe @isNumber(value) = js {(typeof @value === "number" && !isNaN(@value) ? "true" : "")}
-/exe @isArray(value) = js {(Array.isArray(@value) ? "true" : "")}
-/exe @isObject(value) = js {(@value !== null && typeof @value === "object" && !Array.isArray(@value) ? "true" : "")}
+/exe @isString(@value) = js {(typeof value === "string" ? "true" : "")}
+/exe @isNumber(@value) = js {(typeof value === "number" && !isNaN(value) ? "true" : "")}
+/exe @isArray(@value) = js {(Array.isArray(value) ? "true" : "")}
+/exe @isObject(@value) = js {(value !== null && typeof value === "object" && !Array.isArray(value) ? "true" : "")}
 
-/exe @and(a, b) = js {(@a !== "" && @b !== "" ? "true" : "")}
-/exe @or(a, b) = js {(@a !== "" || @b !== "" ? "true" : "")}
-/exe @xor(a, b) = js {((@a !== "" && @b === "") || (@a === "" && @b !== "") ? "true" : "")}
+/exe @and(@a, @b) = js {(a !== "" && b !== "" ? "true" : "")}
+/exe @or(@a, @b) = js {(a !== "" || b !== "" ? "true" : "")}
+/exe @xor(@a, @b) = js {((a !== "" && b === "") || (a === "" && b !== "") ? "true" : "")}
 
-/exe @exists(value) = js {(@value !== undefined && @value !== null ? "true" : "")}
-/exe @defined(value) = js {(@value !== undefined ? "true" : "")}
+/exe @exists(@value) = js {(value !== undefined && value !== null ? "true" : "")}
+/exe @defined(@value) = js {(value !== undefined ? "true" : "")}
 
 >> Shadow environment to make functions available to each other
 /exe js = { isTrue, isFalse, not, equals, strictEquals, notEquals, gt, gte, lt, lte, contains, startsWith, endsWith, matches, isEmpty, notEmpty, includes, hasLength, hasMinLength, isString, isNumber, isArray, isObject, and, or, xor, exists, defined }

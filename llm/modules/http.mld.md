@@ -100,8 +100,8 @@ Format and display HTTP responses with pretty printing.
 All HTTP methods use fetch with automatic JSON parsing and native return values. Display methods format output for readability:
 
 ```mlld-run
-/exe @get(url) = js {(
-  fetch(@url)
+/exe @get(@url) = js {(
+  fetch(url)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -118,11 +118,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @post(url, data) = js {(
-  fetch(@url, {
+/exe @post(@url, @data) = js {(
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -140,11 +140,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @put(url, data) = js {(
-  fetch(@url, {
+/exe @put(@url, @data) = js {(
+  fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -162,8 +162,8 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @delete(url) = js {(
-  fetch(@url, { method: 'DELETE' })
+/exe @delete(@url) = js {(
+  fetch(url, { method: 'DELETE' })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -180,11 +180,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @patch(url, data) = js {(
-  fetch(@url, {
+/exe @patch(@url, @data) = js {(
+  fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -202,9 +202,9 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @authGet(url, token) = js {(
-  fetch(@url, {
-    headers: { 'Authorization': `Bearer ${@token}` }
+/exe @authGet(@url, @token) = js {(
+  fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -222,14 +222,14 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @authPost(url, token, data) = js {(
-  fetch(@url, {
+/exe @authPost(@url, @token, @data) = js {(
+  fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${@token}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -247,8 +247,8 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @request(url, options) = js {(
-  fetch(@url, @options)
+/exe @request(@url, @options) = js {(
+  fetch(url, options)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -265,8 +265,8 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     })
 )}
 
-/exe @getData(url) = js {(
-  fetch(@url)
+/exe @getData(@url) = js {(
+  fetch(url)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.json();
@@ -274,11 +274,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => { throw error; })
 )}
 
-/exe @postData(url, data) = js {(
-  fetch(@url, {
+/exe @postData(@url, @data) = js {(
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -287,11 +287,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => { throw error; })
 )}
 
-/exe @putData(url, data) = js {(
-  fetch(@url, {
+/exe @putData(@url, @data) = js {(
+  fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -300,11 +300,11 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => { throw error; })
 )}
 
-/exe @patchData(url, data) = js {(
-  fetch(@url, {
+/exe @patchData(@url, @data) = js {(
+  fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -313,8 +313,8 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
     .catch(error => { throw error; })
 )}
 
-/exe @deleteData(url) = js {(
-  fetch(@url, {
+/exe @deleteData(@url) = js {(
+  fetch(url, {
     method: 'DELETE'
   })
     .then(response => {
@@ -328,8 +328,8 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
 Display methods for formatted output:
 
 ```mlld-run
-/exe @displayGet(url) = js {(
-  fetch(@url)
+/exe @displayGet(@url) = js {(
+  fetch(url)
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       return response.text();
@@ -350,11 +350,11 @@ Display methods for formatted output:
     })
 )}
 
-/exe @displayPost(url, data) = js {(
-  fetch(@url, {
+/exe @displayPost(@url, @data) = js {(
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: typeof @data === 'string' ? @data : JSON.stringify(@data)
+    body: typeof data === 'string' ? data : JSON.stringify(data)
   })
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);

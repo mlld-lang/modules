@@ -64,8 +64,30 @@ Returns `"true"` if anything exists at the path, empty string otherwise.
 These functions use shell commands to check file system state and return "true" or empty string for use in conditionals:
 
 ```mlld-run
-/exe @fileExists(path) = run {test -f "@path" && echo "true" || echo ""}
-/exe @dirExists(path) = run {test -d "@path" && echo "true" || echo ""}
-/exe @pathExists(path) = run {test -e "@path" && echo "true" || echo ""}
+/exe @fileExists(@path) = sh {
+  if test -f "$path"; then
+    echo "true"
+  else
+    echo ""
+  fi
+}
+/exe @dirExists(@path) = sh {
+  if test -d "$path"; then
+    echo "true"
+  else
+    echo ""
+  fi
+}
+/exe @pathExists(@path) = sh {
+  if test -e "$path"; then
+    echo "true"
+  else
+    echo ""
+  fi
+}
 ```
+
+## Module Export
+
+All functions are exported by default in mlld modules.
 

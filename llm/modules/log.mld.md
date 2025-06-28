@@ -111,7 +111,7 @@ Structured logging output for parsing by log aggregation systems.
 
 >> Debug each transformation stage
 /exe @processUsers(data) = js {(
-  JSON.parse(@data).users.map(u => ({
+  JSON.parse(data).users.map(u => ({
     ...u,
     processed: true
   }))
@@ -137,10 +137,10 @@ Structured logging output for parsing by log aggregation systems.
 
 /exe @debugLog(input) = js {(
   // Only log if DEBUG_LEVEL is set
-  if (@DEBUG_LEVEL) {
-    @logVerbose(@input);
+  if (DEBUG_LEVEL) {
+    logVerbose(input);
   }
-  return @input;
+  return input;
 )}
 ```
 
@@ -169,36 +169,36 @@ The loggers complement mlld's built-in @DEBUG variable:
   console.error(`\n${separator}`);
   console.error(`[${timestamp}] PIPELINE LOG`);
   console.error(`${separator}`);
-  console.error(`Type: ${typeof @input} | Length: ${
-    typeof @input === 'string' ? @input.length + ' chars' : 
-    Array.isArray(@input) ? @input.length + ' items' : 'N/A'
+  console.error(`Type: ${typeof input} | Length: ${
+    typeof input === 'string' ? input.length + ' chars' : 
+    Array.isArray(input) ? input.length + ' items' : 'N/A'
   }`);
   
   // Smart preview based on data type
-  if (@input === null || @input === undefined) {
-    console.error(`Value: ${@input}`);
-  } else if (typeof @input === 'string') {
-    if (@input.length <= 100) {
-      console.error(`Value: "${@input}"`);
+  if (input === null || input === undefined) {
+    console.error(`Value: ${input}`);
+  } else if (typeof input === 'string') {
+    if (input.length <= 100) {
+      console.error(`Value: "${input}"`);
     } else {
-      console.error(`Preview: "${@input.substring(0, 50)}..."`);
-      console.error(`(${@input.length - 50} more characters)`);
+      console.error(`Preview: "${input.substring(0, 50)}..."`);
+      console.error(`(${input.length - 50} more characters)`);
     }
   } else {
     try {
-      const preview = JSON.stringify(@input, null, 2);
+      const preview = JSON.stringify(input, null, 2);
       if (preview.length <= 200) {
         console.error(`Value:\n${preview}`);
       } else {
         console.error(`Preview:\n${preview.substring(0, 200)}...\n(truncated)`);
       }
     } catch (e) {
-      console.error(`Value: [${typeof @input}] - Unable to stringify`);
+      console.error(`Value: [${typeof input}] - Unable to stringify`);
     }
   }
   
   console.error(`${separator}\n`);
-  return @input;
+  return input;
 )}
 
 >> Verbose logger - detailed analysis
@@ -212,37 +212,37 @@ The loggers complement mlld's built-in @DEBUG variable:
   
   // Detailed input analysis
   console.error(`INPUT ANALYSIS:`);
-  console.error(`  Type: ${typeof @input}`);
-  console.error(`  Constructor: ${@input?.constructor?.name || 'N/A'}`);
+  console.error(`  Type: ${typeof input}`);
+  console.error(`  Constructor: ${input?.constructor?.name || 'N/A'}`);
   
-  if (typeof @input === 'string') {
-    console.error(`  Length: ${@input.length} characters`);
-    console.error(`  Lines: ${@input.split('\n').length}`);
+  if (typeof input === 'string') {
+    console.error(`  Length: ${input.length} characters`);
+    console.error(`  Lines: ${input.split('\n').length}`);
     
     // Content type detection
-    const trimmed = @input.trim();
+    const trimmed = input.trim();
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       console.error(`  Format: Likely JSON`);
       try {
-        JSON.parse(@input);
+        JSON.parse(input);
         console.error(`  Valid: ✓ Parseable as JSON`);
       } catch {
         console.error(`  Valid: ✗ Invalid JSON syntax`);
       }
     } else if (trimmed.includes('<') && trimmed.includes('>')) {
       console.error(`  Format: Likely XML/HTML`);
-    } else if (@input.includes(',') && @input.split('\n')[0]?.includes(',')) {
+    } else if (input.includes(',') && input.split('\n')[0]?.includes(',')) {
       console.error(`  Format: Likely CSV`);
     } else {
       console.error(`  Format: Plain text or unknown`);
     }
-  } else if (Array.isArray(@input)) {
-    console.error(`  Length: ${@input.length} items`);
-    if (@input.length > 0) {
-      console.error(`  First item type: ${typeof @input[0]}`);
+  } else if (Array.isArray(input)) {
+    console.error(`  Length: ${input.length} items`);
+    if (input.length > 0) {
+      console.error(`  First item type: ${typeof input[0]}`);
     }
-  } else if (@input && typeof @input === 'object') {
-    const keys = Object.keys(@input);
+  } else if (input && typeof input === 'object') {
+    const keys = Object.keys(input);
     console.error(`  Keys: ${keys.length} properties`);
     if (keys.length > 0 && keys.length <= 10) {
       console.error(`  Properties: ${keys.join(', ')}`);
@@ -252,8 +252,8 @@ The loggers complement mlld's built-in @DEBUG variable:
   }
   
   console.error(`\nDATA PREVIEW:`);
-  if (typeof @input === 'string') {
-    const lines = @input.split('\n');
+  if (typeof input === 'string') {
+    const lines = input.split('\n');
     const preview = lines.slice(0, 5).map((line, i) => 
       `  ${(i + 1).toString().padStart(3)}: ${line}`
     ).join('\n');
@@ -263,7 +263,7 @@ The loggers complement mlld's built-in @DEBUG variable:
     }
   } else {
     try {
-      const stringified = JSON.stringify(@input, null, 2);
+      const stringified = JSON.stringify(input, null, 2);
       const lines = stringified.split('\n');
       if (lines.length <= 10) {
         console.error(stringified);
@@ -282,7 +282,7 @@ The loggers complement mlld's built-in @DEBUG variable:
   console.error(`  • Check mlld's built-in @DEBUG variable for environment info`);
   console.error(`${separator}\n`);
   
-  return @input;
+  return input;
 )}
 
 >> JSON logger - structured output
@@ -292,39 +292,39 @@ The loggers complement mlld's built-in @DEBUG variable:
     type: 'pipeline_log',
     level: 'debug',
     input: {
-      dataType: typeof @input,
-      constructor: @input?.constructor?.name,
-      length: typeof @input === 'string' ? @input.length : 
-              Array.isArray(@input) ? @input.length : null,
+      dataType: typeof input,
+      constructor: input?.constructor?.name,
+      length: typeof input === 'string' ? input.length : 
+              Array.isArray(input) ? input.length : null,
       preview: null,
       metadata: {}
     }
   };
   
   // Add preview based on type
-  if (typeof @input === 'string') {
-    logEntry.input.preview = @input.length > 100 ? 
-      @input.substring(0, 100) + '...' : @input;
-    logEntry.input.metadata.lines = @input.split('\n').length;
-  } else if (@input !== null && @input !== undefined) {
+  if (typeof input === 'string') {
+    logEntry.input.preview = input.length > 100 ? 
+      input.substring(0, 100) + '...' : input;
+    logEntry.input.metadata.lines = input.split('\n').length;
+  } else if (input !== null && input !== undefined) {
     try {
-      const stringified = JSON.stringify(@input);
+      const stringified = JSON.stringify(input);
       logEntry.input.preview = stringified.length > 100 ?
         stringified.substring(0, 100) + '...' : stringified;
-      if (Array.isArray(@input)) {
-        logEntry.input.metadata.firstItemType = @input[0] ? typeof @input[0] : null;
-      } else if (typeof @input === 'object') {
-        logEntry.input.metadata.keys = Object.keys(@input);
+      if (Array.isArray(input)) {
+        logEntry.input.metadata.firstItemType = input[0] ? typeof input[0] : null;
+      } else if (typeof input === 'object') {
+        logEntry.input.metadata.keys = Object.keys(input);
       }
     } catch {
       logEntry.input.preview = '[Unable to stringify]';
     }
   } else {
-    logEntry.input.preview = String(@input);
+    logEntry.input.preview = String(input);
   }
   
   console.error(JSON.stringify(logEntry));
-  return @input;
+  return input;
 )}
 
 >> Shadow environment to make functions available to each other

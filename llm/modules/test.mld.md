@@ -106,59 +106,59 @@ Check if a function throws an error.
 ```mlld-run
 >> Basic Assertions
 /exe @eq(a, b) = js {
-  return @a === @b
+  return a === b
 }
 
 /exe @deepEq(a, b) = js {
-  return JSON.stringify(@a) === JSON.stringify(@b)
+  return JSON.stringify(a) === JSON.stringify(b)
 }
 
 /exe @ok(value) = js {
-  return !!@value
+  return !!value
 }
 
 /exe @notOk(value) = js {
-  return !@value
+  return !value
 }
 
 >> Comparison Assertions
 /exe @gt(a, b) = js {
-  return @a > @b
+  return a > b
 }
 
 /exe @gte(a, b) = js {
-  return @a >= @b
+  return a >= b
 }
 
 /exe @lt(a, b) = js {
-  return @a < @b
+  return a < b
 }
 
 /exe @lte(a, b) = js {
-  return @a <= @b
+  return a <= b
 }
 
 >> Container Assertions
 /exe @includes(container, item) = js {
-  if (typeof @container === 'string') {
-    return @container.includes(@item)
+  if (typeof container === 'string') {
+    return container.includes(item)
   }
-  if (Array.isArray(@container)) {
-    return @container.includes(@item)
+  if (Array.isArray(container)) {
+    return container.includes(item)
   }
   return false
 }
 
 /exe @contains(haystack, needle) = js {
-  return String(@haystack).includes(String(@needle))
+  return String(haystack).includes(String(needle))
 }
 
 /exe @len(value) = js {
-  if (typeof @value === 'string' || Array.isArray(@value)) {
-    return @value.length
+  if (typeof value === 'string' || Array.isArray(value)) {
+    return value.length
   }
-  if (typeof @value === 'object' && @value !== null) {
-    return Object.keys(@value).length
+  if (typeof value === 'object' && value !== null) {
+    return Object.keys(value).length
   }
   return 0
 }
@@ -166,7 +166,7 @@ Check if a function throws an error.
 >> Error Assertions
 /exe @throws(fn) = js {
   try {
-    @fn()
+    fn()
     return false
   } catch {
     return true

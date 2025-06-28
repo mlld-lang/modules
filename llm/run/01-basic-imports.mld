@@ -6,6 +6,9 @@ description: Test basic module imports with mlld v2 syntax
 
 Testing that each core module can be imported successfully.
 
+## Debug Info
+/show @debug
+
 ## String Module
 
 /import { upper, lower, trim, capitalize } from @local/string
@@ -30,9 +33,9 @@ Testing that each core module can be imported successfully.
 
 ## Test Module
 
-/import { equals, gt, contains } from @local/test
+/import { eq, gt, contains } from @local/test
 
-/when @equals(5, 5) => show `✓ equals(5, 5) works`
+/when @eq(5, 5) => show `✓ eq(5, 5) works`
 /when @gt(10, 5) => show `✓ gt(10, 5) works`
 /when @contains([1, 2, 3], 2) => show `✓ contains([1,2,3], 2) works`
 

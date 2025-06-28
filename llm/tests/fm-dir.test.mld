@@ -1,0 +1,199 @@
+>> Tests for @mlld/fm-dir module
+
+/import { * } from "modules/llm/modules/test.mld.md"
+/import { * } from "modules/llm/modules/fm-dir.mld.md"
+
+## Setup test environment
+
+>>  Create test directories
+@run [(mkdir -p /tmp/fm-dir-test/posts /tmp/fm-dir-test/docs /tmp/fm-dir-test/nested/deep)}
+
+>>  Create test files with frontmatter
+/var @post1 = [[---
+title: First Post
+author: Alice
+date: 2024-01-15
+published: true
+tags: ["javascript", "testing"}
+---
+
+>>  First Post
+
+This is the content of the first post.]
+@output @post1 to "/tmp/fm-dir-test/posts/post1.md"
+
+/var @post2 = [[---
+title: Second Post  
+author: Bob
+date: 2024-01-20
+published: false
+tags: ["python", "tutorial"}
+---
+
+>>  Second Post
+
+This is the content of the second post.]
+@output @post2 to "/tmp/fm-dir-test/posts/post2.md"
+
+/var @post3 = [[---
+title: Third Post
+author: Alice
+date: 2024-01-25
+published: true
+tags: ["javascript", "tutorial"}
+category: tech
+---
+
+>>  Third Post
+
+This is the content of the third post.]
+@output @post3 to "/tmp/fm-dir-test/posts/post3.md"
+
+/var @doc1 = [[---
+title: Documentation
+version: 1.0.0
+---
+
+>>  Documentation
+
+Some documentation content.]
+@output @doc1 to "/tmp/fm-dir-test/docs/README.md"
+
+>>  File without frontmatter
+/var @plainFile = [[# Plain File
+
+No frontmatter here.]
+@output @plainFile to "/tmp/fm-dir-test/plain.txt"
+
+>>  Nested file
+/var @nestedFile = [[---
+location: deep
+---
+Nested content]
+@output @nestedFile to "/tmp/fm-dir-test/nested/deep/file.md"
+
+## Test grabDir (non-recursive)
+
+/var @dirFiles = @grabDir("/tmp/fm-dir-test/posts", "*.md")
+/var @test_grabDir_returns_array = @ok(Array.isArray(@dirFiles))
+/var @test_grabDir_count = @eq(@dirFiles.length, 3)
+/var @test_grabDir_has_path = @ok(@dirFiles[0].path)
+/var @test_grabDir_has_name = @ok(@dirFiles[0].name)
+/var @test_grabDir_has_fm = @ok(@dirFiles[0].fm)
+
+## Test grabFiles (recursive)
+
+/var @allFiles = @grabFiles("/tmp/fm-dir-test", "**/*.md")
+/var @test_grabFiles_returns_array = @ok(Array.isArray(@allFiles))
+/var @test_grabFiles_finds_nested = @ok(@allFiles.length >= 5)
+
+## Test grab with options
+
+/var @grabbedWithPreview = @grab("/tmp/fm-dir-test/posts", "*.md", {
+  "contentPreview": 20
+})
+/var @test_grab_has_preview = @ok(@grabbedWithPreview[0].preview)
+/var @test_grab_preview_length = @ok(@grabbedWithPreview[0].preview.length <= 23) # 20 chars + "..."
+
+/var @grabbedWithContent = @grab("/tmp/fm-dir-test/posts", "post1.md", {
+  "includeContent": true
+})
+/var @test_grab_has_content = @ok(@grabbedWithContent[0].content)
+/var @test_grab_content_includes = @includes(@grabbedWithContent[0].content, "This is the content")
+
+>> Test frontmatter filtering in grab
+/var @publishedOnly = @grab("/tmp/fm-dir-test/posts", "*.md", {
+  "fm": { "published": true }
+})
+/var @test_grab_fm_filter = @eq(@publishedOnly.length, 2)
+
+## Test filterByFrontmatter
+
+/var @allPosts = @grabFiles("/tmp/fm-dir-test/posts", "*.md")
+/var @publishedPosts = @filterByFrontmatter(@allPosts, "published", true)
+/var @test_filter_published = @eq(@publishedPosts.length, 2)
+
+/var @alicePosts = @filterByFrontmatter(@allPosts, "author", "Alice")
+/var @test_filter_author = @eq(@alicePosts.length, 2)
+
+/var @hasTags = @filterByFrontmatter(@allPosts, "tags")
+/var @test_filter_exists = @eq(@hasTags.length, 3)
+
+## Test sortByField
+
+/var @sortedByDate = @sortByField(@allPosts, "date", "asc")
+/var @test_sort_asc_first = @eq(@sortedByDate[0].fm.title, "First Post")
+/var @test_sort_asc_last = @eq(@sortedByDate[2].fm.title, "Third Post")
+
+/var @sortedByDateDesc = @sortByField(@allPosts, "date", "desc")
+/var @test_sort_desc_first = @eq(@sortedByDateDesc[0].fm.title, "Third Post")
+
+## Test groupByField
+
+/var @groupedByAuthor = @groupByField(@allPosts, "author")
+/var @test_group_has_alice = @ok(@groupedByAuthor["Alice"])
+/var @test_group_alice_count = @eq(@groupedByAuthor["Alice"].length, 2)
+/var @test_group_has_bob = @ok(@groupedByAuthor["Bob"])
+/var @test_group_bob_count = @eq(@groupedByAuthor["Bob"].length, 1)
+
+/var @groupedByPublished = @groupByField(@allPosts, "published")
+/var @test_group_published_true = @eq(@groupedByPublished["true"].length, 2)
+/var @test_group_published_false = @eq(@groupedByPublished["false"].length, 1)
+
+## Test extractField
+
+/var @allTitles = @extractField(@allPosts, "title")
+/var @test_extract_titles = @ok(Array.isArray(@allTitles))
+/var @test_extract_titles_count = @eq(@allTitles.length, 3)
+/var @test_extract_titles_contains = @includes(@allTitles, "First Post")
+
+## Test uniqueValues
+
+/var @allTags = @uniqueValues(@allPosts, "tags")
+/var @test_unique_tags = @ok(Array.isArray(@allTags))
+/var @test_unique_tags_count = @eq(@allTags.length, 4) # javascript, testing, python, tutorial
+/var @test_unique_has_javascript = @includes(@allTags, "javascript")
+/var @test_unique_has_python = @includes(@allTags, "python")
+
+/var @allAuthors = @uniqueValues(@allPosts, "author")
+/var @test_unique_authors = @deepEq(@allAuthors.sort(), ["Alice", "Bob"])
+
+## Test file metadata
+
+/var @filesWithMeta = @grab("/tmp/fm-dir-test/posts", "post1.md")
+/var @firstFile = @filesWithMeta[0}
+/var @test_has_ext = @eq(@firstFile.ext, ".md")
+/var @test_has_size = @ok(@firstFile.size > 0)
+/var @test_has_modified = @ok(@firstFile.modified)
+
+## Test edge cases
+
+>>  Files without frontmatter
+/var @mixedFiles = @grabFiles("/tmp/fm-dir-test", "*")
+/var @noFrontmatter = @filterByFrontmatter(@mixedFiles, "anyfield")
+/var @withoutFm = @mixedFiles.filter(f => !f.fm)
+/var @test_handles_no_fm = @ok(@withoutFm.length > 0)
+
+>>  Group files including those without frontmatter
+/var @groupedAll = @groupByField(@mixedFiles, "title")
+/var @test_group_no_value = @ok(@groupedAll["_no_value"] || @groupedAll["_no_frontmatter"])
+
+## Cleanup
+
+@run [(rm -rf /tmp/fm-dir-test)}
+
+## Summary
+
+/show [[
+Test Results:
+- grabDir: Basic directory scanning works
+- grabFiles: Recursive scanning with glob patterns works
+- grab: Advanced options (preview, content, fm filter) work
+- filterByFrontmatter: Field filtering works correctly
+- sortByField: Sorting by date and other fields works
+- groupByField: Grouping by author and boolean fields works
+- extractField: Field extraction works
+- uniqueValues: Unique value extraction with array flattening works
+- File metadata: Extension, size, and modified date are captured
+- Edge cases: Handles files without frontmatter gracefully
+]

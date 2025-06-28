@@ -1,0 +1,45 @@
+---
+description: Demonstrate the @ parameter issue in current modules
+---
+
+# Module Syntax Issue Report
+
+## The Problem
+
+The core modules are using incorrect syntax in JavaScript code blocks. They have `@param` inside JS blocks, but parameters should be plain names without `@`.
+
+## Example from string.mld.md
+
+```
+INCORRECT (current):
+/exe @upper(str) = js {(String(@str).toUpperCase())}
+
+CORRECT (should be):
+/exe @upper(str) = js {(String(str).toUpperCase())}
+```
+
+## Test Case
+
+Let's demonstrate this breaks imports:
+
+```mlld
+>> This will fail:
+>> /import { upper } from @local/string
+>> /show @upper("hello")
+```
+
+## Affected Modules
+
+Based on grep search, these modules have the issue:
+- string.mld.md
+- array.mld.md
+- test.mld.md
+- log.mld.md
+- conditions.mld.md
+- http.mld.md
+
+## Impact
+
+This means none of the core modules can be imported and used with mlld v2 (or v1!) until this is fixed.
+
+/show `\n⚠️  Critical issue found: All core modules have incorrect JS parameter syntax!`

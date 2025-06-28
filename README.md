@@ -31,8 +31,8 @@ Process data arrays with powerful operations:
 @data names = @pluck(@users, "name")
 @data totalAge = @sum(@users, "age")
 
-@add [[Engineers: {{engineers}}]]
-@add [[Total age: {{totalAge}}]]
+@add ::Engineers: {{engineers}}::
+@add ::Total age: {{totalAge}}::
 ```
 
 ---
@@ -48,9 +48,9 @@ Essential utilities for building complex conditional logic in mlld:
 @data threshold = 10
 @data count = 15
 
-@when @and(@gt(@count, @threshold), @contains(@users, "alice")) => @add [[High count with Alice present]]
-@when @isEmpty(@users) => @add [[No users found]]
-@when @equals(@count, 15) => @add [[Exact match!]]
+@when @and(@gt(@count, @threshold), @contains(@users, "alice")) => @add ::High count with Alice present::
+@when @isEmpty(@users) => @add ::No users found::
+@when @equals(@count, 15) => @add ::Exact match!::
 ```
 
 ---
@@ -62,9 +62,9 @@ Provides basic file system checks that return truthy/falsy values for use with  
 ```mlld
 @import { fileExists, dirExists, pathExists } from @mlld/fs
 
-@when @fileExists("config.json") => @add [[Config file found!]]
-@when @dirExists("src") => @add [[Source directory exists]]
-@when @pathExists("README.md") => @add [[README is available]]
+@when @fileExists("config.json") => @add ::Config file found!::
+@when @dirExists("src") => @add ::Source directory exists::
+@when @pathExists("README.md") => @add ::README is available::
 ```
 
 ---
@@ -81,7 +81,7 @@ Quick HTTP requests with automatic JSON handling:
 @run @auth.get("https://api.github.com/user", @token)
 
 @data userData = @data.get("https://api.github.com/users/octocat")
-@add [[User: {{userData.name}}]]
+@add ::User: {{userData.name}}::
 ```
 
 ---
@@ -100,8 +100,8 @@ Common string operations:
 @data words = @split(@name, " ")
 @text rejoined = @join(@words, "-")
 
-@when @includes(@name, "doe") => @add [[Contains 'doe']]
-@add [[Formatted: {{formatted}}]]
+@when @includes(@name, "doe") => @add ::Contains 'doe'::
+@add ::Formatted: {{formatted}}::
 ```
 
 ---
@@ -114,10 +114,10 @@ Easy AI integration for your mlld scripts:
 @import { claude, llm, codex } from @mlld/ai
 
 @text response = @claude.ask("What's the capital of France?")
-@add [[Claude says: {{response}}]]
+@add ::Claude says: {{response}}::
 
 @text answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-@add [[LLM says: {{answer}}]]
+@add ::LLM says: {{answer}}::
 ```
 
 ---
@@ -130,12 +130,12 @@ Bundle your project files for AI analysis or documentation:
 @import { xml, md, tree } from @mlld/bundle
 
 @text src_xml = @xml("./src")
-@add [[Project structure in XML:]]
-@add [[{{src_xml}}]]
+@add ::Project structure in XML:::
+@add ::{{src_xml}}::
 
 @text docs_md = @md("./docs")
-@add [[Documentation structure:]]
-@add [[{{docs_md}}]]
+@add ::Documentation structure:::
+@add ::{{docs_md}}::
 ```
 
 ---
@@ -147,7 +147,7 @@ Fix relative links when moving markdown content between directories:
 ```mlld
 @import [fix-relative-links.mld.md]
 
-@text content = [[See the [docs](../docs/guide.md) for details.]]
+@text content = ::See the [docs](../docs/guide.md) for details.::
 
 # Fix links: (content, from_dir, to_dir)
 @text fixed = @fixRelativeLinks(@content, "src/modules", "dist")
@@ -166,7 +166,7 @@ grab directories and get file listings:
 @data moduleFiles = @grabDir("modules/core", "*.mld.md")
 @data allFiles = @grabFiles(".", "**/*.md")
 
-@add [[Found {{@length(@moduleFiles)}} modules]]
+@add ::Found {{@length(@moduleFiles)}} modules::
 ```
 
 
@@ -192,8 +192,8 @@ Process data arrays with powerful operations:
 @data names = @pluck(@users, "name")
 @data totalAge = @sum(@users, "age")
 
-@add [[Engineers: {{engineers}}]]
-@add [[Total age: {{totalAge}}]]
+@add ::Engineers: {{engineers}}::
+@add ::Total age: {{totalAge}}::
 ```
 
 ---
@@ -209,9 +209,9 @@ Essential utilities for building complex conditional logic in mlld:
 @data threshold = 10
 @data count = 15
 
-@when @and(@gt(@count, @threshold), @contains(@users, "alice")) => @add [[High count with Alice present]]
-@when @isEmpty(@users) => @add [[No users found]]
-@when @equals(@count, 15) => @add [[Exact match!]]
+@when @and(@gt(@count, @threshold), @contains(@users, "alice")) => @add ::High count with Alice present::
+@when @isEmpty(@users) => @add ::No users found::
+@when @equals(@count, 15) => @add ::Exact match!::
 ```
 
 ---
@@ -223,9 +223,9 @@ Provides basic file system checks that return truthy/falsy values for use with  
 ```mlld
 @import { fileExists, dirExists, pathExists } from @mlld/fs
 
-@when @fileExists("config.json") => @add [[Config file found!]]
-@when @dirExists("src") => @add [[Source directory exists]]
-@when @pathExists("README.md") => @add [[README is available]]
+@when @fileExists("config.json") => @add ::Config file found!::
+@when @dirExists("src") => @add ::Source directory exists::
+@when @pathExists("README.md") => @add ::README is available::
 ```
 
 ---
@@ -242,7 +242,7 @@ Quick HTTP requests with automatic JSON handling:
 @run @auth.get("https://api.github.com/user", @token)
 
 @data userData = @data.get("https://api.github.com/users/octocat")
-@add [[User: {{userData.name}}]]
+@add ::User: {{userData.name}}::
 ```
 
 ---
@@ -261,8 +261,8 @@ Common string operations:
 @data words = @split(@name, " ")
 @text rejoined = @join(@words, "-")
 
-@when @includes(@name, "doe") => @add [[Contains 'doe']]
-@add [[Formatted: {{formatted}}]]
+@when @includes(@name, "doe") => @add ::Contains 'doe'::
+@add ::Formatted: {{formatted}}::
 ```
 
 ---
@@ -275,10 +275,10 @@ Easy AI integration for your mlld scripts:
 @import { claude, llm, codex } from @mlld/ai
 
 @text response = @claude.ask("What's the capital of France?")
-@add [[Claude says: {{response}}]]
+@add ::Claude says: {{response}}::
 
 @text answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-@add [[LLM says: {{answer}}]]
+@add ::LLM says: {{answer}}::
 ```
 
 ---
@@ -291,12 +291,12 @@ Bundle your project files for AI analysis or documentation:
 @import { xml, md, tree } from @mlld/bundle
 
 @text src_xml = @xml("./src")
-@add [[Project structure in XML:]]
-@add [[{{src_xml}}]]
+@add ::Project structure in XML:::
+@add ::{{src_xml}}::
 
 @text docs_md = @md("./docs")
-@add [[Documentation structure:]]
-@add [[{{docs_md}}]]
+@add ::Documentation structure:::
+@add ::{{docs_md}}::
 ```
 
 ---
@@ -308,7 +308,7 @@ Fix relative links when moving markdown content between directories:
 ```mlld
 @import [fix-relative-links.mld.md]
 
-@text content = [[See the [docs](../docs/guide.md) for details.]]
+@text content = ::See the [docs](../docs/guide.md) for details.::
 
 # Fix links: (content, from_dir, to_dir)
 @text fixed = @fixRelativeLinks(@content, "src/modules", "dist")
@@ -327,7 +327,7 @@ grab directories and get file listings:
 @data moduleFiles = @grabDir("modules/core", "*.mld.md")
 @data allFiles = @grabFiles(".", "**/*.md")
 
-@add [[Found {{@length(@moduleFiles)}} modules]]
+@add ::Found {{@length(@moduleFiles)}} modules::
 ```
 
 
