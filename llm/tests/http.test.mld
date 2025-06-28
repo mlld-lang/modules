@@ -1,52 +1,49 @@
 >> Tests for @mlld/http module
 
-/import { * } from "../modules/test.mld.md"
-/import { * } from "../modules/http.mld.md"
-
->>  Note: These tests use httpbin.org, a free HTTP testing service
->>  In a production environment, you might want to mock these calls
+/import { ok, eq, includes, deepEq } from "../modules/test.mld.md"
+/import { http } from "../modules/http.mld.md"
 
 ## Test fetch.get (returns native objects)
-/var @getResponse = @fetch.get("https://httpbin.org/get")
+/var @getResponse = @http.fetch.get("https://httpbin.org/get")
 /var @test_fetch_get_returns_object = @ok(typeof @getResponse === "object")
 /var @test_fetch_get_has_url = @includes(@getResponse.url, "httpbin.org/get")
 /var @test_fetch_get_has_headers = @ok(@getResponse.headers)
 
 ## Test fetch.post with JSON data
 /var @postData = {"test": "value", "number": 42}
-/var @postResponse = @fetch.post("https://httpbin.org/post", @postData)
+/var @postResponse = @http.fetch.post("https://httpbin.org/post", @postData)
 /var @test_fetch_post_returns_object = @ok(typeof @postResponse === "object")
 /var @test_fetch_post_echo_correct = @deepEq(@postResponse.json, @postData)
 /var @test_fetch_post_method = @eq(@postResponse.method, "POST")
 
 ## Test fetch.put
 /var @putData = {"updated": true}
-/var @putResponse = @fetch.put("https://httpbin.org/put", @putData)
+/var @putResponse = @http.fetch.put("https://httpbin.org/put", @putData)
 /var @test_fetch_put_returns_object = @ok(typeof @putResponse === "object")
 /var @test_fetch_put_echo_correct = @deepEq(@putResponse.json, @putData)
 /var @test_fetch_put_method = @eq(@putResponse.method, "PUT")
 
 ## Test fetch.patch
 /var @patchData = {"patched": true}
-/var @patchResponse = @fetch.patch("https://httpbin.org/patch", @patchData)
+/var @patchResponse = @http.fetch.patch("https://httpbin.org/patch", @patchData)
 /var @test_fetch_patch_returns_object = @ok(typeof @patchResponse === "object")
 /var @test_fetch_patch_echo_correct = @deepEq(@patchResponse.json, @patchData)
 /var @test_fetch_patch_method = @eq(@patchResponse.method, "PATCH")
 
 ## Test fetch.delete
-/var @deleteResponse = @fetch.delete("https://httpbin.org/delete")
+/var @deleteResponse = @http.fetch.delete("https://httpbin.org/delete")
 /var @test_fetch_delete_returns_object = @ok(typeof @deleteResponse === "object")
 /var @test_fetch_delete_method = @eq(@deleteResponse.method, "DELETE")
 
 ## Test auth methods (with mock token)
 /var @mockToken = "test-token-12345"
-/var @authGetResponse = @auth.get("https://httpbin.org/bearer", @mockToken)
+/var @authGetResponse = @http.auth.get("https://httpbin.org/bearer", @mockToken)
 /var @test_auth_get_authenticated = @ok(@authGetResponse.authenticated)
 /var @test_auth_get_token_correct = @eq(@authGetResponse.token, @mockToken)
 
 ## Test auth.post
 /var @authPostData = {"secure": "data"}
-/var @authPostResponse = @auth.post("https://httpbin.org/bearer", @mockToken, @authPostData)
+/var @authPostResponse = @http.auth.post("https://httpbin.org/bearer", @mockToken, @authPostData)
 /var @test_auth_post_authenticated = @ok(@authPostResponse.authenticated)
 /var @test_auth_post_has_token = @eq(@authPostResponse.token, @mockToken)
 
@@ -60,7 +57,7 @@
   },
   "body": @customBody
 }
-/var @customResponse = @request("https://httpbin.org/post", @customOptions)
+/var @customResponse = @http.request("https://httpbin.org/post", @customOptions)
 /var @test_custom_request_header = @eq(@customResponse.headers["X-Custom-Header"], "test-value")
 /var @test_custom_request_data = @deepEq(@customResponse.json, {"custom": "request"})
 

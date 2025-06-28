@@ -1,6 +1,6 @@
 >>  Simple test to verify test system works
 
-/import { * } from "../modules/test.mld.md"
+/import { ok, notOk, eq } from "../modules/test.mld.md"
 
 >>  Basic tests
 /var @test_true_is_true = @ok(true)
@@ -9,7 +9,7 @@
 /var @test_strings_equal = @eq("hello", "hello")
 
 >> Test with arrays
-/var @arr = [1, 2, 3}
+/var @arr = [1, 2, 3]
 /var @test_array_length = @eq(@arr.length, 3)
 /var @test_array_first = @eq(@arr.0, 1)
 

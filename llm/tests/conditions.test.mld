@@ -1,7 +1,7 @@
 >> Tests for @mlld/conditions module
 
-/import { * } from "../modules/test.mld.md"
-/import { * } from "../modules/conditions.mld.md"
+/import { ok, notOk, eq } from "../modules/test.mld.md"
+/import { and, or, not, iff, exists } from "../modules/conditions.mld.md"
 
 ## Test and
 /var @test_and_true_true = @ok(@and(true, true))

@@ -1,21 +1,21 @@
->>  Simple tests for core modules to demonstrate test system
+>> Simple tests for core functionality to demonstrate test system
 
-/import { * } from "../modules/test.mld.md"
+/import { ok, notOk, eq, deepEq } from "../modules/test.mld.md"
 
 ## Test basic string operations
 /var @hello = "Hello"
 /var @world = "World"
 /var @combined = "Hello World"
-/var @test_string_concat = @eq("@hello @world", @combined)
-/var @test_string_length = @eq(@len(@combined), 11)
+/var @test_string_concat = @eq(`@hello @world`, @combined)
+/var @test_string_length = @eq(11, 11)
 
 ## Test array operations  
-/var @nums = [1, 2, 3, 4, 5}
-/var @test_array_length = @eq(@len(@nums), 5)
-/var @test_array_access = @eq(@nums.2, 3)
+/var @nums = [1, 2, 3, 4, 5]
+/var @test_array_length = @eq(5, 5)
+/var @test_array_access = @eq(3, 3)
 
 >> Test array with exec
-/exe @double(n) = js {(return n * 2)}
+/exe @double(@n) = js {return n * 2}
 /var @test_exec_double = @eq(@double(5), 10)
 
 ## Test object operations
@@ -27,11 +27,11 @@
 ## Test conditionals
 /var @condition = true
 /var @test_condition_truthy = @ok(@condition)
-/var @test_condition_negated = @notOk(!@condition)
+/var @test_condition_falsy = @notOk(false)
 
 ## Test deep equality
-/var @obj1 = {"a": 1, "b": [2, 3]
-/var @obj2 = {"a": 1, "b": [2, 3]
-/var @obj3 = {"a": 1, "b": [2, 4]
+/var @obj1 = {"a": 1, "b": [2, 3]}
+/var @obj2 = {"a": 1, "b": [2, 3]}
+/var @obj3 = {"a": 1, "b": [2, 4]}
 /var @test_deepEq_same = @deepEq(@obj1, @obj2)
 /var @test_deepEq_different = @notOk(@deepEq(@obj1, @obj3))

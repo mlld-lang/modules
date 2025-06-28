@@ -152,7 +152,7 @@ Show directory structure without file contents.
 Bundle implementation using shell utilities:
 
 ```mlld-run
-@exec xml(path) = @run sh [(
+/exe @xml(@path) = sh {
   # Generate XML representation of directory structure
   # Uses SCREAMING_SNAKE_CASE for XML tags
   
@@ -196,7 +196,7 @@ Bundle implementation using shell utilities:
   fi
 }
 
-@exec md(path) = @run sh [(
+/exe @md(@path) = sh {
   # Generate Markdown representation of directory structure
   
   function process_md_dir() {
@@ -263,7 +263,7 @@ Bundle implementation using shell utilities:
   fi
 }
 
-@exec tree(path) = @run sh [(
+/exe @tree(@path) = sh {
   # Show directory tree structure
   # Try to use tree command if available, otherwise fallback
   
@@ -312,7 +312,7 @@ Bundle implementation using shell utilities:
   fi
 }
 
-@data module = {
+/var @module = {
   xml: @xml,
   md: @md,
   tree: @tree

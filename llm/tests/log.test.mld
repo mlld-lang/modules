@@ -1,0 +1,60 @@
+>> Tests for @mlld/log module
+
+/import { ok, eq } from "../modules/test.mld.md"
+/import { log, info, warn, error, debug, group, time, table, inspect } from "../modules/log.mld.md"
+
+## Test basic logging functions exist
+/var @test_log_exists = @ok(@log)
+/var @test_info_exists = @ok(@info)
+/var @test_warn_exists = @ok(@warn)
+/var @test_error_exists = @ok(@error)
+/var @test_debug_exists = @ok(@debug)
+/var @test_group_exists = @ok(@group)
+/var @test_time_exists = @ok(@time)
+/var @test_table_exists = @ok(@table)
+/var @test_inspect_exists = @ok(@inspect)
+
+## Test function types
+/var @test_log_is_function = @eq(typeof @log, "function")
+/var @test_info_is_function = @eq(typeof @info, "function")
+/var @test_warn_is_function = @eq(typeof @warn, "function")
+/var @test_error_is_function = @eq(typeof @error, "function")
+/var @test_debug_is_function = @eq(typeof @debug, "function")
+/var @test_group_is_function = @eq(typeof @group, "function")
+/var @test_time_is_function = @eq(typeof @time, "function")
+/var @test_table_is_function = @eq(typeof @table, "function")
+/var @test_inspect_is_function = @eq(typeof @inspect, "function")
+
+## Test basic logging
+/var @logResult = @log("Test message")
+/var @test_log_returns_value = @eq(@logResult, "Test message")
+
+/var @infoResult = @info("Info message")
+/var @test_info_returns_value = @eq(@infoResult, "Info message")
+
+/var @warnResult = @warn("Warning message")
+/var @test_warn_returns_value = @eq(@warnResult, "Warning message")
+
+/var @errorResult = @error("Error message")
+/var @test_error_returns_value = @eq(@errorResult, "Error message")
+
+/var @debugResult = @debug("Debug message")
+/var @test_debug_returns_value = @eq(@debugResult, "Debug message")
+
+## Test complex data logging
+/var @testData = {"name": "test", "values": [1, 2, 3]}
+/var @logDataResult = @log(@testData)
+/var @test_log_returns_complex_data = @eq(@logDataResult, @testData)
+
+## Test table with array of objects
+/var @tableData = [
+  {"name": "Alice", "age": 30},
+  {"name": "Bob", "age": 25}
+]
+/var @tableResult = @table(@tableData)
+/var @test_table_returns_data = @eq(@tableResult, @tableData)
+
+## Test inspect function
+/var @inspectResult = @inspect(@testData)
+/var @test_inspect_returns_string = @eq(typeof @inspectResult, "string")
+/var @test_inspect_contains_data = @ok(@inspectResult.includes("name"))

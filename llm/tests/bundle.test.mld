@@ -1,108 +1,45 @@
 >> Tests for @mlld/bundle module
 
-/import { * } from "../modules/test.mld.md"
-/import { * } from "../modules/bundle.mld.md"
+/import { ok, eq, includes } from "../modules/test.mld.md"
+/import { module } from "../modules/bundle.mld.md"
 
->>  Create test mlld files for bundling
-/var @mainFile = [[
-/import { helper1, helper2 } from "./utils.mld"
-/import { feature } from "./feature.mld"
+## Test module structure
+/var @test_module_exists = @ok(@module)
+/var @test_module_is_object = @ok(typeof @module === "object")
+/var @test_has_xml = @ok(@module.xml)
+/var @test_has_md = @ok(@module.md)
+/var @test_has_tree = @ok(@module.tree)
 
-/var @greeting = "Hello from main"
-@run @helper1()
-@run @feature()
-]
-@output @mainFile to "/tmp/bundle-test/main.mld"
+## Test function types
+/var @test_xml_is_function = @eq(typeof @module.xml, "function")
+/var @test_md_is_function = @eq(typeof @module.md, "function")
+/var @test_tree_is_function = @eq(typeof @module.tree, "function")
 
-/var @utilsFile = [[
-/exe @helper1() = js {(
-  console.log("Helper 1 called");
-  return true;
-)}
+## Create test directory structure
+/run {mkdir -p /tmp/bundle-test/src /tmp/bundle-test/docs}
+/output "export const hello = () => 'Hello World';" to "/tmp/bundle-test/src/hello.js"
+/output "export const goodbye = () => 'Goodbye';" to "/tmp/bundle-test/src/goodbye.js"
+/output "# Documentation\n\nThis is a test file." to "/tmp/bundle-test/docs/README.md"
 
-/exe @helper2() = js {(
-  console.log("Helper 2 called");
-  return true;
-)}
+## Test XML bundling
+/var @xmlResult = @module.xml("/tmp/bundle-test/src")
+/var @test_xml_returns_string = @ok(typeof @xmlResult === "string")
+/var @test_xml_has_src_tag = @includes(@xmlResult, "<SRC>")
+/var @test_xml_has_hello_js = @includes(@xmlResult, "<HELLO_JS")
+/var @test_xml_has_content = @includes(@xmlResult, "Hello World")
 
-/var @utilsVersion = "1.0.0"
-]
-@output @utilsFile to "/tmp/bundle-test/utils.mld"
+## Test Markdown bundling
+/var @mdResult = @module.md("/tmp/bundle-test/docs")
+/var @test_md_returns_string = @ok(typeof @mdResult === "string")
+/var @test_md_has_header = @includes(@mdResult, "# docs")
+/var @test_md_has_readme = @includes(@mdResult, "## README.md")
+/var @test_md_has_content = @includes(@mdResult, "This is a test file")
 
-/var @featureFile = [[
-/import { helper2 } from "./utils.mld"
+## Test tree command
+/var @treeResult = @module.tree("/tmp/bundle-test")
+/var @test_tree_returns_string = @ok(typeof @treeResult === "string")
+/var @test_tree_has_src = @includes(@treeResult, "src")
+/var @test_tree_has_docs = @includes(@treeResult, "docs")
 
-/exe @feature() = js {(
-  console.log("Feature activated");
-  return @helper2();
-)}
-]
-@output @featureFile to "/tmp/bundle-test/feature.mld"
-
-## Test bundle function
-/var @bundled = @bundle("/tmp/bundle-test/main.mld")
-/var @test_bundle_returns_string = @ok(typeof @bundled === "string")
-/var @test_bundle_has_content = @includes(@bundled, "Hello from main")
-/var @test_bundle_has_imports = @includes(@bundled, "@import")
-
-## Test bundleWithDeps (should inline dependencies)
-/var @bundledWithDeps = @bundleWithDeps("/tmp/bundle-test/main.mld")
-/var @test_bundleWithDeps_returns_string = @ok(typeof @bundledWithDeps === "string")
-/var @test_bundleWithDeps_has_main = @includes(@bundledWithDeps, "Hello from main")
-/var @test_bundleWithDeps_has_helper1 = @includes(@bundledWithDeps, "Helper 1 called")
-/var @test_bundleWithDeps_has_feature = @includes(@bundledWithDeps, "Feature activated")
-/var @test_bundleWithDeps_has_utils_version = @includes(@bundledWithDeps, "1.0.0")
-
-## Test analyze function
-/var @analysis = @analyze("/tmp/bundle-test/main.mld")
-/var @test_analyze_returns_object = @ok(typeof @analysis === "object")
-/var @test_analyze_has_imports = @ok(@analysis.imports)
-/var @test_analyze_has_exports = @ok(@analysis.exports !== undefined)
-/var @test_analyze_has_dependencies = @ok(@analysis.dependencies)
-
->>  Check specific analysis results
-/var @test_analyze_imports_count = @ok(@analysis.imports.length >= 2)
-/var @test_analyze_has_utils_dep = @includes(@analysis.dependencies, "./utils.mld")
-/var @test_analyze_has_feature_dep = @includes(@analysis.dependencies, "./feature.mld")
-
-## Test tree function (dependency tree)
-/var @depTree = @tree("/tmp/bundle-test/main.mld")
-/var @test_tree_returns_object = @ok(typeof @depTree === "object")
-/var @test_tree_has_name = @eq(@depTree.name, "main.mld")
-/var @test_tree_has_children = @ok(Array.isArray(@depTree.children))
-/var @test_tree_children_count = @ok(@depTree.children.length >= 2)
-
->>  Check tree structure
-/var @utilsChild = @depTree.children.find(c => c.name === "utils.mld")
-/var @featureChild = @depTree.children.find(c => c.name === "feature.mld")
-/var @test_tree_has_utils_child = @ok(@utilsChild)
-/var @test_tree_has_feature_child = @ok(@featureChild)
-
->>  Feature should also depend on utils
-/var @test_feature_has_deps = @ok(@featureChild && @featureChild.children.length > 0)
-
-## Test with circular dependencies
-/var @circular1 = [[
-/import { func2 } from "./circular2.mld"
-/exe @func1() = js {(return "func1")}
-]
-@output @circular1 to "/tmp/bundle-test/circular1.mld"
-
-/var @circular2 = [[
-/import { func1 } from "./circular1.mld"
-/exe @func2() = js {(return "func2")}
-]
-@output @circular2 to "/tmp/bundle-test/circular2.mld"
-
->>  Analyze circular dependencies
-/var @circularAnalysis = @analyze("/tmp/bundle-test/circular1.mld")
-/var @test_circular_detected = @ok(@circularAnalysis.hasCircularDeps || @circularAnalysis.dependencies.length > 0)
-
-## Test with non-existent file handling
-/var @test_bundle_function_exists = @ok(@bundle)
-/var @test_bundleWithDeps_function_exists = @ok(@bundleWithDeps)
-/var @test_analyze_function_exists = @ok(@analyze)
-/var @test_tree_function_exists = @ok(@tree)
-
->>  Cleanup
-@run [(rm -rf /tmp/bundle-test)}
+## Cleanup
+/run {rm -rf /tmp/bundle-test}

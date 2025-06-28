@@ -1,7 +1,7 @@
 >> Tests for @mlld/string module
 
-/import { * } from "../modules/test.mld.md"
-/import { * } from "../modules/string.mld.md"
+/import { ok, notOk, eq, deepEq } from "../modules/test.mld.md"
+/import { charAt, charCodeAt, endsWith, includes, indexOf, join, lastIndexOf, padEnd, padStart, repeat, replace, replaceAll, slice, split, startsWith, substring, toLowerCase, toUpperCase, trim } from "../modules/string.mld.md"
 
 ## Test trim
 /var @test_trim_spaces = @eq(@trim("  hello world  "), "hello world")

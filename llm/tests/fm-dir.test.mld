@@ -1,12 +1,12 @@
 >> Tests for @mlld/fm-dir module
 
-/import { * } from "modules/llm/modules/test.mld.md"
-/import { * } from "modules/llm/modules/fm-dir.mld.md"
+/import { ok, eq, includes, deepEq } from "../modules/test.mld.md"
+/import { grab, grabDir, grabFiles, filterByFrontmatter, sortByField, groupByField, extractField, uniqueValues } from "../modules/fm-dir.mld.md"
 
 ## Setup test environment
 
 >>  Create test directories
-@run [(mkdir -p /tmp/fm-dir-test/posts /tmp/fm-dir-test/docs /tmp/fm-dir-test/nested/deep)}
+/run {mkdir -p /tmp/fm-dir-test/posts /tmp/fm-dir-test/docs /tmp/fm-dir-test/nested/deep}
 
 >>  Create test files with frontmatter
 /var @post1 = [[---
@@ -20,7 +20,7 @@ tags: ["javascript", "testing"}
 >>  First Post
 
 This is the content of the first post.]
-@output @post1 to "/tmp/fm-dir-test/posts/post1.md"
+/output @post1 to "/tmp/fm-dir-test/posts/post1.md"
 
 /var @post2 = [[---
 title: Second Post  
@@ -33,7 +33,7 @@ tags: ["python", "tutorial"}
 >>  Second Post
 
 This is the content of the second post.]
-@output @post2 to "/tmp/fm-dir-test/posts/post2.md"
+/output @post2 to "/tmp/fm-dir-test/posts/post2.md"
 
 /var @post3 = [[---
 title: Third Post
@@ -47,7 +47,7 @@ category: tech
 >>  Third Post
 
 This is the content of the third post.]
-@output @post3 to "/tmp/fm-dir-test/posts/post3.md"
+/output @post3 to "/tmp/fm-dir-test/posts/post3.md"
 
 /var @doc1 = [[---
 title: Documentation
@@ -57,20 +57,20 @@ version: 1.0.0
 >>  Documentation
 
 Some documentation content.]
-@output @doc1 to "/tmp/fm-dir-test/docs/README.md"
+/output @doc1 to "/tmp/fm-dir-test/docs/README.md"
 
 >>  File without frontmatter
 /var @plainFile = [[# Plain File
 
 No frontmatter here.]
-@output @plainFile to "/tmp/fm-dir-test/plain.txt"
+/output @plainFile to "/tmp/fm-dir-test/plain.txt"
 
 >>  Nested file
 /var @nestedFile = [[---
 location: deep
 ---
 Nested content]
-@output @nestedFile to "/tmp/fm-dir-test/nested/deep/file.md"
+/output @nestedFile to "/tmp/fm-dir-test/nested/deep/file.md"
 
 ## Test grabDir (non-recursive)
 
@@ -180,7 +180,7 @@ Nested content]
 
 ## Cleanup
 
-@run [(rm -rf /tmp/fm-dir-test)}
+/run {rm -rf /tmp/fm-dir-test}
 
 ## Summary
 

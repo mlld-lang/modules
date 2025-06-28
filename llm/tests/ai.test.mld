@@ -1,108 +1,42 @@
 >> Tests for @mlld/ai module
 
-/import { * } from "@local/test"
-/import { * } from "@local/ai"
+/import { ok, eq } from "../modules/test.mld.md"
+/import { claude, llm, codex } from "../modules/ai.mld.md"
 
->>  Note: These tests verify the AI module functions exist and have correct signatures
->>  Actual AI API calls would require API keys and incur costs, so we test structure only
+## Test that main objects exist
+/var @test_claude_exists = @ok(@claude)
+/var @test_llm_exists = @ok(@llm)
+/var @test_codex_exists = @ok(@codex)
 
-## Test that all main functions exist
-/var @test_complete_exists = @ok(@complete)
-/var @test_embed_exists = @ok(@embed)
-/var @test_generateImage_exists = @ok(@generateImage)
-/var @test_transcribe_exists = @ok(@transcribe)
-/var @test_vision_exists = @ok(@vision)
-/var @test_models_exists = @ok(@models)
+## Test claude object structure
+/var @test_claude_is_object = @ok(typeof @claude === "object")
+/var @test_claude_has_ask = @ok(@claude.ask)
+/var @test_claude_ask_is_function = @eq(typeof @claude.ask, "function")
 
-## Test models structure
-/var @test_models_is_object = @ok(typeof @models === "object")
-/var @test_models_has_gpt4 = @ok(@models.gpt4)
-/var @test_models_has_gpt35 = @ok(@models.gpt35)
-/var @test_models_has_claude = @ok(@models.claude)
-/var @test_models_has_embedding = @ok(@models.embedding)
-/var @test_models_has_whisper = @ok(@models.whisper)
-/var @test_models_has_dalle = @ok(@models.dalle)
+## Test llm object structure
+/var @test_llm_is_object = @ok(typeof @llm === "object")
+/var @test_llm_has_ask = @ok(@llm.ask)
+/var @test_llm_has_media = @ok(@llm.media)
+/var @test_llm_has_tools = @ok(@llm.tools)
+/var @test_llm_has_all = @ok(@llm.all)
+/var @test_llm_ask_is_function = @eq(typeof @llm.ask, "function")
+/var @test_llm_media_is_function = @eq(typeof @llm.media, "function")
+/var @test_llm_tools_is_function = @eq(typeof @llm.tools, "function")
+/var @test_llm_all_is_function = @eq(typeof @llm.all, "function")
 
-## Test model name values
-/var @test_gpt4_model_name = @eq(@models.gpt4, "gpt-4")
-/var @test_gpt35_model_name = @eq(@models.gpt35, "gpt-3.5-turbo")
-/var @test_claude_model_name = @eq(@models.claude, "claude-3-opus-20240229")
-/var @test_embedding_model_name = @eq(@models.embedding, "text-embedding-3-small")
-/var @test_whisper_model_name = @eq(@models.whisper, "whisper-1")
-/var @test_dalle_model_name = @eq(@models.dalle, "dall-e-3")
+## Test codex object structure
+/var @test_codex_is_object = @ok(typeof @codex === "object")
+/var @test_codex_has_ask = @ok(@codex.ask)
+/var @test_codex_has_media = @ok(@codex.media)
+/var @test_codex_ask_is_function = @eq(typeof @codex.ask, "function")
+/var @test_codex_media_is_function = @eq(typeof @codex.media, "function")
 
-## Test function signatures (by checking they're functions)
-/var @test_complete_is_function = @eq(typeof @complete, "function")
-/var @test_embed_is_function = @eq(typeof @embed, "function")
-/var @test_generateImage_is_function = @eq(typeof @generateImage, "function")
-/var @test_transcribe_is_function = @eq(typeof @transcribe, "function")
-/var @test_vision_is_function = @eq(typeof @vision, "function")
+## Test actual function calls
+/var @claude_response = @claude.ask("Say hello")
+/var @test_claude_response = @ok(@claude_response)
 
->> Test that we can create mock calls (without actually calling APIs)
->>  This verifies the parameter structure is correct
+/var @llm_response = @llm.ask("You are a test bot", "Say test")
+/var @test_llm_response = @ok(@llm_response)
 
-## Test complete parameters
-/exe @mockComplete() = js {(
-  // Test that complete can be called with proper parameters
-  const prompt = "Test prompt";
-  const options = {
-    model: "gpt-4",
-    temperature: 0.7,
-    max_tokens: 100
-  };
-  // Would call: @complete(prompt, options)
-  return true;
-)}
-/var @test_complete_params = @ok(@mockComplete())
-
-## Test embed parameters
-/exe @mockEmbed() = js {(
-  // Test embed parameter structure
-  const text = "Text to embed";
-  const options = {
-    model: "text-embedding-3-small"
-  };
-  // Would call: @embed(text, options)
-  return true;
-)}
-/var @test_embed_params = @ok(@mockEmbed())
-
-## Test generateImage parameters
-/exe @mockGenerateImage() = js {(
-  // Test generateImage parameter structure
-  const prompt = "A beautiful sunset";
-  const options = {
-    model: "dall-e-3",
-    size: "1024x1024",
-    quality: "standard"
-  };
-  // Would call: @generateImage(prompt, options)
-  return true;
-)}
-/var @test_generateImage_params = @ok(@mockGenerateImage())
-
-## Test vision parameters
-/exe @mockVision() = js {(
-  // Test vision parameter structure
-  const imageUrl = "https://example.com/image.jpg";
-  const prompt = "What's in this image?";
-  const options = {
-    model: "gpt-4-vision-preview"
-  };
-  // Would call: @vision(imageUrl, prompt, options)
-  return true;
-)}
-/var @test_vision_params = @ok(@mockVision())
-
-## Test transcribe parameters
-/exe @mockTranscribe() = js {(
-  // Test transcribe parameter structure
-  const audioPath = "/path/to/audio.mp3";
-  const options = {
-    model: "whisper-1",
-    language: "en"
-  };
-  // Would call: @transcribe(audioPath, options)
-  return true;
-)}
-/var @test_transcribe_params = @ok(@mockTranscribe())
+/var @codex_response = @codex.ask("Write a hello world function")
+/var @test_codex_response = @ok(@codex_response)
