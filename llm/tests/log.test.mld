@@ -1,7 +1,7 @@
 >> Tests for @mlld/log module
 
-/import { ok, eq } from "../modules/test.mld.md"
-/import { log, info, warn, error, debug, group, time, table, inspect } from "../modules/log.mld.md"
+/import { ok, eq, deepEq } from "@local/test"
+/import { log, info, warn, error, debug, group, time, table, inspect } from "@local/log"
 
 ## Test basic logging functions exist
 /var @test_log_exists = @ok(@log)
@@ -15,15 +15,16 @@
 /var @test_inspect_exists = @ok(@inspect)
 
 ## Test function types
-/var @test_log_is_function = @eq(typeof @log, "function")
-/var @test_info_is_function = @eq(typeof @info, "function")
-/var @test_warn_is_function = @eq(typeof @warn, "function")
-/var @test_error_is_function = @eq(typeof @error, "function")
-/var @test_debug_is_function = @eq(typeof @debug, "function")
-/var @test_group_is_function = @eq(typeof @group, "function")
-/var @test_time_is_function = @eq(typeof @time, "function")
-/var @test_table_is_function = @eq(typeof @table, "function")
-/var @test_inspect_is_function = @eq(typeof @inspect, "function")
+/exe @isFunction(@val) = js { return typeof val === "function"; }
+/var @test_log_is_function = @ok(@isFunction(@log))
+/var @test_info_is_function = @ok(@isFunction(@info))
+/var @test_warn_is_function = @ok(@isFunction(@warn))
+/var @test_error_is_function = @ok(@isFunction(@error))
+/var @test_debug_is_function = @ok(@isFunction(@debug))
+/var @test_group_is_function = @ok(@isFunction(@group))
+/var @test_time_is_function = @ok(@isFunction(@time))
+/var @test_table_is_function = @ok(@isFunction(@table))
+/var @test_inspect_is_function = @ok(@isFunction(@inspect))
 
 ## Test basic logging
 /var @logResult = @log("Test message")
@@ -44,7 +45,7 @@
 ## Test complex data logging
 /var @testData = {"name": "test", "values": [1, 2, 3]}
 /var @logDataResult = @log(@testData)
-/var @test_log_returns_complex_data = @eq(@logDataResult, @testData)
+/var @test_log_returns_complex_data = @deepEq(@logDataResult, @testData)
 
 ## Test table with array of objects
 /var @tableData = [
@@ -52,9 +53,11 @@
   {"name": "Bob", "age": 25}
 ]
 /var @tableResult = @table(@tableData)
-/var @test_table_returns_data = @eq(@tableResult, @tableData)
+/var @test_table_returns_data = @deepEq(@tableResult, @tableData)
 
 ## Test inspect function
 /var @inspectResult = @inspect(@testData)
-/var @test_inspect_returns_string = @eq(typeof @inspectResult, "string")
-/var @test_inspect_contains_data = @ok(@inspectResult.includes("name"))
+/exe @isString(@val) = js { return typeof val === "string"; }
+/var @test_inspect_returns_string = @ok(@isString(@inspectResult))
+/exe @containsName(str) = js { return @str.includes("name"); }
+/var @test_inspect_contains_data = @ok(@containsName(@inspectResult))

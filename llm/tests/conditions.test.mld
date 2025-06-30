@@ -1,7 +1,7 @@
 >> Tests for @mlld/conditions module
 
-/import { ok, notOk, eq } from "../modules/test.mld.md"
-/import { and, or, not, iff, exists } from "../modules/conditions.mld.md"
+/import { ok, notOk, eq } from "@local/test"
+/import { and, or, not, exists, xor } from "@local/conditions"
 
 ## Test and
 /var @test_and_true_true = @ok(@and(true, true))
@@ -37,16 +37,16 @@
 /var @test_not_null = @ok(@not(null))
 /var @test_not_undefined = @ok(@not(undefined))
 
-## Test iff (if and only if)
-/var @test_iff_true_true = @ok(@iff(true, true))
-/var @test_iff_true_false = @notOk(@iff(true, false))
-/var @test_iff_false_true = @notOk(@iff(false, true))
-/var @test_iff_false_false = @ok(@iff(false, false))
+## Test xor (exclusive or)
+/var @test_xor_true_true = @notOk(@xor(true, true))
+/var @test_xor_true_false = @ok(@xor(true, false))
+/var @test_xor_false_true = @ok(@xor(false, true))
+/var @test_xor_false_false = @notOk(@xor(false, false))
 
->> Test iff with truthy/falsy values
-/var @test_iff_truthy_truthy = @ok(@iff("hello", "world"))
-/var @test_iff_truthy_falsy = @notOk(@iff("hello", ""))
-/var @test_iff_falsy_falsy = @ok(@iff(0, null))
+>> Test xor with truthy/falsy values
+/var @test_xor_truthy_truthy = @notOk(@xor("hello", "world"))
+/var @test_xor_truthy_falsy = @ok(@xor("hello", ""))
+/var @test_xor_falsy_falsy = @notOk(@xor(0, null))
 
 ## Test exists
 /var @test_exists_value = @ok(@exists("hello"))
@@ -72,5 +72,11 @@
 /var @x = 5
 /var @y = 10
 /var @z = 15
-/var @test_chained_and = @ok(@and(@and(@x < @y, @y < @z), @x < @z))
-/var @test_chained_or = @ok(@or(@or(@x > 10, @y > 10), @z > 10))
+/exe @xLessY() = js { return 5 < 10; }
+/exe @yLessZ() = js { return 10 < 15; }
+/exe @xLessZ() = js { return 5 < 15; }
+/exe @xGreater10() = js { return 5 > 10; }
+/exe @yGreater10() = js { return 10 > 10; }
+/exe @zGreater10() = js { return 15 > 10; }
+/var @test_chained_and = @ok(@and(@and(@xLessY(), @yLessZ()), @xLessZ()))
+/var @test_chained_or = @ok(@or(@or(@xGreater10(), @yGreater10()), @zGreater10()))

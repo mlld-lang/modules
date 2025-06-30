@@ -1,7 +1,7 @@
 >> Tests for @mlld/ai module
 
-/import { ok, eq } from "../modules/test.mld.md"
-/import { claude, llm, codex } from "../modules/ai.mld.md"
+/import { ok, eq } from "@local/test"
+/import { claude, llm, codex } from "@local/ai"
 
 ## Test that main objects exist
 /var @test_claude_exists = @ok(@claude)
@@ -9,27 +9,29 @@
 /var @test_codex_exists = @ok(@codex)
 
 ## Test claude object structure
-/var @test_claude_is_object = @ok(typeof @claude === "object")
+/exe @isObject(@val) = js { return typeof val === "object"; }
+/exe @isFunction(@val) = js { return typeof val === "function"; }
+/var @test_claude_is_object = @ok(@isObject(@claude))
 /var @test_claude_has_ask = @ok(@claude.ask)
-/var @test_claude_ask_is_function = @eq(typeof @claude.ask, "function")
+/var @test_claude_ask_is_function = @ok(@isFunction(@claude.ask))
 
 ## Test llm object structure
-/var @test_llm_is_object = @ok(typeof @llm === "object")
+/var @test_llm_is_object = @ok(@isObject(@llm))
 /var @test_llm_has_ask = @ok(@llm.ask)
 /var @test_llm_has_media = @ok(@llm.media)
 /var @test_llm_has_tools = @ok(@llm.tools)
 /var @test_llm_has_all = @ok(@llm.all)
-/var @test_llm_ask_is_function = @eq(typeof @llm.ask, "function")
-/var @test_llm_media_is_function = @eq(typeof @llm.media, "function")
-/var @test_llm_tools_is_function = @eq(typeof @llm.tools, "function")
-/var @test_llm_all_is_function = @eq(typeof @llm.all, "function")
+/var @test_llm_ask_is_function = @ok(@isFunction(@llm.ask))
+/var @test_llm_media_is_function = @ok(@isFunction(@llm.media))
+/var @test_llm_tools_is_function = @ok(@isFunction(@llm.tools))
+/var @test_llm_all_is_function = @ok(@isFunction(@llm.all))
 
 ## Test codex object structure
-/var @test_codex_is_object = @ok(typeof @codex === "object")
+/var @test_codex_is_object = @ok(@isObject(@codex))
 /var @test_codex_has_ask = @ok(@codex.ask)
 /var @test_codex_has_media = @ok(@codex.media)
-/var @test_codex_ask_is_function = @eq(typeof @codex.ask, "function")
-/var @test_codex_media_is_function = @eq(typeof @codex.media, "function")
+/var @test_codex_ask_is_function = @ok(@isFunction(@codex.ask))
+/var @test_codex_media_is_function = @ok(@isFunction(@codex.media))
 
 ## Test actual function calls
 /var @claude_response = @claude.ask("Say hello")

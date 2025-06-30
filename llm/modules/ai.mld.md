@@ -6,21 +6,21 @@ about: LLM cli wrappers
 needs: ["sh"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
-keywords: ["llm", "ai", "openai", "anthropic", "claude", "codex"]
+keywords: ["llm", "ai", "openai", "anthropic", "google", "claude", "codex", "gemini"]
 license: CC0
 mlldVersion: "*"
 ---
 
 # @mlld/ai
 
-Simple wrappers for AI CLI tools (llm, claude, codex) to integrate language models into mlld workflows.
+Simple wrappers for AI CLI tools (llm, claude, codex, gemini) to integrate language models into mlld workflows.
 
 ## tldr
 
 Easy AI integration for your mlld scripts:
 
 ```mlld
-@import { claude, llm, codex } from @mlld/ai
+@import { claude, llm, codex, gemini } from @mlld/ai
 
 @text response = @claude.ask("What's the capital of France?")
 @add [[Claude says: {{response}}]]
@@ -101,51 +101,139 @@ Convert diagrams or images to code.
 /show [[{{implementation}}]]
 ```
 
+### Gemini Integration
+
+#### `gemini.ask(prompt)`
+
+Direct interface to Google's Gemini via the gemini CLI tool.
+
+```mlld
+/var @analysis = @gemini.ask("Explain quantum computing in simple terms")
+/show [[Explanation: {{analysis}}]]
+```
+
+#### `gemini.media(prompt, media_path)`
+
+Multimodal prompts with Gemini.
+
+```mlld
+/var @description = @gemini.media("What's happening in this image?", "photo.jpg")
+/show [[{{description}}]]
+```
+
 ## module
 
 Wrappers for popular AI CLI tools:
 
 ```mlld-run
-/exe @claude_ask(prompt) = run {
+/exe @claude_ask(@prompt) = sh {
   # Requires claude CLI tool installed
-  claude-code "@prompt" 2>/dev/null || echo "Error: claude CLI not found. Install from https://github.com/anthropics/claude-code"
-}
-
-/exe @llm_ask(system, prompt) = run {
-  # Requires llm CLI tool installed
-  llm -s "@system" "@prompt" 2>/dev/null || echo "Error: llm CLI not found. Install with: pip install llm"
-}
-
-/exe @llm_media(system, prompt, media) = run {
-  # LLM with media attachment
-  if [ -f "@media" ]; then
-    llm -s "@system" -a "@media" "@prompt" 2>/dev/null || echo "Error: llm CLI not found or media file missing"
+  if ! command -v claude >/dev/null 2>&1; then
+    echo "Error: claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
+    exit 1
+  fi
+  
+  result=$(claude -p "$prompt" 2>&1)
+  exit_code=$?
+  
+  if [ $exit_code -eq 0 ]; then
+    echo "$result"
+  elif echo "$result" | grep -q "Invalid API key"; then
+    echo "Error: Invalid Claude API key. Set ANTHROPIC_API_KEY environment variable."
   else
-    echo "Error: Media file not found: @media"
+    echo "Error: $result"
   fi
 }
 
-/exe @llm_tools(system, prompt, tools) = run {
-  # LLM with tools enabled
-  llm -s "@system" --tools "@tools" "@prompt" 2>/dev/null || echo "Error: llm CLI not found or tools not available"
-}
-
-/exe @llm_all(system, prompt, parameters) = run {
-  # LLM with custom parameters
-  llm -s "@system" @parameters "@prompt" 2>/dev/null || echo "Error: llm CLI not found"
-}
-
-/exe @codex_ask(prompt) = run {
-  # Requires codex or compatible CLI
-  codex "@prompt" 2>/dev/null || llm -m gpt-4 "@prompt" 2>/dev/null || echo "Error: codex CLI not found. Using llm as fallback."
-}
-
-/exe @codex_media(prompt, media) = run {
-  # Codex with media input
-  if [ -f "@media" ]; then
-    codex -a "@media" "@prompt" 2>/dev/null || llm -m gpt-4-vision -a "@media" "@prompt" 2>/dev/null || echo "Error: codex CLI not found or media file missing"
+/exe @llm_ask(@system, @prompt) = sh {
+  # Requires llm CLI tool installed
+  if ! command -v llm >/dev/null 2>&1; then
+    echo "Error: llm CLI not found. Install with: pip install llm"
+    exit 1
+  fi
+  
+  result=$(llm "$system - $prompt" 2>&1)
+  exit_code=$?
+  
+  if [ $exit_code -eq 0 ]; then
+    echo "$result"
+  elif echo "$result" | grep -q "No API key"; then
+    echo "Error: No LLM API key found. Configure with: llm keys set openai"
   else
-    echo "Error: Media file not found: @media"
+    echo "Error: $result"
+  fi
+}
+
+/exe @llm_media(@system, @prompt, @media) = sh {
+  # LLM with media attachment
+  if [ -f "$media" ]; then
+    llm -a "$media" "$system - $prompt" 2>/dev/null || echo "Error: llm CLI not found or media file missing"
+  else
+    echo "Error: Media file not found: $media"
+  fi
+}
+
+/exe @llm_tools(@system, @prompt, @tools) = sh {
+  # LLM with tools enabled
+  llm --tools "$tools" "$system - $prompt" 2>/dev/null || echo "Error: llm CLI not found or tools not available"
+}
+
+/exe @llm_all(@system, @prompt, @parameters) = sh {
+  # LLM with custom parameters
+  llm $parameters "$system - $prompt" 2>/dev/null || echo "Error: llm CLI not found"
+}
+
+/exe @codex_ask(@prompt) = sh {
+  # Requires codex or compatible CLI
+  # Codex tries to do interactive auth, so we need to handle it carefully
+  if command -v codex >/dev/null 2>&1; then
+    # Check if API key is set to avoid interactive prompt
+    if [ -n "$OPENAI_API_KEY" ]; then
+      codex "$prompt" 2>/dev/null || echo "Error: Codex failed. Check your OPENAI_API_KEY."
+    else
+      echo "Error: OPENAI_API_KEY not set. Export OPENAI_API_KEY environment variable."
+    fi
+  elif command -v llm >/dev/null 2>&1; then
+    llm -m gpt-4 "$prompt" 2>/dev/null || echo "Error: LLM fallback failed"
+  else
+    echo "Error: codex CLI not found. Install with: npm install -g @openai/codex"
+  fi
+}
+
+/exe @codex_media(@prompt, @media) = sh {
+  # Codex with media input
+  if [ -f "$media" ]; then
+    codex -a "$media" "$prompt" 2>/dev/null || llm -m gpt-4-vision -a "$media" "$prompt" 2>/dev/null || echo "Error: codex CLI not found or media file missing"
+  else
+    echo "Error: Media file not found: $media"
+  fi
+}
+
+/exe @gemini_ask(@prompt) = sh {
+  # Requires gemini CLI tool installed
+  if ! command -v gemini >/dev/null 2>&1; then
+    echo "Error: gemini CLI not found. Install with: npm install -g @google/gemini-cli"
+    exit 1
+  fi
+  
+  result=$(gemini -p "$prompt" 2>&1)
+  exit_code=$?
+  
+  if [ $exit_code -eq 0 ]; then
+    echo "$result"
+  elif echo "$result" | grep -q "API key"; then
+    echo "Error: Invalid Gemini API key. Set GOOGLE_API_KEY environment variable."
+  else
+    echo "Error: $result"
+  fi
+}
+
+/exe @gemini_media(@prompt, @media) = sh {
+  # Gemini with media input
+  if [ -f "$media" ]; then
+    gemini -a "$media" -p "$prompt" 2>/dev/null || echo "Error: gemini CLI not found or media file missing. Install with: npm install -g @google/gemini-cli"
+  else
+    echo "Error: Media file not found: $media"
   fi
 }
 
@@ -163,5 +251,10 @@ Wrappers for popular AI CLI tools:
 /var @codex = {
   ask: @codex_ask,
   media: @codex_media
+}
+
+/var @gemini = {
+  ask: @gemini_ask,
+  media: @gemini_media
 }
 ```

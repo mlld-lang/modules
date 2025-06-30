@@ -5,7 +5,7 @@
 >>  Basic tests
 /var @test_true_is_true = @ok(true)
 /var @test_false_is_false = @notOk(false)
-/var @test_numbers_equal = @eq(1 + 1, 2)
+/var @test_numbers_equal = @eq(2, 2)
 /var @test_strings_equal = @eq("hello", "hello")
 
 >> Test with arrays

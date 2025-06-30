@@ -1,51 +1,48 @@
 >> Tests for @mlld/fix-relative-links module
 
-/import { ok, eq, includes } from "../modules/test.mld.md"
-/import { fixRelativeLinks } from "../modules/fix-relative-links.mld.md"
+/import { ok, eq, includes } from "@local/test"
+/import { fixRelativeLinks } from "@local/fix-relative-links"
 
 ## Test basic relative link fixing
-/var @markdownWithLinks = [[
+/var @markdownWithLinks = `
 >> Test Document
 
 Here's a [relative link](./docs/guide.md) and an [image](../images/logo.png).
 
 Also check the [absolute link](/root/file.md) and [external link](https://example.com).
 
-![Alt text](./assets/image.jpg)
-]
+![Alt text](./assets/image.jpg)`
 
 /var @fixed = @fixRelativeLinks(@markdownWithLinks, ".", "https://github.com/user/repo/blob/main")
-/var @test_fixed_is_string = @ok(typeof @fixed === "string")
+/exe @isString(@val) = js { return typeof val === "string"; }
+/var @test_fixed_is_string = @ok(@isString(@fixed))
 /var @test_fixed_has_github_link = @includes(@fixed, "https://github.com/user/repo/blob/main/docs/guide.md")
 /var @test_fixed_has_image_link = @includes(@fixed, "https://github.com/user/repo/blob/main/assets/image.jpg")
 /var @test_fixed_preserves_external = @includes(@fixed, "https://example.com")
 
 ## Test with subdirectory base
-/var @subDirMarkdown = [[
-See [parent file](../README.md) and [sibling](./sibling.md).
-]
+/var @subDirMarkdown = `
+See [parent file](../README.md) and [sibling](./sibling.md).`
 
 /var @fixedSubDir = @fixRelativeLinks(@subDirMarkdown, "docs", "https://github.com/user/repo/blob/main")
 /var @test_subdir_parent_link = @includes(@fixedSubDir, "https://github.com/user/repo/blob/main/README.md")
 /var @test_subdir_sibling_link = @includes(@fixedSubDir, "https://github.com/user/repo/blob/main/docs/sibling.md")
 
 ## Test with nested paths
-/var @nestedMarkdown = [[
-Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md).
-]
+/var @nestedMarkdown = `
+Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md).`
 
 /var @fixedNested = @fixRelativeLinks(@nestedMarkdown, "src/components", "https://example.com/base")
 /var @test_nested_deep_link = @includes(@fixedNested, "https://example.com/base/src/components/sub/folder/file.md")
 /var @test_nested_up_over_link = @includes(@fixedNested, "https://example.com/base/other/doc.md")
 
 ## Test preservation of non-relative links
-/var @mixedLinks = [[
+/var @mixedLinks = `
 - [External](https://google.com)
 - [Protocol](ftp://server.com/file)
 - [Anchor](#section)
 - [Absolute](/absolute/path.md)
-- [Relative](./relative.md)
-]
+- [Relative](./relative.md)`
 
 /var @fixedMixed = @fixRelativeLinks(@mixedLinks, ".", "https://base.url")
 /var @test_preserves_https = @includes(@fixedMixed, "https://google.com")
@@ -55,11 +52,10 @@ Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md).
 /var @test_fixes_relative = @includes(@fixedMixed, "https://base.url/relative.md")
 
 ## Test with images
-/var @imageMarkdown = [[
+/var @imageMarkdown = `
 ![Logo](./logo.png)
 ![External](https://cdn.example.com/image.jpg)
-![Parent](../assets/banner.jpg)
-]
+![Parent](../assets/banner.jpg)`
 
 /var @fixedImages = @fixRelativeLinks(@imageMarkdown, "docs", "https://repo.url")
 /var @test_fixes_image_relative = @includes(@fixedImages, "https://repo.url/docs/logo.png")
@@ -76,7 +72,7 @@ Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md).
 /var @test_no_links_unchanged = @eq(@fixedNoLinks, @noLinksMarkdown)
 
 ## Test complex markdown structure
-/var @complexMarkdown = [[
+/var @complexMarkdown = `
 >>  Documentation
 
 Check out:
@@ -88,12 +84,11 @@ Check out:
 This [link](./in-code.md) should not be changed
 ```
 
-> Quote with [reference](./quote-ref.md)
-]
+> Quote with [reference](./quote-ref.md)`
 
 /var @fixedComplex = @fixRelativeLinks(@complexMarkdown, "docs", "https://project.com")
 /var @test_complex_api_link = @includes(@fixedComplex, "https://project.com/docs/api/index.md")
 /var @test_complex_examples_link = @includes(@fixedComplex, "https://project.com/examples/basic.md")
 /var @test_complex_guide_link = @includes(@fixedComplex, "https://project.com/docs/guide/getting-started.md")
 /var @test_complex_quote_link = @includes(@fixedComplex, "https://project.com/docs/quote-ref.md")
->>  Note: Links in code blocks should ideally not be changed, but this might depend on implementation
+>> Note: Links in code blocks should ideally not be changed, but this might depend on implementation

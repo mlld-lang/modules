@@ -1,7 +1,7 @@
 >> Tests for @mlld/fm-dir module
 
-/import { ok, eq, includes, deepEq } from "../modules/test.mld.md"
-/import { grab, grabDir, grabFiles, filterByFrontmatter, sortByField, groupByField, extractField, uniqueValues } from "../modules/fm-dir.mld.md"
+/import { ok, eq, includes, deepEq } from "@local/test"
+/import { grab, grabDir, grabFiles, filterByFrontmatter, sortByField, groupByField, extractField, uniqueValues } from "@local/fm-dir"
 
 ## Setup test environment
 
@@ -9,67 +9,67 @@
 /run {mkdir -p /tmp/fm-dir-test/posts /tmp/fm-dir-test/docs /tmp/fm-dir-test/nested/deep}
 
 >>  Create test files with frontmatter
-/var @post1 = [[---
+/var @post1 = `---
 title: First Post
 author: Alice
 date: 2024-01-15
 published: true
-tags: ["javascript", "testing"}
+tags: ["javascript", "testing"]
 ---
 
 >>  First Post
 
-This is the content of the first post.]
+This is the content of the first post.`
 /output @post1 to "/tmp/fm-dir-test/posts/post1.md"
 
-/var @post2 = [[---
+/var @post2 = `---
 title: Second Post  
 author: Bob
 date: 2024-01-20
 published: false
-tags: ["python", "tutorial"}
+tags: ["python", "tutorial"]
 ---
 
 >>  Second Post
 
-This is the content of the second post.]
+This is the content of the second post.`
 /output @post2 to "/tmp/fm-dir-test/posts/post2.md"
 
-/var @post3 = [[---
+/var @post3 = `---
 title: Third Post
 author: Alice
 date: 2024-01-25
 published: true
-tags: ["javascript", "tutorial"}
+tags: ["javascript", "tutorial"]
 category: tech
 ---
 
 >>  Third Post
 
-This is the content of the third post.]
+This is the content of the third post.`
 /output @post3 to "/tmp/fm-dir-test/posts/post3.md"
 
-/var @doc1 = [[---
+/var @doc1 = `---
 title: Documentation
 version: 1.0.0
 ---
 
 >>  Documentation
 
-Some documentation content.]
+Some documentation content.`
 /output @doc1 to "/tmp/fm-dir-test/docs/README.md"
 
 >>  File without frontmatter
-/var @plainFile = [[# Plain File
+/var @plainFile = `# Plain File
 
-No frontmatter here.]
+No frontmatter here.`
 /output @plainFile to "/tmp/fm-dir-test/plain.txt"
 
 >>  Nested file
-/var @nestedFile = [[---
+/var @nestedFile = `---
 location: deep
 ---
-Nested content]
+Nested content`
 /output @nestedFile to "/tmp/fm-dir-test/nested/deep/file.md"
 
 ## Test grabDir (non-recursive)
@@ -85,7 +85,8 @@ Nested content]
 
 /var @allFiles = @grabFiles("/tmp/fm-dir-test", "**/*.md")
 /var @test_grabFiles_returns_array = @ok(Array.isArray(@allFiles))
-/var @test_grabFiles_finds_nested = @ok(@allFiles.length >= 5)
+/exe @hasAtLeast5(@arr) = js { return arr.length >= 5; }
+/var @test_grabFiles_finds_nested = @ok(@hasAtLeast5(@allFiles))
 
 ## Test grab with options
 
@@ -93,7 +94,8 @@ Nested content]
   "contentPreview": 20
 })
 /var @test_grab_has_preview = @ok(@grabbedWithPreview[0].preview)
-/var @test_grab_preview_length = @ok(@grabbedWithPreview[0].preview.length <= 23) # 20 chars + "..."
+/exe @isPreviewLength(@preview) = js { return preview.length <= 23; }
+/var @test_grab_preview_length = @ok(@isPreviewLength(@grabbedWithPreview[0].preview))  >> 20 chars + "..."
 
 /var @grabbedWithContent = @grab("/tmp/fm-dir-test/posts", "post1.md", {
   "includeContent": true
@@ -184,8 +186,7 @@ Nested content]
 
 ## Summary
 
-/show [[
-Test Results:
+/show `Test Results:
 - grabDir: Basic directory scanning works
 - grabFiles: Recursive scanning with glob patterns works
 - grab: Advanced options (preview, content, fm filter) work
@@ -195,5 +196,4 @@ Test Results:
 - extractField: Field extraction works
 - uniqueValues: Unique value extraction with array flattening works
 - File metadata: Extension, size, and modified date are captured
-- Edge cases: Handles files without frontmatter gracefully
-]
+- Edge cases: Handles files without frontmatter gracefully`
