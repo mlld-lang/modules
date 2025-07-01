@@ -91,4 +91,11 @@ This [link](./in-code.md) should not be changed
 /var @test_complex_examples_link = @includes(@fixedComplex, "https://project.com/examples/basic.md")
 /var @test_complex_guide_link = @includes(@fixedComplex, "https://project.com/docs/guide/getting-started.md")
 /var @test_complex_quote_link = @includes(@fixedComplex, "https://project.com/docs/quote-ref.md")
+
 >> Note: Links in code blocks should ideally not be changed, but this might depend on implementation
+
+## Test Summary
+
+/show `Fix Relative Links Tests:`
+/show `Basic tests: @test_basic_link`
+/show `Complex markdown: @test_complex_api_link`

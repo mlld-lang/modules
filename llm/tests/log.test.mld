@@ -1,63 +1,34 @@
 >> Tests for @mlld/log module
 
 /import { ok, eq, deepEq } from "@local/test"
-/import { log, info, warn, error, debug, group, time, table, inspect } from "@local/log"
+/import { log, logVerbose, logJson } from "@local/log"
 
 ## Test basic logging functions exist
 /var @test_log_exists = @ok(@log)
-/var @test_info_exists = @ok(@info)
-/var @test_warn_exists = @ok(@warn)
-/var @test_error_exists = @ok(@error)
-/var @test_debug_exists = @ok(@debug)
-/var @test_group_exists = @ok(@group)
-/var @test_time_exists = @ok(@time)
-/var @test_table_exists = @ok(@table)
-/var @test_inspect_exists = @ok(@inspect)
+/var @test_logVerbose_exists = @ok(@logVerbose)
+/var @test_logJson_exists = @ok(@logJson)
 
 ## Test function types
 /exe @isFunction(@val) = js { return typeof val === "function"; }
 /var @test_log_is_function = @ok(@isFunction(@log))
-/var @test_info_is_function = @ok(@isFunction(@info))
-/var @test_warn_is_function = @ok(@isFunction(@warn))
-/var @test_error_is_function = @ok(@isFunction(@error))
-/var @test_debug_is_function = @ok(@isFunction(@debug))
-/var @test_group_is_function = @ok(@isFunction(@group))
-/var @test_time_is_function = @ok(@isFunction(@time))
-/var @test_table_is_function = @ok(@isFunction(@table))
-/var @test_inspect_is_function = @ok(@isFunction(@inspect))
+/var @test_logVerbose_is_function = @ok(@isFunction(@logVerbose))
+/var @test_logJson_is_function = @ok(@isFunction(@logJson))
 
-## Test basic logging
-/var @logResult = @log("Test message")
-/var @test_log_returns_value = @eq(@logResult, "Test message")
+## Test pass-through behavior (all log functions return input unchanged)
+/var @testString = "Test message"
+/var @logResult = @log(@testString)
+/var @test_log_returns_input = @eq(@logResult, @testString)
 
-/var @infoResult = @info("Info message")
-/var @test_info_returns_value = @eq(@infoResult, "Info message")
-
-/var @warnResult = @warn("Warning message")
-/var @test_warn_returns_value = @eq(@warnResult, "Warning message")
-
-/var @errorResult = @error("Error message")
-/var @test_error_returns_value = @eq(@errorResult, "Error message")
-
-/var @debugResult = @debug("Debug message")
-/var @test_debug_returns_value = @eq(@debugResult, "Debug message")
-
-## Test complex data logging
 /var @testData = {"name": "test", "values": [1, 2, 3]}
 /var @logDataResult = @log(@testData)
 /var @test_log_returns_complex_data = @deepEq(@logDataResult, @testData)
 
-## Test table with array of objects
-/var @tableData = [
-  {"name": "Alice", "age": 30},
-  {"name": "Bob", "age": 25}
-]
-/var @tableResult = @table(@tableData)
-/var @test_table_returns_data = @deepEq(@tableResult, @tableData)
+/var @verboseResult = @logVerbose(@testString)
+/var @test_logVerbose_returns_input = @eq(@verboseResult, @testString)
 
-## Test inspect function
-/var @inspectResult = @inspect(@testData)
-/exe @isString(@val) = js { return typeof val === "string"; }
-/var @test_inspect_returns_string = @ok(@isString(@inspectResult))
-/exe @containsName(str) = js { return @str.includes("name"); }
-/var @test_inspect_contains_data = @ok(@containsName(@inspectResult))
+/var @jsonResult = @logJson(@testData)
+/var @test_logJson_returns_input = @deepEq(@jsonResult, @testData)
+
+## Test pipeline usage
+/var @pipelineResult = @testString | @log | @logVerbose | @logJson
+/var @test_pipeline_preserves_data = @eq(@pipelineResult, @testString)
