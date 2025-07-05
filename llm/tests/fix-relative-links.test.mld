@@ -1,11 +1,11 @@
 >> Tests for @mlld/fix-relative-links module
 
-/import { ok, eq, includes } from "@local/test"
-/import { fixRelativeLinks } from "@local/fix-relative-links"
+/import { ok, eq, includes } from @local/test
+/import { fixRelativeLinks } from @local/fix-relative-links
 
 ## Test basic relative link fixing
 /var @markdownWithLinks = `
->> Test Document
+# Test Document
 
 Here's a [relative link](./docs/guide.md) and an [image](../images/logo.png).
 
@@ -73,16 +73,14 @@ Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md).
 
 ## Test complex markdown structure
 /var @complexMarkdown = `
->>  Documentation
+# Documentation
 
 Check out:
 - The [API docs](./api/index.md)
 - Our [examples](../examples/basic.md)
 - The [guide](./guide/getting-started.md)
 
-```markdown
-This [link](./in-code.md) should not be changed
-```
+    This [link](./in-code.md) should not be changed (in code block)
 
 > Quote with [reference](./quote-ref.md)`
 
@@ -96,6 +94,5 @@ This [link](./in-code.md) should not be changed
 
 ## Test Summary
 
-/show `Fix Relative Links Tests:`
-/show `Basic tests: @test_basic_link`
-/show `Complex markdown: @test_complex_api_link`
+>> Tests completed
+

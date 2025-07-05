@@ -20,13 +20,13 @@ Bundle operations to format directory contents as XML or Markdown with proper st
 Bundle your project files for AI analysis or documentation:
 
 ```mlld
-@import { xml, md, tree } from @mlld/bundle
+@import { xml as toXml, md, tree } from @mlld/bundle
 
-@text src_xml = @xml("./src")
+@text src_xml = @toXml("./src")
 @add [[Project structure in XML:]]
 @add [[{{src_xml}}]]
 
-@text docs_md = @md("./docs")
+@text docs_md = @toMd("./docs")
 @add [[Documentation structure:]]
 @add [[{{docs_md}}]]
 ```
@@ -40,7 +40,7 @@ Bundle your project files for AI analysis or documentation:
 Generate structured XML with SCREAMING_SNAKE_CASE tags for consistency and clarity.
 
 ```mlld
-@text project_context = @xml("./src")
+@text project_context = @toXml("./src")
 @add [[<project-context>]]
 @add [[{{project_context}}]]
 @add [[</project-context>]]
@@ -71,7 +71,7 @@ Generate structured XML with SCREAMING_SNAKE_CASE tags for consistency and clari
 Generate clean Markdown with appropriate header levels and code blocks.
 
 ```mlld
-@text api_docs = @md("./api")
+@text api_docs = @toMd("./api")
 @add [[## API Documentation Bundle]]
 @add [[{{api_docs}}]]
 ```
@@ -117,7 +117,7 @@ Show directory structure without file contents.
 @import { xml } from @mlld/bundle
 @import { claude } from @mlld/ai
 
-@text changes = @xml("./src/components")
+@text changes = @toXml("./src/components")
 @text review = @claude.ask("Review this React component structure for best practices: {{changes}}")
 @add [[Code Review Results:]]
 @add [[{{review}}]]
@@ -127,8 +127,8 @@ Show directory structure without file contents.
 ```mlld
 @import { md } from @mlld/bundle
 
-@text api_bundle = @md("./api")
-@text lib_bundle = @md("./lib")
+@text api_bundle = @toMd("./api")
+@text lib_bundle = @toMd("./lib")
 
 @add [[# Complete API Documentation]]
 @add [[{{api_bundle}}]]
@@ -141,7 +141,7 @@ Show directory structure without file contents.
 @import { xml } from @mlld/bundle
 @import { llm } from @mlld/ai
 
-@text full_project = @xml(".")
+@text full_project = @toXml(".")
 @text analysis = @llm.ask("You are a senior architect", "Analyze this project structure and suggest improvements: {{full_project}}")
 @add [[Architecture Analysis:]]
 @add [[{{analysis}}]]
@@ -152,7 +152,7 @@ Show directory structure without file contents.
 Bundle implementation using shell utilities:
 
 ```mlld-run
-/exe @xml(@path) = sh {
+/exe @toXml(@path) = sh {
   # Generate XML representation of directory structure
   # Uses SCREAMING_SNAKE_CASE for XML tags
   
@@ -196,7 +196,7 @@ Bundle implementation using shell utilities:
   fi
 }
 
-/exe @md(@path) = sh {
+/exe @toMd(@path) = sh {
   # Generate Markdown representation of directory structure
   
   function process_md_dir() {
@@ -313,8 +313,8 @@ Bundle implementation using shell utilities:
 }
 
 /var @module = {
-  xml: @xml,
-  md: @md,
+  toXml: @toXml,
+  toMd: @toMd,
   tree: @tree
 }
 ```

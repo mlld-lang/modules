@@ -1,7 +1,7 @@
 >> Tests for @mlld/array module
 
-/import { ok, eq, deepEq } from "@local/test"
-/import { filter, len, pluck, map, reduce, find, findIndex, indexOf, includes, sortBy, groupBy, uniq, flatten, chunk, zip, range, first, last, slice, reverse, sum, min, max, mean, median } from "@local/array"
+/import { ok, eq, deepEq } from @local/test
+/import { filter, len, pluck, map, reduce, find, findIndex, indexOf, includes, sortBy, groupBy, uniq, flatten, chunk, zip, range, first, last, slice, reverse, sum, min, max, mean, median } from @local/array
 
 ## Test filter
 /var @items = [

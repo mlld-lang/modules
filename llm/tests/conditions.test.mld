@@ -1,7 +1,7 @@
 >> Tests for @mlld/conditions module
 
-/import { ok, notOk, eq } from "@local/test"
-/import { and, or, not, exists, xor } from "@local/conditions"
+/import { ok, notOk, eq } from @local/test
+/import { and, or, not, exists, xor } from @local/conditions
 
 ## Test and
 /var @test_and_true_true = @ok(@and(true, true))
@@ -63,10 +63,10 @@
 
 ## Test complex conditions
 >> Testing De Morgan's laws
-/var @a = true
-/var @b = false
-/var @test_demorgan_1 = @eq(@not(@and(@a, @b)), @or(@not(@a), @not(@b)))
-/var @test_demorgan_2 = @eq(@not(@or(@a, @b)), @and(@not(@a), @not(@b)))
+/var @val_a = true
+/var @val_b = false
+/var @test_demorgan_1 = @eq(@not(@and(@val_a, @val_b)), @or(@not(@val_a), @not(@val_b)))
+/var @test_demorgan_2 = @eq(@not(@or(@val_a, @val_b)), @and(@not(@val_a), @not(@val_b)))
 
 >> Testing chained conditions
 /var @x = 5

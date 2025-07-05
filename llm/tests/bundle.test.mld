@@ -1,20 +1,20 @@
 >> Tests for @mlld/bundle module
 
-/import { ok, eq, includes } from "@local/test"
-/import { module } from "@local/bundle"
+/import { ok, eq, includes } from @local/test
+/import { module } from @local/bundle
 
 ## Test module structure
 /var @test_module_exists = @ok(@module)
 /exe @isObject(@val) = js { return typeof val === "object"; }
 /var @test_module_is_object = @ok(@isObject(@module))
-/var @test_has_xml = @ok(@module.xml)
-/var @test_has_md = @ok(@module.md)
+/var @test_has_xml = @ok(@module.toXml)
+/var @test_has_md = @ok(@module.toMd)
 /var @test_has_tree = @ok(@module.tree)
 
 ## Test function types
 /exe @isFunction(@val) = js { return typeof val === "function"; }
-/var @test_xml_is_function = @ok(@isFunction(@module.xml))
-/var @test_md_is_function = @ok(@isFunction(@module.md))
+/var @test_xml_is_function = @ok(@isFunction(@module.toXml))
+/var @test_md_is_function = @ok(@isFunction(@module.toMd))
 /var @test_tree_is_function = @ok(@isFunction(@module.tree))
 
 ## Create test directory structure
@@ -24,7 +24,7 @@
 /output "# Documentation\n\nThis is a test file." to "/tmp/bundle-test/docs/README.md"
 
 ## Test XML bundling
-/var @xmlResult = @module.xml("/tmp/bundle-test/src")
+/var @xmlResult = @module.toXml("/tmp/bundle-test/src")
 /exe @isString(@val) = js { return typeof val === "string"; }
 /var @test_xml_returns_string = @ok(@isString(@xmlResult))
 /var @test_xml_has_src_tag = @includes(@xmlResult, "<SRC>")
@@ -32,7 +32,7 @@
 /var @test_xml_has_content = @includes(@xmlResult, "Hello World")
 
 ## Test Markdown bundling
-/var @mdResult = @module.md("/tmp/bundle-test/docs")
+/var @mdResult = @module.toMd("/tmp/bundle-test/docs")
 /var @test_md_returns_string = @ok(@isString(@mdResult))
 /var @test_md_has_header = @includes(@mdResult, "# docs")
 /var @test_md_has_readme = @includes(@mdResult, "## README.md")
