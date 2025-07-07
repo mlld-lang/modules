@@ -1,5 +1,5 @@
 ---
-name: log
+name: pipelog
 author: mlld
 version: 1.0.0
 about: Pipeline debugging and logging utilities
@@ -11,16 +11,16 @@ license: CC0
 mlldVersion: "*"
 ---
 
-# @mlld/log
+# @mlld/pipelog
 
-Pipeline debugging utilities that provide pass-through logging to stderr. Perfect for debugging data transformations, monitoring pipeline execution, and understanding data flow without affecting output.
+Pipeline debugging utilities that provide pass-through logging to stderr. Useful for debugging data transformations, monitoring pipeline execution, and understanding data flow without affecting output.
 
 ## tldr
 
 Debug your pipelines by inserting logging between transformations:
 
 ```mlld
-/import { log, logVerbose, logJson } from @mlld/log
+/import { log, logVerbose, logJson } from @mlld/pipelog
 
 >> Simple pipeline debugging
 /var @result = @data | @json | @log | @uppercase | @log
@@ -38,7 +38,7 @@ All loggers output to stderr, ensuring your pipeline data flows unchanged to std
 
 ### Core Concepts
 
-The @mlld/log module provides **pass-through transformers** that log to stderr while returning input unchanged. This design enables:
+The @mlld/pipelog module provides **pass-through transformers** that log to stderr while returning input unchanged. This design enables:
 
 - Zero side effects on pipeline data
 - Clean separation of debug output from pipeline output
@@ -52,7 +52,7 @@ The @mlld/log module provides **pass-through transformers** that log to stderr w
 Concise logging with essential information about the data passing through.
 
 ```mlld
-/import { log } from @mlld/log
+/import { log } from @mlld/pipelog
 
 /var @data = run {curl -s https://api.example.com/data}
 /var @result = @data | @json | @log | @uppercase
@@ -73,7 +73,7 @@ Concise logging with essential information about the data passing through.
 Detailed analysis with data type detection and content preview.
 
 ```mlld
-/import { logVerbose } from @mlld/log
+/import { logVerbose } from @mlld/pipelog
 
 /var @complexData = { users: @users, config: @config }
 /var @processed = @complexData | @json | @logVerbose | @transform
@@ -93,7 +93,7 @@ Detailed analysis with data type detection and content preview.
 Structured logging output for parsing by log aggregation systems.
 
 ```mlld
-/import { logJson } from @mlld/log
+/import { logJson } from @mlld/pipelog
 
 >> Produces JSON log entries on stderr
 /var @result = @data | @logJson | @process
@@ -107,10 +107,10 @@ Structured logging output for parsing by log aggregation systems.
 #### Debugging Complex Pipelines
 
 ```mlld
-/import { log, logVerbose } from @mlld/log
+/import { log, logVerbose } from @mlld/pipelog
 
 >> Debug each transformation stage
-/exe @processUsers(data) = js {(
+/exe @processUsers(data) = js {
   JSON.parse(data).users.map(u => ({
     ...u,
     processed: true
@@ -130,18 +130,18 @@ Structured logging output for parsing by log aggregation systems.
 #### Conditional Logging
 
 ```mlld
-/import { log, logVerbose } from @mlld/log
+/import { log, logVerbose } from @mlld/pipelog
 
 >> Use environment variables to control logging
 /import { DEBUG_LEVEL } from @INPUT
 
-/exe @debugLog(input) = js {(
+/exe @debugLog(input) = js {
   // Only log if DEBUG_LEVEL is set
   if (DEBUG_LEVEL) {
     logVerbose(input);
   }
   return input;
-)}
+}
 ```
 
 #### Integration with @DEBUG
@@ -149,7 +149,7 @@ Structured logging output for parsing by log aggregation systems.
 The loggers complement mlld's built-in @DEBUG variable:
 
 ```mlld
-/import { log } from @mlld/log
+/import { log } from @mlld/pipelog
 
 >> The logger shows immediate pipeline state
 /var @result = @data | @log | @transform
@@ -162,7 +162,7 @@ The loggers complement mlld's built-in @DEBUG variable:
 
 ```mlld-run
 >> Basic logger - concise output
-/exe @log(input) = js {(
+/exe @log(input) = js {
   const timestamp = new Date().toISOString();
   const separator = '='.repeat(80);
   
@@ -199,10 +199,10 @@ The loggers complement mlld's built-in @DEBUG variable:
   
   console.error(`${separator}\n`);
   return input;
-)}
+}
 
 >> Verbose logger - detailed analysis
-/exe @logVerbose(input) = js {(
+/exe @logVerbose(input) = js {
   const timestamp = new Date().toISOString();
   const separator = '='.repeat(80);
   
@@ -283,10 +283,10 @@ The loggers complement mlld's built-in @DEBUG variable:
   console.error(`${separator}\n`);
   
   return input;
-)}
+}
 
 >> JSON logger - structured output
-/exe @logJson(input) = js {(
+/exe @logJson(input) = js {
   const logEntry = {
     timestamp: new Date().toISOString(),
     type: 'pipeline_log',
@@ -325,7 +325,7 @@ The loggers complement mlld's built-in @DEBUG variable:
   
   console.error(JSON.stringify(logEntry));
   return input;
-)}
+}
 
 >> Shadow environment to make functions available to each other
 /exe js = { log, logVerbose, logJson }
@@ -335,7 +335,7 @@ The loggers complement mlld's built-in @DEBUG variable:
 
 ### Design Philosophy
 
-The @mlld/log module follows these principles:
+The @mlld/pipelog module follows these principles:
 
 1. **Zero Side Effects**: All loggers are pure pass-through functions
 2. **Stderr Only**: Debug output never pollutes pipeline data
