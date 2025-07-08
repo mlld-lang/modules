@@ -43,7 +43,7 @@ grab directories with advanced frontmatter support:
 Most flexible file grabbing with options:
 
 ```mlld
-/var @files = @grab(".", "**/*.md", {
+/var files = @grab(".", "**/*.md", {
   "includeFrontmatter": true,
   "includeContent": false,
   "contentPreview": 50,
@@ -81,8 +81,8 @@ Recursive file grabbing:
 Filter files by frontmatter field:
 
 ```mlld
-/var @published = @filterByFrontmatter(@files, "published", true)
-/var @hasAuthor = @filterByFrontmatter(@files, "author")  >> Just check existence
+/var @published = @filterByFrontmatter(files, "published", true)
+/var @hasAuthor = @filterByFrontmatter(files, "author")  >> Just check existence
 ```
 
 #### `sortByField(files, field, order)`
@@ -90,8 +90,8 @@ Filter files by frontmatter field:
 Sort files by frontmatter field:
 
 ```mlld
-/var @byDate = @sortByField(@files, "date", "desc")
-/var @byTitle = @sortByField(@files, "title", "asc")
+/var @byDate = @sortByField(files, "date", "desc")
+/var @byTitle = @sortByField(files, "title", "asc")
 ```
 
 #### `groupByField(files, field)`
@@ -99,8 +99,8 @@ Sort files by frontmatter field:
 Group files by frontmatter field:
 
 ```mlld
-/var @byCategory = @groupByField(@files, "category")
-/var @byAuthor = @groupByField(@files, "author")
+/var @byCategory = @groupByField(files, "category")
+/var @byAuthor = @groupByField(files, "author")
 ```
 
 ### Utility Functions
@@ -110,8 +110,8 @@ Group files by frontmatter field:
 Extract all values for a field:
 
 ```mlld
-/var @allTitles = @extractField(@files, "title")
-/var @allDates = @extractField(@files, "date")
+/var @allTitles = @extractField(files, "title")
+/var @allDates = @extractField(files, "date")
 ```
 
 #### `uniqueValues(files, field)`
@@ -119,8 +119,8 @@ Extract all values for a field:
 Get unique values for a field (flattens arrays):
 
 ```mlld
-/var @allTags = @uniqueValues(@files, "tags")
-/var @allAuthors = @uniqueValues(@files, "author")
+/var @allTags = @uniqueValues(files, "tags")
+/var @allAuthors = @uniqueValues(files, "author")
 ```
 
 ### Return Format
@@ -146,8 +146,8 @@ Advanced directory scanning with shadow environment for complex operations:
   const path_mod = require('path');
   const matter = require('gray-matter');
   
-  const searchPath = @path || '.';
-  const searchPattern = @pattern || '*';
+  const searchPath = path || '.';
+  const searchPattern = pattern || '*';
   
   const results = [];
   
@@ -202,8 +202,8 @@ Advanced directory scanning with shadow environment for complex operations:
   const glob = require('glob');
   const matter = require('gray-matter');
   
-  const base = @basePath || '.';
-  const pattern = @globPattern || '**/*';
+  const base = basePath || '.';
+  const pattern = globPattern || '**/*';
   
   try {
     const files = glob.sync(pattern, {
@@ -252,9 +252,9 @@ Advanced directory scanning with shadow environment for complex operations:
   const matter = require('gray-matter');
   const glob = require('glob');
   
-  const cwd = @searchPath || '.';
-  const globPattern = @pattern || '**/*.md';
-  const opts = @options || {};
+  const cwd = searchPath || '.';
+  const globPattern = pattern || '**/*.md';
+  const opts = options || {};
   
   try {
     // Default options
@@ -332,18 +332,18 @@ Advanced directory scanning with shadow environment for complex operations:
 /exe @filterByFrontmatter(files, field, value) = node {
   // Debug parameters
   console.log('filterByFrontmatter called with:');
-  console.log('files type:', typeof @files);
-  console.log('field:', @field, 'type:', typeof @field);
-  console.log('value:', @value, 'type:', typeof @value);
+  console.log('files type:', typeof files);
+  console.log('field:', field, 'type:', typeof field);
+  console.log('value:', value, 'type:', typeof value);
   
   // Ensure files is an array (might be JSON string)
-  const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
+  const fileArray = Array.isArray(files) ? files : JSON.parse(files || '[]');
   
   return fileArray.filter(file => {
     if (!file.fm) return false;
     
     // Support nested field access (e.g., "author.name")
-    const fields = @field.split('.');
+    const fields = field.split('.');
     let current = file.fm;
     
     for (const f of fields) {
@@ -355,8 +355,8 @@ Advanced directory scanning with shadow environment for complex operations:
     }
     
     // If value is provided, check equality
-    if (@value !== undefined) {
-      return current === @value;
+    if (value !== undefined) {
+      return current === value;
     }
     
     // Otherwise just check if field exists and is truthy
@@ -365,14 +365,14 @@ Advanced directory scanning with shadow environment for complex operations:
 }
 
 /exe @extractField(files, field) = node {
-  const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
+  const fileArray = Array.isArray(files) ? files : JSON.parse(files || '[]');
   const values = [];
   
   fileArray.forEach(file => {
     if (!file.fm) return;
     
     // Support nested field access
-    const fields = @field.split('.');
+    const fields = field.split('.');
     let current = file.fm;
     
     for (const f of fields) {
@@ -392,14 +392,14 @@ Advanced directory scanning with shadow environment for complex operations:
 }
 
 /exe @uniqueValues(files, field) = node {
-  const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
+  const fileArray = Array.isArray(files) ? files : JSON.parse(files || '[]');
   const allValues = [];
   
   fileArray.forEach(file => {
     if (!file.fm) return;
     
     // Support nested field access
-    const fields = @field.split('.');
+    const fields = field.split('.');
     let current = file.fm;
     
     for (const f of fields) {
@@ -421,15 +421,15 @@ Advanced directory scanning with shadow environment for complex operations:
 }
 
 /exe @sortByField(files, field, order) = node {
-  const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
-  const sortOrder = @order || 'asc';
+  const fileArray = Array.isArray(files) ? files : JSON.parse(files || '[]');
+  const sortOrder = order || 'asc';
   
   return [...fileArray].sort((a, b) => {
     // Extract field values
     const getFieldValue = (file) => {
       if (!file.fm) return undefined;
       
-      const fields = @field.split('.');
+      const fields = field.split('.');
       let current = file.fm;
       
       for (const f of fields) {
@@ -461,7 +461,7 @@ Advanced directory scanning with shadow environment for complex operations:
 }
 
 /exe @groupByField(files, field) = node {
-  const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
+  const fileArray = Array.isArray(files) ? files : JSON.parse(files || '[]');
   const groups = {};
   
   fileArray.forEach(file => {
@@ -472,7 +472,7 @@ Advanced directory scanning with shadow environment for complex operations:
     }
     
     // Extract field value
-    const fields = @field.split('.');
+    const fields = field.split('.');
     let current = file.fm;
     
     for (const f of fields) {

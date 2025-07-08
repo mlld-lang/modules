@@ -1,6 +1,6 @@
 >> Tests for @mlld/fm-dir module
 
-/import { ok, eq, includes, deepEq } from @local/test
+/import { ok, eq, includes, deepEq, gt } from @local/test
 /import { grab, grabDir, grabFiles, filterByFrontmatter, sortByField, groupByField, extractField, uniqueValues } from @local/fm-dir
 
 ## Setup test environment
