@@ -116,7 +116,7 @@ See the [main docs](../../README.md) for more.
 ## module
 
 ```mlld-run
-@exec fixRelativeLinks(content, sourceDir, destDir) = @run node [(
+/exe @fixRelativeLinks(content, sourceDir, destDir) = node {
   const path = require('path');
   
   // Parameters are injected as variables by mlld

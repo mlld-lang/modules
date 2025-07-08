@@ -1,7 +1,7 @@
 >> Tests for @mlld/http module
 
 /import { ok, eq, includes, deepEq } from @local/test
-/import { http } from @local/http
+/import { module as http } from @local/http
 
 ## Test fetch.get (returns native objects)
 /exe @isObject(@val) = js { return typeof val === "object"; }

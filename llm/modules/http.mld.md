@@ -272,7 +272,7 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
       return response.json();
     })
     .catch(error => { throw error; })
-)}
+}
 
 /exe @postData(@url, @data) = js {
   fetch(url, {
@@ -285,7 +285,7 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
       return response.json();
     })
     .catch(error => { throw error; })
-)}
+}
 
 /exe @putData(@url, @data) = js {
   fetch(url, {
@@ -298,7 +298,7 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
       return response.json();
     })
     .catch(error => { throw error; })
-)}
+}
 
 /exe @patchData(@url, @data) = js {
   fetch(url, {
@@ -311,7 +311,7 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
       return response.json();
     })
     .catch(error => { throw error; })
-)}
+}
 
 /exe @deleteData(@url) = js {
   fetch(url, {
@@ -322,7 +322,7 @@ All HTTP methods use fetch with automatic JSON parsing and native return values.
       return response.json();
     })
     .catch(error => { throw error; })
-)}
+}
 ```
 
 Display methods for formatted output:
@@ -376,38 +376,29 @@ Display methods for formatted output:
     })
 }
 
->> Shadow environment to make functions available to each other
-/exe js = { get, post, put, patch, delete: deleteData, authGet, authPost, request, getData, postData, putData, patchData, deleteData, displayGet, displayPost }
-```
-
-This module uses a structured export to provide both individual methods and organized interfaces:
-
-```mlld-run
-/var @http = {
-  get: @get,
-  post: @post,
-  put: @put,
-  patch: @patch,
-  delete: @delete,
-  
-  auth: {
-    get: @authGet,
-    post: @authPost
+>> Create structured export with nested organization
+/var @module = {
+  "get": @displayGet,
+  "post": @displayPost,
+  "put": @put,
+  "patch": @patch,
+  "delete": @delete,
+  "auth": {
+    "get": @authGet,
+    "post": @authPost
   },
-  
-  request: @request,
-  
-  fetch: {
-    get: @getData,
-    post: @postData,
-    put: @putData,
-    patch: @patchData,
-    delete: @deleteData
+  "fetch": {
+    "get": @getData,
+    "post": @postData,
+    "put": @putData,
+    "patch": @patchData,
+    "delete": @deleteData
   },
-  
-  display: {
-    get: @displayGet,
-    post: @displayPost
-  }
+  "request": @request
 }
+
+>> Shadow environment - make functions available to each other
+/exe js = { get, post, put, patch, authGet, authPost, request, getData, postData, putData, patchData, deleteData, displayGet, displayPost }
 ```
+
+This module uses a structured export to provide both individual methods and organized interfaces, defined in the main `mlld-run` block above.

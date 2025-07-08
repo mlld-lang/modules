@@ -141,7 +141,7 @@ All grab functions return arrays of objects with:
 Advanced directory scanning with shadow environment for complex operations:
 
 ```mlld-run
-/exe @grabDir(path, pattern) = node {(
+/exe @grabDir(path, pattern) = node {
   const fs = require('fs');
   const path_mod = require('path');
   const matter = require('gray-matter');
@@ -194,9 +194,9 @@ Advanced directory scanning with shadow environment for complex operations:
   }
   
   return results;
-)}
+}
 
-/exe @grabFiles(basePath, globPattern) = node {(
+/exe @grabFiles(basePath, globPattern) = node {
   const fs = require('fs');
   const path_mod = require('path');
   const glob = require('glob');
@@ -244,9 +244,9 @@ Advanced directory scanning with shadow environment for complex operations:
     console.error('Error scanning files:', err.message);
     return [];
   }
-)}
+}
 
-/exe @grab(searchPath, pattern, options) = node {(
+/exe @grab(searchPath, pattern, options) = node {
   const fs = require('fs');
   const path = require('path');
   const matter = require('gray-matter');
@@ -327,9 +327,9 @@ Advanced directory scanning with shadow environment for complex operations:
     console.error('Error in grab:', err.message);
     return [];
   }
-)}
+}
 
-/exe @filterByFrontmatter(files, field, value) = node {(
+/exe @filterByFrontmatter(files, field, value) = node {
   // Debug parameters
   console.log('filterByFrontmatter called with:');
   console.log('files type:', typeof @files);
@@ -362,9 +362,9 @@ Advanced directory scanning with shadow environment for complex operations:
     // Otherwise just check if field exists and is truthy
     return !!current;
   });
-)}
+}
 
-/exe @extractField(files, field) = node {(
+/exe @extractField(files, field) = node {
   const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
   const values = [];
   
@@ -389,9 +389,9 @@ Advanced directory scanning with shadow environment for complex operations:
   });
   
   return values;
-)}
+}
 
-/exe @uniqueValues(files, field) = node {(
+/exe @uniqueValues(files, field) = node {
   const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
   const allValues = [];
   
@@ -418,9 +418,9 @@ Advanced directory scanning with shadow environment for complex operations:
   });
   
   return [...new Set(allValues)];
-)}
+}
 
-/exe @sortByField(files, field, order) = node {(
+/exe @sortByField(files, field, order) = node {
   const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
   const sortOrder = @order || 'asc';
   
@@ -458,9 +458,9 @@ Advanced directory scanning with shadow environment for complex operations:
     
     return sortOrder === 'desc' ? -result : result;
   });
-)}
+}
 
-/exe @groupByField(files, field) = node {(
+/exe @groupByField(files, field) = node {
   const fileArray = Array.isArray(@files) ? @files : JSON.parse(@files || '[]');
   const groups = {};
   
@@ -490,7 +490,7 @@ Advanced directory scanning with shadow environment for complex operations:
   });
   
   return groups;
-)}
+}
 
 >> Shadow environment to make functions available to each other
 /exe node = { grabDir, grabFiles, grab, filterByFrontmatter, extractField, uniqueValues, sortByField, groupByField }
