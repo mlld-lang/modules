@@ -1,4 +1,4 @@
->> Tests for @mlld/log module
+>> Tests for @mlld/pipelog module
 
 /import { ok, eq, deepEq } from @local/test
 /import { log, logVerbose, logJson } from @local/pipelog

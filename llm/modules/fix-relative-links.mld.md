@@ -20,13 +20,13 @@ Pipeline transformer that adjusts relative paths in markdown links to be correct
 Recalculates relative links when moving content between directories:
 
 ```mlld
-@import [fix-relative-links.mld.md]
+/import [fix-relative-links.mld.md]
 
-@text content = [[See the [docs](../docs/guide.md) for details.]]
+/var @content = [[See the [docs](../docs/guide.md) for details.]]
 
 >> The function asks: "How do I get from dist/ to src/docs/guide.md?"
 >> Answer: "../src/docs/guide.md"
-@text fixed = @fixRelativeLinks(@content, "src/modules", "dist")
+/var @fixed = @fixRelativeLinks(@content, "src/modules", "dist")
 >>                                        ↑                ↑
 >>                   where content thinks it is    where it's actually going
 ```
@@ -52,12 +52,12 @@ This module is designed to work as a pipeline transformer with mlld's built-in p
 
 ```mlld
 # Generate content and fix paths in one operation
-@text readme = @run [cat template.md] with {
+/var @readme = run {cat template.md} with {
   pipeline: [@fixRelativeLinks(@input, "templates", "output/docs")]
 }
 
 # Or use with other transformers and built-ins
-@exec processDoc(content, srcDir, destDir) = @run [echo "@content"] with {
+/exe @processDoc(@content, @srcDir, @destDir) = run {echo "@content"} with {
   pipeline: [
     @fixRelativeLinks(@input, @srcDir, @destDir),
     @JSON(@input)  # Use built-in JSON transformer
@@ -70,23 +70,23 @@ This module is designed to work as a pipeline transformer with mlld's built-in p
 You can also use it directly to process content:
 
 ```mlld
-@data processedContent = @fixRelativeLinks(@rawContent, "src", "dist")
-@add @processedContent
+/var @processedContent = @fixRelativeLinks(@rawContent, "src", "dist")
+/show @processedContent
 ```
 
 ### Examples
 
 **Basic usage:**
 ```mlld
-@text content = [[Check out [the guide](../docs/guide.md)]]
-@text fixed = @fixRelativeLinks(@content, "src/pages", "dist")
+/var @content = [[Check out [the guide](../docs/guide.md)]]
+/var @fixed = @fixRelativeLinks(@content, "src/pages", "dist")
 # Result: "Check out [the guide](../src/docs/guide.md)]"
 ```
 
 **Real-world example - README generation:**
 ```mlld
 # Content written from modules/llm/ perspective
-@text readme = [[
+/var @readme = [[
 ## Modules
 
 - [Array utilities](../core/array.mld.md)
@@ -95,7 +95,7 @@ See the [main docs](../../README.md) for more.
 ]]
 
 # Fix paths for output to modules/core/README.md
-@text fixedReadme = @fixRelativeLinks(@readme, "modules/llm", "modules/core")
+/var @fixedReadme = @fixRelativeLinks(@readme, "modules/llm", "modules/core")
 # Results in:
 # - [Array utilities](./array.mld.md)
 # - [String helpers](./string.mld.md)

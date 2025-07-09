@@ -31,7 +31,7 @@ grab directories with advanced frontmatter support:
 /var @byAuthor = @groupByField(@allDocs, "author")
 /var @recent = @sortByField(@published, "date", "desc")
 
-/show [[Found {{@length(@modules)}} modules and {{@length(@published)}} published posts]]
+/show `Found @length(@modules) modules and @length(@published) published posts`
 ```
 
 ## docs

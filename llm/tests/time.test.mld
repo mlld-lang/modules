@@ -1,0 +1,104 @@
+>> Comprehensive tests for @mlld/time module
+
+/import { ok, notOk, eq, contains, gt } from @local/test
+/import { time } from @local/time
+
+## Test format function
+/var @testDate = "2025-07-08T10:30:45Z"
+/var @formatted_date = @time.format(@testDate, "YYYY-MM-DD")
+/var @test_format_date = @eq(@formatted_date, "2025-07-08")
+/var @formatted_time = @time.format(@testDate, "HH:mm:ss")
+/var @test_format_time = @eq(@formatted_time, "10:30:45")
+/var @formatted_year = @time.format(@testDate, "YYYY")
+/var @test_format_year = @eq(@formatted_year, "2025")
+
+## Test parse function
+/var @parsed = @time.parse("2025-07-08", "YYYY-MM-DD")
+/var @test_parse_valid = @ok(@parsed)
+/var @test_parse_iso = @contains(@parsed, "T")
+
+## Test date arithmetic
+/var @baseDate = "2025-07-08T10:00:00Z"
+/var @tomorrow = @time.add(@baseDate, { days: 1 })
+/var @test_add_day = @contains(@tomorrow, "2025-07-09")
+
+/var @nextWeek = @time.add(@baseDate, { weeks: 1 })
+/var @test_add_week = @contains(@nextWeek, "2025-07-15")
+
+/var @yesterday = @time.subtract(@baseDate, { days: 1 })
+/var @test_subtract_day = @contains(@yesterday, "2025-07-07")
+
+## Test diff function
+/var @startDate = "2025-07-08T00:00:00Z"
+/var @endDate = "2025-07-10T12:00:00Z"
+/var @dayDiff = @time.diff(@startDate, @endDate, "days")
+/var @test_diff_days = @eq(@dayDiff, 2.5)
+
+/var @hourDiff = @time.diff(@startDate, @endDate, "hours")
+/var @test_diff_hours = @eq(@hourDiff, 60)
+
+## Test comparison functions
+/var @earlierDate = "2025-07-08T10:00:00Z"
+/var @laterDate = "2025-07-09T10:00:00Z"
+/var @before_result = @time.compare.before(@earlierDate, @laterDate)
+/var @test_before_true = @ok(@before_result)
+/var @before_false_result = @time.compare.before(@laterDate, @earlierDate)
+/var @test_before_false = @notOk(@before_false_result)
+/var @after_result = @time.compare.after(@laterDate, @earlierDate)
+/var @test_after_true = @ok(@after_result)
+/var @equal_same_result = @time.compare.equal(@earlierDate, @earlierDate)
+/var @test_equal_same = @ok(@equal_same_result)
+/var @equal_diff_result = @time.compare.equal(@earlierDate, @laterDate)
+/var @test_equal_diff = @notOk(@equal_diff_result)
+
+/var @middleDate = "2025-07-08T20:00:00Z"
+/var @between_result = @time.compare.between(@middleDate, @earlierDate, @laterDate)
+/var @test_between = @ok(@between_result)
+
+## Test business days
+/var @monday = "2025-07-07T10:00:00Z"
+/var @saturday = "2025-07-12T10:00:00Z"
+/var @monday_business = @time.business.isBusinessDay(@monday)
+/var @test_monday_business = @ok(@monday_business)
+/var @saturday_business = @time.business.isBusinessDay(@saturday)
+/var @test_saturday_business = @notOk(@saturday_business)
+
+/var @friday = "2025-07-11T10:00:00Z"
+/var @nextBusinessDay = @time.business.addDays(@friday, 1)
+/var @test_skip_weekend = @contains(@nextBusinessDay, "2025-07-14")
+
+## Test timezone functions
+/var @tz = @time.tz.current()
+/var @test_tz_exists = @ok(@tz)
+/var @offset = @time.tz.offset()
+/var @test_offset_format = @contains(@offset, ":")
+
+## Test shortcuts
+/var @isoNow = @time.iso(@now)
+/var @test_iso = @contains(@isoNow, "T")
+/var @dateOnly = @time.date(@now)
+/var @test_date_only = @contains(@dateOnly, "-")
+/var @timeOnly = @time.time(@now)
+/var @test_time_only = @contains(@timeOnly, ":")
+/var @unixTime = @time.unix(@now)
+/var @test_unix = @gt(@unixTime, 0)
+
+## Test start/end functions
+/var @dayStart = @time.startOf(@testDate, "day")
+/var @test_start_day = @contains(@dayStart, "T00:00:00")
+/var @dayEnd = @time.endOf(@testDate, "day")
+/var @test_end_day = @contains(@dayEnd, "T23:59:59")
+
+## Summary
+/show `
+Time-structured module test results:
+- Format: @test_format_date, @test_format_time, @test_format_year
+- Parse: @test_parse_valid, @test_parse_iso
+- Add/Subtract: @test_add_day, @test_add_week, @test_subtract_day
+- Diff: @test_diff_days, @test_diff_hours
+- Compare: @test_before_true, @test_after_true, @test_equal_same, @test_between
+- Business: @test_monday_business, @test_saturday_business, @test_skip_weekend
+- Timezone: @test_tz_exists, @test_offset_format
+- Shortcuts: @test_iso, @test_date_only, @test_time_only, @test_unix
+- Start/End: @test_start_day, @test_end_day
+`

@@ -33,8 +33,8 @@ Process data arrays with powerful operations:
 /var @names = @pluck(@users, "name")
 /var @totalAge = @sum(@users, "age")
 
-/show [[Engineers: {{engineers}}]]
-/show [[Total age: {{totalAge}}]]
+/show `Engineers: @engineers`
+/show `Total age: @totalAge`
 ```
 
 ## docs
@@ -47,9 +47,12 @@ Essential array access and information.
 
 ```mlld
 /var @items = ["apple", "banana", "cherry"]
-/show [[Count: {{@length(@items)}}]]
-/show [[First: {{@first(@items)}}]]
-/show [[Last: {{@last(@items)}}]]
+/var @count = @length(@items)
+/var @firstItem = @first(@items)
+/var @lastItem = @last(@items)
+/show `Count: @count`
+/show `First: @firstItem`
+/show `Last: @lastItem`
 ```
 
 ### Transformation

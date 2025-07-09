@@ -20,15 +20,15 @@ Bundle operations to format directory contents as XML or Markdown with proper st
 Bundle your project files for AI analysis or documentation:
 
 ```mlld
-@import { xml as toXml, md, tree } from @mlld/bundle
+/import { xml as toXml, md, tree } from @mlld/bundle
 
-@text src_xml = @toXml("./src")
-@add [[Project structure in XML:]]
-@add [[{{src_xml}}]]
+/var @src_xml = @toXml("./src")
+/show [[Project structure in XML:]]
+/show `@src_xml`
 
-@text docs_md = @toMd("./docs")
-@add [[Documentation structure:]]
-@add [[{{docs_md}}]]
+/var @docs_md = @toMd("./docs")
+/show [[Documentation structure:]]
+/show `@docs_md`
 ```
 
 ## docs
@@ -40,10 +40,10 @@ Bundle your project files for AI analysis or documentation:
 Generate structured XML with SCREAMING_SNAKE_CASE tags for consistency and clarity.
 
 ```mlld
-@text project_context = @toXml("./src")
-@add [[<project-context>]]
-@add [[{{project_context}}]]
-@add [[</project-context>]]
+/var @project_context = @toXml("./src")
+/show [[<project-context>]]
+/show `@project_context`
+/show [[</project-context>]]
 ```
 
 **Example output:**
@@ -71,9 +71,9 @@ Generate structured XML with SCREAMING_SNAKE_CASE tags for consistency and clari
 Generate clean Markdown with appropriate header levels and code blocks.
 
 ```mlld
-@text api_docs = @toMd("./api")
-@add [[## API Documentation Bundle]]
-@add [[{{api_docs}}]]
+/var @api_docs = @toMd("./api")
+/show [[## API Documentation Bundle]]
+/show `@api_docs`
 ```
 
 **Example output:**
@@ -105,46 +105,46 @@ router.post('/login', async (req, res) => {
 Show directory structure without file contents.
 
 ```mlld
-@text structure = @tree("./src")
-@add [[Project structure:]]
-@add [[{{structure}}]]
+/var @structure = @tree("./src")
+/show [[Project structure:]]
+/show `@structure`
 ```
 
 ### Use Cases
 
 #### AI Code Review
 ```mlld
-@import { xml } from @mlld/bundle
-@import { claude } from @mlld/ai
+/import { xml } from @mlld/bundle
+/import { claude } from @mlld/ai
 
-@text changes = @toXml("./src/components")
-@text review = @claude.ask("Review this React component structure for best practices: {{changes}}")
-@add [[Code Review Results:]]
-@add [[{{review}}]]
+/var @changes = @toXml("./src/components")
+/var @review = @claude.ask(`Review this React component structure for best practices: @changes`)
+/show [[Code Review Results:]]
+/show `@review`
 ```
 
 #### Documentation Generation
 ```mlld
-@import { md } from @mlld/bundle
+/import { md } from @mlld/bundle
 
-@text api_bundle = @toMd("./api")
-@text lib_bundle = @toMd("./lib")
+/var @api_bundle = @toMd("./api")
+/var @lib_bundle = @toMd("./lib")
 
-@add [[# Complete API Documentation]]
-@add [[{{api_bundle}}]]
-@add [[# Library Documentation]]
-@add [[{{lib_bundle}}]]
+/show [[# Complete API Documentation]]
+/show `@api_bundle`
+/show [[# Library Documentation]]
+/show `@lib_bundle`
 ```
 
 #### Project Analysis
 ```mlld
-@import { xml } from @mlld/bundle
-@import { llm } from @mlld/ai
+/import { xml } from @mlld/bundle
+/import { llm } from @mlld/ai
 
-@text full_project = @toXml(".")
-@text analysis = @llm.ask("You are a senior architect", "Analyze this project structure and suggest improvements: {{full_project}}")
-@add [[Architecture Analysis:]]
-@add [[{{analysis}}]]
+/var @full_project = @toXml(".")
+/var @analysis = @llm.ask("You are a senior architect", `Analyze this project structure and suggest improvements: @full_project`)
+/show [[Architecture Analysis:]]
+/show `@analysis`
 ```
 
 ## module

@@ -20,13 +20,13 @@ Simple wrappers for AI CLI tools (llm, claude, codex, gemini) to integrate langu
 Easy AI integration for your mlld scripts:
 
 ```mlld
-@import { claude, llm, codex, gemini } from @mlld/ai
+/import { claude, llm, codex, gemini } from @mlld/ai
 
-@text response = @claude.ask("What's the capital of France?")
-@add [[Claude says: {{response}}]]
+/var @response = @claude.ask("What's the capital of France?")
+/show `Claude says: @response`
 
-@text answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-@add [[LLM says: {{answer}}]]
+/var @answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
+/show `LLM says: @answer`
 ```
 
 ## docs
@@ -38,8 +38,8 @@ Easy AI integration for your mlld scripts:
 Direct interface to Claude via the claude CLI tool.
 
 ```mlld
-@text analysis = @claude.ask("Analyze this code for potential issues: function add(a,b) { return a + b }")
-@add [[Code review: {{analysis}}]]
+/var @analysis = @claude.ask("Analyze this code for potential issues: function add(a,b) { return a + b }")
+/show `Code review: @analysis`
 ```
 
 ### LLM CLI Integration
@@ -49,8 +49,8 @@ Direct interface to Claude via the claude CLI tool.
 Basic LLM interaction with system prompt.
 
 ```mlld
-@text haiku = @llm.ask("You are a poet", "Write a haiku about programming")
-@add [[{{haiku}}]]
+/var @haiku = @llm.ask("You are a poet", "Write a haiku about programming")
+/show @haiku
 ```
 
 #### `llm.media(system, prompt, media_path)`
@@ -58,8 +58,8 @@ Basic LLM interaction with system prompt.
 Include images or files in your prompts.
 
 ```mlld
-@text description = @llm.media("You are an image analyst", "Describe this diagram", "architecture.png")
-@add [[Analysis: {{description}}]]
+/var @description = @llm.media("You are an image analyst", "Describe this diagram", "architecture.png")
+/show `Analysis: @description`
 ```
 
 #### `llm.tools(system, prompt, tools)`
@@ -67,8 +67,8 @@ Include images or files in your prompts.
 Use LLM with tool capabilities.
 
 ```mlld
-@text weather = @llm.tools("You can check weather", "What's the weather in NYC?", "weather")
-@add [[{{weather}}]]
+/var @weather = @llm.tools("You can check weather", "What's the weather in NYC?", "weather")
+/show @weather
 ```
 
 #### `llm.all(system, prompt, parameters)`
@@ -76,8 +76,8 @@ Use LLM with tool capabilities.
 Full control over LLM parameters.
 
 ```mlld
-@text creative = @llm.all("You are creative", "Write a story opening", "--temperature 0.9 --max-tokens 200")
-@add [[{{creative}}]]
+/var @creative = @llm.all("You are creative", "Write a story opening", "--temperature 0.9 --max-tokens 200")
+/show @creative
 ```
 
 ### Codex Integration
@@ -87,9 +87,9 @@ Full control over LLM parameters.
 Generate code with OpenAI Codex or similar.
 
 ```mlld
-@text code = @codex.ask("Write a Python function to calculate fibonacci numbers")
-@add [[Generated code:]]
-@add [[{{code}}]]
+/var @code = @codex.ask("Write a Python function to calculate fibonacci numbers")
+/show `Generated code:`
+/show @code
 ```
 
 #### `codex.media(prompt, media_path)`
@@ -98,7 +98,7 @@ Convert diagrams or images to code.
 
 ```mlld
 /var @implementation = @codex.media("Convert this flowchart to Python code", "algorithm.png")
-/show [[{{implementation}}]]
+/show @implementation
 ```
 
 ### Gemini Integration
@@ -109,7 +109,7 @@ Direct interface to Google's Gemini via the gemini CLI tool.
 
 ```mlld
 /var @analysis = @gemini.ask("Explain quantum computing in simple terms")
-/show [[Explanation: {{analysis}}]]
+/show `Explanation: @analysis`
 ```
 
 #### `gemini.media(prompt, media_path)`
@@ -118,7 +118,7 @@ Multimodal prompts with Gemini.
 
 ```mlld
 /var @description = @gemini.media("What's happening in this image?", "photo.jpg")
-/show [[{{description}}]]
+/show @description
 ```
 
 ## module

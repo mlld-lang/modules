@@ -80,8 +80,8 @@ Return response data as native JavaScript objects for easy processing.
 /var @userData = @fetch.get("https://api.github.com/users/octocat")
 /var @response = @fetch.post("https://httpbin.org/post", {"test": true})
 
-/show [[User: {{userData.name}} has {{userData.public_repos}} repos]]
-/show [[Posted data echo: {{response.json.test}}]]
+/show `User: @userData.name has @userData.public_repos repos`
+/show `Posted data echo: @response.json.test`
 ```
 
 ### Display Methods
@@ -377,7 +377,7 @@ Display methods for formatted output:
 }
 
 >> Create structured export with nested organization
-/var @module = {
+/var @http = {
   "get": @displayGet,
   "post": @displayPost,
   "put": @put,

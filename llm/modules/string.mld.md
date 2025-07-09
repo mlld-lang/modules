@@ -30,7 +30,7 @@ Common string operations:
 /var @rejoined = @join(@words, "-")
 
 /when @includes(@name, "doe") => /show [[Contains 'doe']]
-/show [[Formatted: {{formatted}}]]
+/show `Formatted: @formatted`
 ```
 
 ## docs
@@ -43,8 +43,8 @@ Essential string utilities for length and whitespace handling.
 
 ```mlld
 /var @name = "  John Doe  "
-/show [[Length: {{@length(@name)}}]]
-/show [[Trimmed: '{{@trim(@name)}}']]
+/show `Length: @length(@name)`
+/show `Trimmed: '@trim(@name)'`
 ```
 
 ### Case Transformations
@@ -55,9 +55,9 @@ Text case conversion for formatting.
 
 ```mlld
 /var @message = "hello world"
-/show [[Upper: {{@upper(@message)}}]]
-/show [[Title: {{@title(@message)}}]]
-/show [[Capitalized: {{@capitalize(@message)}}]]
+/show `Upper: @upper(@message)`
+/show `Title: @title(@message)`
+/show `Capitalized: @capitalize(@message)`
 ```
 
 #### `camelCase(str)`, `snakeCase(str)`, `kebabCase(str)`
@@ -66,9 +66,9 @@ Identifier formatting for different naming conventions.
 
 ```mlld
 /var @phrase = "user full name"
-/show [[camelCase: {{@camelCase(@phrase)}}]]
-/show [[snake_case: {{@snakeCase(@phrase)}}]]
-/show [[kebab-case: {{@kebabCase(@phrase)}}]]
+/show `camelCase: @camelCase(@phrase)`
+/show `snake_case: @snakeCase(@phrase)`
+/show `kebab-case: @kebabCase(@phrase)`
 ```
 
 ### Splitting and Joining
@@ -109,7 +109,7 @@ Text substitution and cleaning.
 
 ```mlld
 /var @cleaned = @replaceAll(@input, " ", "-")
-/var @updated = @replace(@template, "{{name}}", @userName)
+/var @updated = @replace(@template, "@name", @userName)
 ```
 
 ### Validation
@@ -120,7 +120,7 @@ Content validation for data processing.
 
 ```mlld
 /when @isEmpty(@userInput) => /show [[Input required]]
-/when @isNumeric(@value) => /show [[Valid number: {{@value}}]]
+/when @isNumeric(@value) => /show `Valid number: @value`
 ```
 
 ## module
@@ -179,8 +179,8 @@ All string operations use JavaScript's native string methods with consistent beh
 /exe @replace(@str, @search, @replacement) = js {(String(str).replace(search, replacement))}
 /exe @replaceAll(@str, @search, @replacement) = js {(String(str).replaceAll(search, replacement))}
 
-/exe @padStart(@str, @length, @padChar) = js {(String(str).padStart(length, padChar || ' '))}
-/exe @padEnd(@str, @length, @padChar) = js {(String(str).padEnd(length, padChar || ' '))}
+/exe @padStart(@str, @targetLength, @padChar) = js {(String(str).padStart(targetLength, padChar || ' '))}
+/exe @padEnd(@str, @targetLength, @padChar) = js {(String(str).padEnd(targetLength, padChar || ' '))}
 /exe @repeat(@str, @count) = js {(String(str).repeat(count))}
 
 /exe @reverse(@str) = js {(String(str).split('').reverse().join(''))}

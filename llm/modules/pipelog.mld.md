@@ -2,7 +2,7 @@
 name: pipelog
 author: mlld
 version: 1.0.0
-about: Pipeline debugging and logging utilities
+about: Pass-through pipeline debugging for mlld
 needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
@@ -13,7 +13,7 @@ mlldVersion: "*"
 
 # @mlld/pipelog
 
-Pipeline debugging utilities that provide pass-through logging to stderr. Useful for debugging data transformations, monitoring pipeline execution, and understanding data flow without affecting output.
+Pass-through debugging functions for mlld pipelines that log to stderr without affecting data flow. Insert between pipeline steps to see what data is passing through.
 
 ## tldr
 
@@ -38,12 +38,11 @@ All loggers output to stderr, ensuring your pipeline data flows unchanged to std
 
 ### Core Concepts
 
-The @mlld/pipelog module provides **pass-through transformers** that log to stderr while returning input unchanged. This design enables:
+The @mlld/pipelog module provides **pass-through functions** that log to stderr while returning input unchanged. This design enables:
 
 - Zero side effects on pipeline data
 - Clean separation of debug output from pipeline output
-- Integration with standard Unix tools and logging systems
-- Rich contextual information during pipeline execution
+- Simple debugging of mlld pipeline transformations
 
 ### Basic Logger
 
@@ -102,9 +101,9 @@ Structured logging output for parsing by log aggregation systems.
 >> {"timestamp":"2024-01-20T10:30:45.123Z","type":"pipeline_log","input":{...}}
 ```
 
-### Advanced Usage
+### Usage Examples
 
-#### Debugging Complex Pipelines
+#### Debugging Pipeline Transformations
 
 ```mlld
 /import { log, logVerbose } from @mlld/pipelog
@@ -123,28 +122,9 @@ Structured logging output for parsing by log aggregation systems.
   | @log           >> Log parsed data
   | @processUsers  >> Transform
   | @logVerbose    >> Detailed view of result
-
->> Trace data flow through the entire pipeline
 ```
 
-#### Conditional Logging
-
-```mlld
-/import { log, logVerbose } from @mlld/pipelog
-
->> Use environment variables to control logging
-/import { DEBUG_LEVEL } from @INPUT
-
-/exe @debugLog(input) = js {
-  // Only log if DEBUG_LEVEL is set
-  if (DEBUG_LEVEL) {
-    logVerbose(input);
-  }
-  return input;
-}
-```
-
-#### Integration with @DEBUG
+#### Comparing with mlld's @DEBUG
 
 The loggers complement mlld's built-in @DEBUG variable:
 
@@ -338,19 +318,11 @@ The loggers complement mlld's built-in @DEBUG variable:
 The @mlld/pipelog module follows these principles:
 
 1. **Zero Side Effects**: All loggers are pure pass-through functions
-2. **Stderr Only**: Debug output never pollutes pipeline data
+2. **Stderr Only**: Debug output never pollutes pipeline data  
 3. **Progressive Detail**: Choose verbosity level based on needs
-4. **Format Detection**: Intelligent analysis of data types
-5. **Integration Ready**: Works with existing logging infrastructure
+4. **Simple and Focused**: Designed specifically for debugging mlld pipelines
 
-### Performance Considerations
-
-- Minimal overhead when logging small data
-- Smart truncation for large datasets
-- Efficient string operations
-- No external dependencies
-
-### Usage Patterns
+### Common Usage Patterns
 
 #### Development Debugging
 ```mlld
@@ -363,30 +335,15 @@ The @mlld/pipelog module follows these principles:
   | @format
 ```
 
-#### Production Monitoring
+#### Debugging Failed Transformations
 ```mlld
->> Conditional logging based on environment
-/when @ENV.LOG_LEVEL => /var @final = @data | @logJson | @process
+>> Use verbose logging to understand data structure
+/var @result = @complexData | @logVerbose | @transform
 ```
 
-#### Error Investigation
-```mlld
->> Verbose logging when things go wrong
-/when !@result.success => /show @logVerbose(@result)
-```
+### Tips for Using with Unix Tools
 
-### Tips and Tricks
-
-1. **Combine with tee**: `mlld script.mld 2>debug.log | tee output.txt`
-2. **Filter logs**: `mlld script.mld 2>&1 | grep "PIPELINE LOG"`
-3. **Parse JSON logs**: `mlld script.mld 2>&1 | jq 'select(.type=="pipeline_log")'`
+1. **Save debug output**: `mlld script.mld 2>debug.log`
+2. **View logs and output**: `mlld script.mld 2>&1 | tee output.txt`
+3. **Filter logs**: `mlld script.mld 2>&1 | grep "PIPELINE LOG"`
 4. **Silent operation**: `mlld script.mld 2>/dev/null`
-
-### Future Enhancements
-
-Potential additions to the module:
-- Custom log formatters
-- Log level filtering
-- Colorized output for terminals
-- Integration with OpenTelemetry
-- Performance metrics logging
