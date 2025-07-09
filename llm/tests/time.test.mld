@@ -1,3 +1,26 @@
+# Time Module Tests
+
+This file contains comprehensive tests for the `@mlld/time` module.
+
+## Overview
+
+The time module provides structured date/time operations organized into namespaces:
+- Core functions: `format`, `parse`, `add`, `subtract`, `diff`
+- Comparison namespace: `time.compare.*` for date comparisons
+- Business namespace: `time.biz.*` for business day calculations  
+- Timezone namespace: `time.tz.*` for timezone utilities
+- Shortcuts: `iso`, `unix`, `date`, `time` for common formats
+- Boundary functions: `startOf`, `endOf` for date boundaries
+
+## Test Structure
+
+Tests use the local test helpers:
+- `@ok(condition)` - Assert truthy
+- `@notOk(condition)` - Assert falsy
+- `@eq(actual, expected)` - Assert equality
+- `@contains(str, substr)` - Assert string contains substring
+- `@gt(a, b)` - Assert greater than
+
 >> Comprehensive tests for @mlld/time module
 
 /import { ok, notOk, eq, contains, gt } from @local/test
@@ -89,6 +112,29 @@
 /var @dayEnd = @time.endOf(@testDate, "day")
 /var @test_end_day = @contains(@dayEnd, "T23:59:59")
 
+## Test relative time
+/var @pastDate = "2025-07-01T10:00:00Z"
+/var @futureDate = "2025-07-15T10:00:00Z"
+/var @relative_past = @time.relative(@pastDate)
+/var @test_relative_past = @contains(@relative_past, "ago")
+/var @relative_future = @time.relative(@futureDate)
+/var @test_relative_future = @contains(@relative_future, "in")
+
+## Test duration helpers
+/var @oneWeek = @time.duration.weeks(1)
+/var @test_week_duration = @eq(@oneWeek.weeks, 1)
+/var @twoHours = @time.duration.hours(2)
+/var @test_hour_duration = @eq(@twoHours.hours, 2)
+/var @composite = @time.duration.compose({ hours: 1, minutes: 30 })
+/var @test_composite = @eq(@composite.hours, 1)
+/var @test_composite_min = @eq(@composite.minutes, 30)
+
+## Test duration math
+/var @doubled = @time.duration.multiply(@twoHours, 2)
+/var @test_multiply = @eq(@doubled.hours, 4)
+/var @halved = @time.duration.divide(@twoHours, 2)
+/var @test_divide = @eq(@halved.hours, 1)
+
 ## Summary
 /show `
 Time-structured module test results:
@@ -101,4 +147,7 @@ Time-structured module test results:
 - Timezone: @test_tz_exists, @test_offset_format
 - Shortcuts: @test_iso, @test_date_only, @test_time_only, @test_unix
 - Start/End: @test_start_day, @test_end_day
+- Relative: @test_relative_past, @test_relative_future
+- Duration: @test_week_duration, @test_hour_duration, @test_composite, @test_composite_min
+- Duration Math: @test_multiply, @test_divide
 `

@@ -19,9 +19,12 @@
 
 ## Create test directory structure
 /run {mkdir -p /tmp/bundle-test/src /tmp/bundle-test/docs}
-/output "export const hello = () => 'Hello World';" to "/tmp/bundle-test/src/hello.js"
-/output "export const goodbye = () => 'Goodbye';" to "/tmp/bundle-test/src/goodbye.js"
-/output "# Documentation\n\nThis is a test file." to "/tmp/bundle-test/docs/README.md"
+/var @helloContent = "export const hello = () => 'Hello World';"
+/var @goodbyeContent = "export const goodbye = () => 'Goodbye';"
+/var @docContent = "# Documentation\n\nThis is a test file."
+/output @helloContent to "/tmp/bundle-test/src/hello.js"
+/output @goodbyeContent to "/tmp/bundle-test/src/goodbye.js"
+/output @docContent to "/tmp/bundle-test/docs/README.md"
 
 ## Test XML bundling
 /var @xmlResult = @module.toXml("/tmp/bundle-test/src")

@@ -17,7 +17,7 @@ Directory scanning utilities that return structured data about files and directo
 
 ## tldr
 
-grab directories with advanced frontmatter support:
+Grab directories with advanced frontmatter support:
 
 ```mlld
 /import { grab, grabDir, grabFiles, filterByFrontmatter, sortByField, groupByField } from @mlld/fm-dir
@@ -330,12 +330,6 @@ Advanced directory scanning with shadow environment for complex operations:
 }
 
 /exe @filterByFrontmatter(files, field, value) = node {
-  // Debug parameters
-  console.log('filterByFrontmatter called with:');
-  console.log('files type:', typeof files);
-  console.log('field:', field, 'type:', typeof field);
-  console.log('value:', value, 'type:', typeof value);
-  
   // Ensure files is an array (might be JSON string)
   const fileArray = Array.isArray(files) ? files : JSON.parse(files || '[]');
   
