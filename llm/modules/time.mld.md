@@ -200,12 +200,12 @@ Comprehensive time and date operations with organized namespaces.
 }
 
 # Business days
-/exe @isBusinessDay(@date) = js {
+/exe @isBizDay(@date) = js {
   const day = new Date(date).getDay();
   day !== 0 && day !== 6;
 }
 
-/exe @addBusinessDays(@date, @days) = node {
+/exe @addBizDays(@date, @days) = node {
   const d = new Date(date);
   let remaining = Math.abs(days);
   const direction = days > 0 ? 1 : -1;
@@ -253,9 +253,9 @@ Comprehensive time and date operations with organized namespaces.
     "equal": @equal,
     "between": @between
   },
-  "business": {
-    "isBusinessDay": @isBusinessDay,
-    "addDays": @addBusinessDays
+  "biz": {
+    "isBizDay": @isBizDay,
+    "addDays": @addBizDays
   },
   "tz": {
     "current": @getCurrentTimezone,
@@ -264,6 +264,6 @@ Comprehensive time and date operations with organized namespaces.
 }
 
 >> Shadow environment
-/exe js = { format, parse, add, subtract, diff, before, after, equal, between, iso, unix, dateOnly, timeOnly, isBusinessDay, addBusinessDays, getCurrentTimezone, getOffset, startOf, endOf }
-/exe node = { format, add, subtract, diff, addBusinessDays, getOffset, startOf, endOf }
+/exe js = { format, parse, add, subtract, diff, before, after, equal, between, iso, unix, dateOnly, timeOnly, isBizDay, addBizDays, getCurrentTimezone, getOffset, startOf, endOf }
+/exe node = { format, add, subtract, diff, addBizDays, getOffset, startOf, endOf }
 ```

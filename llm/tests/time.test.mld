@@ -58,13 +58,13 @@
 ## Test business days
 /var @monday = "2025-07-07T10:00:00Z"
 /var @saturday = "2025-07-12T10:00:00Z"
-/var @monday_business = @time.business.isBusinessDay(@monday)
+/var @monday_business = @time.biz.isBizDay(@monday)
 /var @test_monday_business = @ok(@monday_business)
-/var @saturday_business = @time.business.isBusinessDay(@saturday)
+/var @saturday_business = @time.biz.isBizDay(@saturday)
 /var @test_saturday_business = @notOk(@saturday_business)
 
 /var @friday = "2025-07-11T10:00:00Z"
-/var @nextBusinessDay = @time.business.addDays(@friday, 1)
+/var @nextBusinessDay = @time.biz.addDays(@friday, 1)
 /var @test_skip_weekend = @contains(@nextBusinessDay, "2025-07-14")
 
 ## Test timezone functions
