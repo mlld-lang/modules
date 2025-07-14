@@ -26,9 +26,9 @@ Essential utilities for building complex conditional logic in mlld:
 /var @threshold = 10
 /var @count = 15
 
-/when @and(@gt(@count, @threshold), @contains(@users, "alice")) => /show [[High count with Alice present]]
-/when @isEmpty(@users) => /show [[No users found]]
-/when @equals(@count, 15) => /show [[Exact match!]]
+/when @and(@gt(@count, @threshold), @contains(@users, "alice")) => /show "High count with Alice present"
+/when @isEmpty(@users) => /show "No users found"
+/when @equals(@count, 15) => /show "Exact match!"
 ```
 
 ## docs
@@ -40,7 +40,7 @@ Essential utilities for building complex conditional logic in mlld:
 Check if a value represents true (handles various truthy representations).
 
 ```mlld
-/when @isTrue(@config.enabled) => /show [[Feature is enabled]]
+/when @isTrue(@config.enabled) => /show "Feature is enabled"
 ```
 
 #### `isFalse(value)` / `not(value)`

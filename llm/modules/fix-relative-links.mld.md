@@ -22,7 +22,7 @@ Recalculates relative links when moving content between directories:
 ```mlld
 /import [fix-relative-links.mld.md]
 
-/var @content = [[See the [docs](../docs/guide.md) for details.]]
+/var @content = "See the [docs](../docs/guide.md) for details."
 
 >> The function asks: "How do I get from dist/ to src/docs/guide.md?"
 >> Answer: "../src/docs/guide.md"
@@ -78,7 +78,7 @@ You can also use it directly to process content:
 
 **Basic usage:**
 ```mlld
-/var @content = [[Check out [the guide](../docs/guide.md)]]
+/var @content = "Check out [the guide](../docs/guide.md)"
 /var @fixed = @fixRelativeLinks(@content, "src/pages", "dist")
 # Result: "Check out [the guide](../src/docs/guide.md)]"
 ```
@@ -86,13 +86,13 @@ You can also use it directly to process content:
 **Real-world example - README generation:**
 ```mlld
 # Content written from modules/llm/ perspective
-/var @readme = [[
+/var @readme = `
 ## Modules
 
 - [Array utilities](../core/array.mld.md)
 - [String helpers](../core/string.mld.md)
 See the [main docs](../../README.md) for more.
-]]
+`
 
 # Fix paths for output to modules/core/README.md
 /var @fixedReadme = @fixRelativeLinks(@readme, "modules/llm", "modules/core")

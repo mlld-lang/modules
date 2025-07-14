@@ -27,7 +27,7 @@ Quick HTTP requests with automatic JSON handling:
 /run @http.auth.get("https://api.github.com/user", @token)
 
 /var @userData = @http.fetch.get("https://api.github.com/users/octocat")
-/show [[User: {{userData.name}}]]
+/show `User: @userData.name`
 ```
 
 ## docs

@@ -1,6 +1,6 @@
 ---
 name: ai
-author: mlld-dev
+author: mlld
 version: 1.0.0
 about: LLM cli wrappers
 needs: ["sh"]

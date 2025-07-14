@@ -1,335 +1,201 @@
-# mlld Standard Library Modules
 
-Standard library modules for the mlld prompt scripting language.
+# mlld core modules
 
-## Module Organization
+Core modules for the mlld prompt scripting language.
 
-Modules are organized into three categories:
+### [ai](./llm/modules/ai.mld.md)
 
-- **core/** - Hopefully stable modules
-- **new/** - Experimental modules
+Easy AI integration for your mlld scripts:
 
-## New Modules
+```mlld
+/import { claude, llm, codex, gemini } from @mlld/ai
 
-These are experiments.
+/var @response = @claude.ask("What's the capital of France?")
+/show `Claude says: @response`
 
-### [array.mld.md](./core/array.mld.md)
+/var @answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
+/show `LLM says: @answer`
+```
+### [array](./llm/modules/array.mld.md)
 
 Process data arrays with powerful operations:
 
 ```mlld
-@import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
+/import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
 
-@data users = [
+/var @users = [
   {"name": "alice", "age": 30, "dept": "engineering"},
   {"name": "bob", "age": 25, "dept": "design"},
   {"name": "charlie", "age": 35, "dept": "engineering"}
 ]
 
-@data engineers = @filter(@users, "dept", "engineering")
-@data sortedByAge = @sortBy(@users, "age")
-@data names = @pluck(@users, "name")
-@data totalAge = @sum(@users, "age")
+/var @engineers = @filter(@users, "dept", "engineering")
+/var @sortedByAge = @sortBy(@users, "age")
+/var @names = @pluck(@users, "name")
+/var @totalAge = @sum(@users, "age")
 
-@add ::Engineers: {{engineers}}::
-@add ::Total age: {{totalAge}}::
+/show `Engineers: @engineers`
+/show `Total age: @totalAge`
 ```
-
----
-
-### [conditions.mld.md](./core/conditions.mld.md)
-
-Essential utilities for building complex conditional logic in mlld:
-
-```mlld
-@import { equals, contains, gt, and, isEmpty } from @mlld/conditions
-
-@data users = ["alice", "bob", "charlie"]
-@data threshold = 10
-@data count = 15
-
-@when @and(@gt(@count, @threshold), @contains(@users, "alice")) => @add ::High count with Alice present::
-@when @isEmpty(@users) => @add ::No users found::
-@when @equals(@count, 15) => @add ::Exact match!::
-```
-
----
-
-### [fs.mld.md](./core/fs.mld.md)
-
-Provides basic file system checks that return truthy/falsy values for use with  conditions:
-
-```mlld
-@import { fileExists, dirExists, pathExists } from @mlld/fs
-
-@when @fileExists("config.json") => @add ::Config file found!::
-@when @dirExists("src") => @add ::Source directory exists::
-@when @pathExists("README.md") => @add ::README is available::
-```
-
----
-
-### [http.mld.md](./core/http.mld.md)
-
-Quick HTTP requests with automatic JSON handling:
-
-```mlld
-@import { get, post, auth, data } from @mlld/http
-
-@run @get("https://api.github.com/users/octocat")
-@run @post("https://httpbin.org/post", {"message": "hello"})
-@run @auth.get("https://api.github.com/user", @token)
-
-@data userData = @data.get("https://api.github.com/users/octocat")
-@add ::User: {{userData.name}}::
-```
-
----
-
-### [string.mld.md](./core/string.mld.md)
-
-Common string operations:
-
-```mlld
-@import { title, camelCase, split, join, trim, includes } from @mlld/string
-
-@text name = "john doe smith"
-@text formatted = @title(@name)
-@text slug = @camelCase(@formatted)
-
-@data words = @split(@name, " ")
-@text rejoined = @join(@words, "-")
-
-@when @includes(@name, "doe") => @add ::Contains 'doe'::
-@add ::Formatted: {{formatted}}::
-```
-
----
-
-### [ai.mld.md](./new/ai.mld.md)
-
-Easy AI integration for your mlld scripts:
-
-```mlld
-@import { claude, llm, codex } from @mlld/ai
-
-@text response = @claude.ask("What's the capital of France?")
-@add ::Claude says: {{response}}::
-
-@text answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-@add ::LLM says: {{answer}}::
-```
-
----
-
-### [bundle.mld.md](./new/bundle.mld.md)
+### [bundle](./llm/modules/bundle.mld.md)
 
 Bundle your project files for AI analysis or documentation:
 
 ```mlld
-@import { xml, md, tree } from @mlld/bundle
+/import { xml as toXml, md, tree } from @mlld/bundle
 
-@text src_xml = @xml("./src")
-@add ::Project structure in XML:::
-@add ::{{src_xml}}::
+/var @src_xml = @toXml("./src")
+/show "Project structure in XML:"
+/show `@src_xml`
 
-@text docs_md = @md("./docs")
-@add ::Documentation structure:::
-@add ::{{docs_md}}::
+/var @docs_md = @toMd("./docs")
+/show "Documentation structure:"
+/show `@docs_md`
 ```
-
----
-
-### [fix-relative-links.mld.md](./new/fix-relative-links.mld.md)
-
-Fix relative links when moving markdown content between directories:
-
-```mlld
-@import [fix-relative-links.mld.md]
-
-@text content = ::See the [docs](../docs/guide.md) for details.::
-
-# Fix links: (content, from_dir, to_dir)
-@text fixed = @fixRelativeLinks(@content, "src/modules", "dist")
-# Result: "See the [docs](../src/docs/guide.md) for details."
-```
-
----
-
-### [grab.mld.md](./new/grab.mld.md)
-
-grab directories and get file listings:
-
-```mlld
-@import { grabDir, grabFiles } from @mlld/grab
-
-@data moduleFiles = @grabDir("modules/core", "*.mld.md")
-@data allFiles = @grabFiles(".", "**/*.md")
-
-@add ::Found {{@length(@moduleFiles)}} modules::
-```
-
-
-## Core Modules
-
-These are intended to be fairly stable long-term.
-
-### [array.mld.md](./core/array.mld.md)
-
-Process data arrays with powerful operations:
-
-```mlld
-@import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
-
-@data users = [
-  {"name": "alice", "age": 30, "dept": "engineering"},
-  {"name": "bob", "age": 25, "dept": "design"},
-  {"name": "charlie", "age": 35, "dept": "engineering"}
-]
-
-@data engineers = @filter(@users, "dept", "engineering")
-@data sortedByAge = @sortBy(@users, "age")
-@data names = @pluck(@users, "name")
-@data totalAge = @sum(@users, "age")
-
-@add ::Engineers: {{engineers}}::
-@add ::Total age: {{totalAge}}::
-```
-
----
-
-### [conditions.mld.md](./core/conditions.mld.md)
+### [conditions](./llm/modules/conditions.mld.md)
 
 Essential utilities for building complex conditional logic in mlld:
 
 ```mlld
-@import { equals, contains, gt, and, isEmpty } from @mlld/conditions
+/import { equals, contains, gt, and, isEmpty } from @mlld/conditions
 
-@data users = ["alice", "bob", "charlie"]
-@data threshold = 10
-@data count = 15
+/var @users = ["alice", "bob", "charlie"]
+/var @threshold = 10
+/var @count = 15
 
-@when @and(@gt(@count, @threshold), @contains(@users, "alice")) => @add ::High count with Alice present::
-@when @isEmpty(@users) => @add ::No users found::
-@when @equals(@count, 15) => @add ::Exact match!::
+/when @and(@gt(@count, @threshold), @contains(@users, "alice")) => /show "High count with Alice present"
+/when @isEmpty(@users) => /show "No users found"
+/when @equals(@count, 15) => /show "Exact match!"
 ```
+### [fix-relative-links](./llm/modules/fix-relative-links.mld.md)
 
----
+Recalculates relative links when moving content between directories:
 
-### [fs.mld.md](./core/fs.mld.md)
+```mlld
+/import [fix-relative-links.mld.md]
+
+/var @content = "See the [docs](../docs/guide.md) for details."
+
+>> The function asks: "How do I get from dist/ to src/docs/guide.md?"
+>> Answer: "../src/docs/guide.md"
+/var @fixed = @fixRelativeLinks(@content, "src/modules", "dist")
+>>                                        ↑                ↑
+>>                   where content thinks it is    where it's actually going
+```
+### [fm-dir](./llm/modules/fm-dir.mld.md)
+
+Grab directories with advanced frontmatter support:
+
+```mlld
+/import { grab, grabDir, grabFiles, filterByFrontmatter, sortByField, groupByField } from @mlld/fm-dir
+
+>> Basic file grabbing
+/var @modules = @grabDir("modules", "*.mld.md")
+/var @allDocs = @grabFiles(".", "**/*.md")
+
+>> Advanced usage with shadow environment
+/var @published = @grab("posts", "*.md", { "fm": { "published": true } })
+/var @byAuthor = @groupByField(@allDocs, "author")
+/var @recent = @sortByField(@published, "date", "desc")
+
+/show `Found @length(@modules) modules and @length(@published) published posts`
+```
+### [fs](./llm/modules/fs.mld.md)
 
 Provides basic file system checks that return truthy/falsy values for use with  conditions:
 
 ```mlld
-@import { fileExists, dirExists, pathExists } from @mlld/fs
+/import { fileExists, dirExists, pathExists } from @mlld/fs
 
-@when @fileExists("config.json") => @add ::Config file found!::
-@when @dirExists("src") => @add ::Source directory exists::
-@when @pathExists("README.md") => @add ::README is available::
+/when @fileExists("config.json") => /show "Config file found!"
+/when @dirExists("src") => /show "Source directory exists"
+/when @pathExists("README.md") => /show "README is available"
 ```
-
----
-
-### [http.mld.md](./core/http.mld.md)
+### [http](./llm/modules/http.mld.md)
 
 Quick HTTP requests with automatic JSON handling:
 
 ```mlld
-@import { get, post, auth, data } from @mlld/http
+/import { http } from @mlld/http
 
-@run @get("https://api.github.com/users/octocat")
-@run @post("https://httpbin.org/post", {"message": "hello"})
-@run @auth.get("https://api.github.com/user", @token)
+/run @http.get("https://api.github.com/users/octocat")
+/run @http.post("https://httpbin.org/post", {"message": "hello"})
+/run @http.auth.get("https://api.github.com/user", @token)
 
-@data userData = @data.get("https://api.github.com/users/octocat")
-@add ::User: {{userData.name}}::
+/var @userData = @http.fetch.get("https://api.github.com/users/octocat")
+/show `User: @userData.name`
+```
+### [pipelog](./llm/modules/pipelog.mld.md)
+
+Debug your pipelines by inserting logging between transformations:
+
+```mlld
+/import { log, logVerbose, logJson } from @mlld/pipelog
+
+>> Simple pipeline debugging
+/var @result = @data | @json | @log | @uppercase | @log
+
+>> Verbose logging with full context
+/var @processed = @fetchData() | @logVerbose | @transform
+
+>> Structured JSON logging for parsing
+/var @output = @input | @logJson | @process
 ```
 
----
-
-### [string.mld.md](./core/string.mld.md)
+All loggers output to stderr, ensuring your pipeline data flows unchanged to stdout.
+### [string](./llm/modules/string.mld.md)
 
 Common string operations:
 
 ```mlld
-@import { title, camelCase, split, join, trim, includes } from @mlld/string
+/import { title, camelCase, split, join, trim, includes } from @mlld/string
 
-@text name = "john doe smith"
-@text formatted = @title(@name)
-@text slug = @camelCase(@formatted)
+/var @name = "john doe smith"
+/var @formatted = @title(@name)
+/var @slug = @camelCase(@formatted)
 
-@data words = @split(@name, " ")
-@text rejoined = @join(@words, "-")
+/var @words = @split(@name, " ")
+/var @rejoined = @join(@words, "-")
 
-@when @includes(@name, "doe") => @add ::Contains 'doe'::
-@add ::Formatted: {{formatted}}::
+/when @includes(@name, "doe") => /show "Contains 'doe'"
+/show `Formatted: @formatted`
 ```
+### [test](./llm/modules/test.mld.md)
 
----
-
-### [ai.mld.md](./new/ai.mld.md)
-
-Easy AI integration for your mlld scripts:
+Test your mlld scripts with simple assertions:
 
 ```mlld
-@import { claude, llm, codex } from @mlld/ai
+/import { eq, deepEq, ok, contains } from @mlld/test
 
-@text response = @claude.ask("What's the capital of France?")
-@add ::Claude says: {{response}}::
+/var @result = @calculateSum(2, 3)
+/when @eq(@result, 5) => /show "✓ Sum calculation correct"
 
-@text answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-@add ::LLM says: {{answer}}::
+/var @data = { "name": "test", "items": [1, 2, 3] }
+/when @deepEq(@data.items, [1, 2, 3]) => /show "✓ Array matches"
+
+/when @contains(@output, "success") => /show "✓ Output contains success message"
 ```
-
----
-
-### [bundle.mld.md](./new/bundle.mld.md)
-
-Bundle your project files for AI analysis or documentation:
+### [time](./llm/modules/time.mld.md)
 
 ```mlld
-@import { xml, md, tree } from @mlld/bundle
+/import { time } from @mlld/time
 
-@text src_xml = @xml("./src")
-@add ::Project structure in XML:::
-@add ::{{src_xml}}::
+>> Use the built-in @now
+/var @today = @time.format(@now, "YYYY-MM-DD")
+/var @tomorrow = @time.add(@now, { days: 1 })
 
-@text docs_md = @md("./docs")
-@add ::Documentation structure:::
-@add ::{{docs_md}}::
+>> Compare dates
+/when @time.compare.before(@dateA, @dateB) => /show "DateA is earlier"
+
+>> Human-readable relative time
+/var @updated = @time.relative(@lastModified)  >> "2 hours ago"
+
+>> Work with durations
+/var @workWeek = @time.duration.days(5)
+/var @deadline = @time.add(@now, @workWeek)
 ```
 
 ---
 
-### [fix-relative-links.mld.md](./new/fix-relative-links.mld.md)
-
-Fix relative links when moving markdown content between directories:
-
-```mlld
-@import [fix-relative-links.mld.md]
-
-@text content = ::See the [docs](../docs/guide.md) for details.::
-
-# Fix links: (content, from_dir, to_dir)
-@text fixed = @fixRelativeLinks(@content, "src/modules", "dist")
-# Result: "See the [docs](../src/docs/guide.md) for details."
-```
-
 ---
-
-### [grab.mld.md](./new/grab.mld.md)
-
-grab directories and get file listings:
-
-```mlld
-@import { grabDir, grabFiles } from @mlld/grab
-
-@data moduleFiles = @grabDir("modules/core", "*.mld.md")
-@data allFiles = @grabFiles(".", "**/*.md")
-
-@add ::Found {{@length(@moduleFiles)}} modules::
-```
-
-
----
-All readmes are generated by the `llm/build.mld` script.
+All readmes are generated by the llm/run/build.mld script.

@@ -23,11 +23,11 @@ Bundle your project files for AI analysis or documentation:
 /import { xml as toXml, md, tree } from @mlld/bundle
 
 /var @src_xml = @toXml("./src")
-/show [[Project structure in XML:]]
+/show "Project structure in XML:"
 /show `@src_xml`
 
 /var @docs_md = @toMd("./docs")
-/show [[Documentation structure:]]
+/show "Documentation structure:"
 /show `@docs_md`
 ```
 
@@ -41,9 +41,9 @@ Generate structured XML with SCREAMING_SNAKE_CASE tags for consistency and clari
 
 ```mlld
 /var @project_context = @toXml("./src")
-/show [[<project-context>]]
+/show "<project-context>"
 /show `@project_context`
-/show [[</project-context>]]
+/show "</project-context>"
 ```
 
 **Example output:**
@@ -72,7 +72,7 @@ Generate clean Markdown with appropriate header levels and code blocks.
 
 ```mlld
 /var @api_docs = @toMd("./api")
-/show [[## API Documentation Bundle]]
+/show "## API Documentation Bundle"
 /show `@api_docs`
 ```
 
@@ -106,7 +106,7 @@ Show directory structure without file contents.
 
 ```mlld
 /var @structure = @tree("./src")
-/show [[Project structure:]]
+/show "Project structure:"
 /show `@structure`
 ```
 
@@ -119,7 +119,7 @@ Show directory structure without file contents.
 
 /var @changes = @toXml("./src/components")
 /var @review = @claude.ask(`Review this React component structure for best practices: @changes`)
-/show [[Code Review Results:]]
+/show "Code Review Results:"
 /show `@review`
 ```
 
@@ -130,9 +130,9 @@ Show directory structure without file contents.
 /var @api_bundle = @toMd("./api")
 /var @lib_bundle = @toMd("./lib")
 
-/show [[# Complete API Documentation]]
+/show "# Complete API Documentation"
 /show `@api_bundle`
-/show [[# Library Documentation]]
+/show "# Library Documentation"
 /show `@lib_bundle`
 ```
 
@@ -143,7 +143,7 @@ Show directory structure without file contents.
 
 /var @full_project = @toXml(".")
 /var @analysis = @llm.ask("You are a senior architect", `Analyze this project structure and suggest improvements: @full_project`)
-/show [[Architecture Analysis:]]
+/show "Architecture Analysis:"
 /show `@analysis`
 ```
 

@@ -23,12 +23,12 @@ Test your mlld scripts with simple assertions:
 /import { eq, deepEq, ok, contains } from @mlld/test
 
 /var @result = @calculateSum(2, 3)
-/when @eq(@result, 5) => /show [[✓ Sum calculation correct]]
+/when @eq(@result, 5) => /show "✓ Sum calculation correct"
 
 /var @data = { "name": "test", "items": [1, 2, 3] }
-/when @deepEq(@data.items, [1, 2, 3]) => /show [[✓ Array matches]]
+/when @deepEq(@data.items, [1, 2, 3]) => /show "✓ Array matches"
 
-/when @contains(@output, "success") => /show [[✓ Output contains success message]]
+/when @contains(@output, "success") => /show "✓ Output contains success message"
 ```
 
 ## docs
@@ -39,22 +39,22 @@ Test your mlld scripts with simple assertions:
 Strict equality check (===).
 
 ```mlld
-/when @eq(@status, "ready") => /show [[✓ Status is ready]]
+/when @eq(@status, "ready") => /show "✓ Status is ready"
 ```
 
 #### `deepEq(a, b)`
 Deep equality check using JSON comparison.
 
 ```mlld
-/when @deepEq(@config, @expectedConfig) => /show [[✓ Config matches expected]]
+/when @deepEq(@config, @expectedConfig) => /show "✓ Config matches expected"
 ```
 
 #### `ok(value)` / `notOk(value)`
 Truthy/falsy checks.
 
 ```mlld
-/when @ok(@user.isActive) => /show [[✓ User is active]]
-/when @notOk(@errors) => /show [[✓ No errors]]
+/when @ok(@user.isActive) => /show "✓ User is active"
+/when @notOk(@errors) => /show "✓ No errors"
 ```
 
 ### Comparison Assertions
@@ -63,8 +63,8 @@ Truthy/falsy checks.
 Numeric comparisons.
 
 ```mlld
-/when @gt(@score, 90) => /show [[✓ High score achieved]]
-/when @lte(@retries, 3) => /show [[✓ Within retry limit]]
+/when @gt(@score, 90) => /show "✓ High score achieved"
+/when @lte(@retries, 3) => /show "✓ Within retry limit"
 ```
 
 ### Container Assertions
@@ -73,22 +73,22 @@ Numeric comparisons.
 Check if array or string contains an item.
 
 ```mlld
-/when @includes(@tags, "important") => /show [[✓ Has important tag]]
-/when @includes(@message, "error") => /show [[✓ Error detected]]
+/when @includes(@tags, "important") => /show "✓ Has important tag"
+/when @includes(@message, "error") => /show "✓ Error detected"
 ```
 
 #### `contains(haystack, needle)`
 String substring check.
 
 ```mlld
-/when @contains(@log, "SUCCESS") => /show [[✓ Log shows success]]
+/when @contains(@log, "SUCCESS") => /show "✓ Log shows success"
 ```
 
 #### `len(value)`
 Get length of strings, arrays, or object keys.
 
 ```mlld
-/when @eq(@len(@items), 5) => /show [[✓ Exactly 5 items]]
+/when @eq(@len(@items), 5) => /show "✓ Exactly 5 items"
 ```
 
 ### Error Assertions
@@ -98,7 +98,7 @@ Check if a function throws an error.
 
 ```mlld
 /exe @badOperation() = js { throw new Error("fail") }
-/when @throws(@badOperation) => /show [[✓ Function throws as expected]]
+/when @throws(@badOperation) => /show "✓ Function throws as expected"
 ```
 
 ## module

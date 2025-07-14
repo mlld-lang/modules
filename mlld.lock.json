@@ -17,7 +17,8 @@
         }
       ]
     },
-    "scriptDir": "llm/run"
+    "scriptDir": "llm/run",
+    "mode": "development"
   },
   "security": {
     "trustedDomains": [

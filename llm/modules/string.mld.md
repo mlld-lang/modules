@@ -29,7 +29,7 @@ Common string operations:
 /var @words = @split(@name, " ")
 /var @rejoined = @join(@words, "-")
 
-/when @includes(@name, "doe") => /show [[Contains 'doe']]
+/when @includes(@name, "doe") => /show "Contains 'doe'"
 /show `Formatted: @formatted`
 ```
 
@@ -99,8 +99,8 @@ Combine arrays back into strings.
 String matching for conditional logic.
 
 ```mlld
-/when @startsWith(@filename, "test_") => /show [[Test file detected]]
-/when @endsWith(@url, ".json") => /show [[JSON endpoint]]
+/when @startsWith(@filename, "test_") => /show "Test file detected"
+/when @endsWith(@url, ".json") => /show "JSON endpoint"
 ```
 
 #### `replace(str, search, replacement)`, `replaceAll(str, search, replacement)`
@@ -119,7 +119,7 @@ Text substitution and cleaning.
 Content validation for data processing.
 
 ```mlld
-/when @isEmpty(@userInput) => /show [[Input required]]
+/when @isEmpty(@userInput) => /show "Input required"
 /when @isNumeric(@value) => /show `Valid number: @value`
 ```
 
