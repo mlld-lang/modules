@@ -3,7 +3,7 @@
 
 Core modules for the mlld prompt scripting language.
 
-### [ai](./llm/modules/ai.mld.md)
+### [@mlld/ai](./llm/modules/ai.mld.md)
 
 Easy AI integration for your mlld scripts:
 
@@ -16,7 +16,8 @@ Easy AI integration for your mlld scripts:
 /var @answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
 /show `LLM says: @answer`
 ```
-### [array](./llm/modules/array.mld.md)
+
+### [@mlld/array](./llm/modules/array.mld.md)
 
 Process data arrays with powerful operations:
 
@@ -37,7 +38,8 @@ Process data arrays with powerful operations:
 /show `Engineers: @engineers`
 /show `Total age: @totalAge`
 ```
-### [bundle](./llm/modules/bundle.mld.md)
+
+### [@mlld/bundle](./llm/modules/bundle.mld.md)
 
 Bundle your project files for AI analysis or documentation:
 
@@ -52,7 +54,8 @@ Bundle your project files for AI analysis or documentation:
 /show "Documentation structure:"
 /show `@docs_md`
 ```
-### [conditions](./llm/modules/conditions.mld.md)
+
+### [@mlld/conditions](./llm/modules/conditions.mld.md)
 
 Essential utilities for building complex conditional logic in mlld:
 
@@ -67,7 +70,8 @@ Essential utilities for building complex conditional logic in mlld:
 /when @isEmpty(@users) => /show "No users found"
 /when @equals(@count, 15) => /show "Exact match!"
 ```
-### [fix-relative-links](./llm/modules/fix-relative-links.mld.md)
+
+### [@mlld/fix-relative-links](./llm/modules/fix-relative-links.mld.md)
 
 Recalculates relative links when moving content between directories:
 
@@ -82,7 +86,8 @@ Recalculates relative links when moving content between directories:
 >>                                        ↑                ↑
 >>                   where content thinks it is    where it's actually going
 ```
-### [fm-dir](./llm/modules/fm-dir.mld.md)
+
+### [@mlld/fm-dir](./llm/modules/fm-dir.mld.md)
 
 Grab directories with advanced frontmatter support:
 
@@ -100,7 +105,8 @@ Grab directories with advanced frontmatter support:
 
 /show `Found @length(@modules) modules and @length(@published) published posts`
 ```
-### [fs](./llm/modules/fs.mld.md)
+
+### [@mlld/fs](./llm/modules/fs.mld.md)
 
 Provides basic file system checks that return truthy/falsy values for use with  conditions:
 
@@ -111,7 +117,8 @@ Provides basic file system checks that return truthy/falsy values for use with  
 /when @dirExists("src") => /show "Source directory exists"
 /when @pathExists("README.md") => /show "README is available"
 ```
-### [http](./llm/modules/http.mld.md)
+
+### [@mlld/http](./llm/modules/http.mld.md)
 
 Quick HTTP requests with automatic JSON handling:
 
@@ -125,7 +132,8 @@ Quick HTTP requests with automatic JSON handling:
 /var @userData = @http.fetch.get("https://api.github.com/users/octocat")
 /show `User: @userData.name`
 ```
-### [pipelog](./llm/modules/pipelog.mld.md)
+
+### [@mlld/pipelog](./llm/modules/pipelog.mld.md)
 
 Debug your pipelines by inserting logging between transformations:
 
@@ -143,7 +151,8 @@ Debug your pipelines by inserting logging between transformations:
 ```
 
 All loggers output to stderr, ensuring your pipeline data flows unchanged to stdout.
-### [string](./llm/modules/string.mld.md)
+
+### [@mlld/string](./llm/modules/string.mld.md)
 
 Common string operations:
 
@@ -160,7 +169,8 @@ Common string operations:
 /when @includes(@name, "doe") => /show "Contains 'doe'"
 /show `Formatted: @formatted`
 ```
-### [test](./llm/modules/test.mld.md)
+
+### [@mlld/test](./llm/modules/test.mld.md)
 
 Test your mlld scripts with simple assertions:
 
@@ -175,7 +185,8 @@ Test your mlld scripts with simple assertions:
 
 /when @contains(@output, "success") => /show "✓ Output contains success message"
 ```
-### [time](./llm/modules/time.mld.md)
+
+### [@mlld/time](./llm/modules/time.mld.md)
 
 ```mlld
 /import { time } from @mlld/time

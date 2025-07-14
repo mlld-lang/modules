@@ -1,24 +1,11 @@
-/var @sections = <@local/*.mld.md # tldr> as "### [<>.fm.name](<>.relative)"
-
-/show "Debug: sections array:"
-/show @sections
-
->> Join the array into a string separated by newlines
-/exe @joinArray(arr, sep) = js {
-  return arr.join(sep);
-}
-
-/var @tldrs = @joinArray(@sections, "\n")
-
-/show "Debug: joined tldrs:"
-/show @tldrs
+/var @sections = <@local/*.mld.md # tldr> as "### [@mlld/<>.fm.name](<>.relative)"
 
 /var @readme = `
 # mlld core modules
 
 Core modules for the mlld prompt scripting language.
 
-@tldrs
+@sections
 
 ---
 

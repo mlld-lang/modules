@@ -20,7 +20,7 @@ Pipeline transformer that adjusts relative paths in markdown links to be correct
 Recalculates relative links when moving content between directories:
 
 ```mlld
-/import [fix-relative-links.mld.md]
+/import { fixRelativeLinks } from @mlld/fix-relative-links
 
 /var @content = "See the [docs](../docs/guide.md) for details."
 
