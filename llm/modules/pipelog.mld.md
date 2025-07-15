@@ -124,9 +124,9 @@ Structured logging output for parsing by log aggregation systems.
   | @logVerbose    >> Detailed view of result
 ```
 
-#### Comparing with mlld's @DEBUG
+#### Comparing with mlld's @debug
 
-The loggers complement mlld's built-in @DEBUG variable:
+The loggers complement mlld's built-in @debug variable:
 
 ```mlld
 /import { log } from @mlld/pipelog
@@ -134,8 +134,8 @@ The loggers complement mlld's built-in @DEBUG variable:
 >> The logger shows immediate pipeline state
 /var @result = @data | @log | @transform
 
->> While @DEBUG shows complete execution context
-/show @DEBUG  >> Shows all variables, pipeline context, etc.
+>> While @debug shows complete execution context
+/show @debug  >> Shows all variables, pipeline context, etc.
 ```
 
 ## module
@@ -256,10 +256,10 @@ The loggers complement mlld's built-in @DEBUG variable:
     }
   }
   
-  console.error(`\nDEBUG TIPS:`);
-  console.error(`  • Use /show @DEBUG to see full pipeline context`);
+  console.error(`\ndebug TIPS:`);
+  console.error(`  • Use /show @debug to see full pipeline context`);
   console.error(`  • Pipe to @json for pretty-printing`);
-  console.error(`  • Check mlld's built-in @DEBUG variable for environment info`);
+  console.error(`  • Check mlld's built-in @debug variable for environment info`);
   console.error(`${separator}\n`);
   
   return input;
