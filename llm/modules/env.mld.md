@@ -193,9 +193,25 @@ Environment variable utilities:
 }
 
 /exe @require(@variables) = js {
-  const result = @validate(variables);
-  if (!result.valid) {
-    console.error(result.summary);
+  // Duplicate the validation logic here since we can't call @validate from within js
+  const vars = Array.isArray(variables) ? variables : [variables];
+  
+  const results = vars.map(varName => {
+    const value = process.env[varName];
+    const exists = value && value.trim().length > 0;
+    
+    return {
+      name: varName,
+      exists: exists,
+      length: exists ? value.length : 0
+    };
+  });
+  
+  const missing = results.filter(r => !r.exists).map(r => r.name);
+  const allValid = missing.length === 0;
+  
+  if (!allValid) {
+    console.error(`❌ Missing ${missing.length} of ${vars.length} required variables: ${missing.join(', ')}`);
     return "";
   }
   return "true";
@@ -307,12 +323,12 @@ Environment variable utilities:
   fi
 }
 
-/exe @export(@name, @value) = sh {
+/exe @setEnv(@name, @value) = sh {
   export "$name"="$value"
   echo "✅ Exported $name"
 }
 
->> Export module structure
+>> Main export
 /var @env = {
   validate: @validate,
   require: @require,
@@ -323,6 +339,6 @@ Environment variable utilities:
   isCI: @isCI,
   ciProvider: @ciProvider,
   load: @load,
-  export: @export
+  export: @setEnv
 }
 ```

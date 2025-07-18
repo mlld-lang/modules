@@ -208,73 +208,73 @@ GitHub operations via the gh CLI:
 
 ```mlld-run
 >> Pull Request operations
-/exe @pr_view(@number, @repo, @fields) = run {
+/exe @pr_view(@number, @repo, @fields) = sh {
   if [ -z "$fields" ]; then
-    gh pr view @number --repo @repo --json number,title,author,files,state,body,labels,createdAt
+    gh pr view $number --repo $repo --json number,title,author,files,state,body,labels,createdAt
   else
-    gh pr view @number --repo @repo --json @fields
+    gh pr view $number --repo $repo --json $fields
   fi
 }
 
-/exe @pr_diff(@number, @repo, @paths) = run {
+/exe @pr_diff(@number, @repo, @paths) = sh {
   if [ -z "$paths" ]; then
-    gh pr diff @number --repo @repo
+    gh pr diff $number --repo $repo
   else
-    gh pr diff @number --repo @repo -- @paths
+    gh pr diff $number --repo $repo -- $paths
   fi
 }
 
-/exe @pr_list(@repo, @options) = run {
+/exe @pr_list(@repo, @options) = sh {
   if [ -z "$options" ]; then
-    gh pr list --repo @repo --json number,title,author,state,labels
+    gh pr list --repo $repo --json number,title,author,state,labels
   else
-    gh pr list --repo @repo @options --json number,title,author,state,labels
+    gh pr list --repo $repo $options --json number,title,author,state,labels
   fi
 }
 
-/exe @pr_comment(@number, @repo, @body) = run {
-  gh pr comment @number --repo @repo --body "@body"
+/exe @pr_comment(@number, @repo, @body) = sh {
+  gh pr comment $number --repo $repo --body "$body"
 }
 
-/exe @pr_review(@number, @repo, @event, @body) = run {
-  gh pr review @number --repo @repo --@event --body "@body"
+/exe @pr_review(@number, @repo, @event, @body) = sh {
+  gh pr review $number --repo $repo --$event --body "$body"
 }
 
-/exe @pr_edit(@number, @repo, @options) = run {
-  gh pr edit @number --repo @repo @options
+/exe @pr_edit(@number, @repo, @options) = sh {
+  gh pr edit $number --repo $repo $options
 }
 
 >> Issue operations
-/exe @issue_create(@repo, @title, @body) = run {
-  gh issue create --repo @repo --title "@title" --body "@body" --json number,url
+/exe @issue_create(@repo, @title, @body) = sh {
+  gh issue create --repo $repo --title "$title" --body "$body" --json number,url
 }
 
-/exe @issue_list(@repo, @options) = run {
+/exe @issue_list(@repo, @options) = sh {
   if [ -z "$options" ]; then
-    gh issue list --repo @repo --json number,title,author,state,labels
+    gh issue list --repo $repo --json number,title,author,state,labels
   else
-    gh issue list --repo @repo @options --json number,title,author,state,labels
+    gh issue list --repo $repo $options --json number,title,author,state,labels
   fi
 }
 
-/exe @issue_comment(@number, @repo, @body) = run {
-  gh issue comment @number --repo @repo --body "@body"
+/exe @issue_comment(@number, @repo, @body) = sh {
+  gh issue comment $number --repo $repo --body "$body"
 }
 
 >> Repository operations
-/exe @repo_view(@repo, @fields) = run {
+/exe @repo_view(@repo, @fields) = sh {
   if [ -z "$fields" ]; then
-    gh repo view @repo --json name,owner,description,stargazerCount,forkCount,url
+    gh repo view $repo --json name,owner,description,stargazerCount,forkCount,url
   else
-    gh repo view @repo --json @fields
+    gh repo view $repo --json $fields
   fi
 }
 
-/exe @repo_clone(@repo, @dir) = run {
+/exe @repo_clone(@repo, @dir) = sh {
   if [ -z "$dir" ]; then
-    gh repo clone @repo
+    gh repo clone $repo
   else
-    gh repo clone @repo @dir
+    gh repo clone $repo $dir
   fi
 }
 
@@ -290,16 +290,16 @@ GitHub operations via the gh CLI:
 }
 
 >> Workflow operations
-/exe @workflow_run(@repo, @workflow, @options) = run {
+/exe @workflow_run(@repo, @workflow, @options) = sh {
   if [ -z "$options" ]; then
-    gh workflow run @workflow --repo @repo
+    gh workflow run $workflow --repo $repo
   else
-    gh workflow run @workflow --repo @repo @options
+    gh workflow run $workflow --repo $repo $options
   fi
 }
 
-/exe @workflow_list(@repo) = run {
-  gh run list --repo @repo --json databaseId,name,status,conclusion,headBranch
+/exe @workflow_list(@repo) = sh {
+  gh run list --repo $repo --json databaseId,name,status,conclusion,headBranch
 }
 
 >> Export module structure

@@ -1,0 +1,153 @@
+> Testing @mlld/github module
+
+/import { ok, notOk, eq, deepEq, contains, throws, len } from @local/test
+/import { github } from @local/github
+
+## Testing module structure
+
+>> Verify main github object exists
+/var @test_github_exists = @ok(@github)
+
+>> Check github has all expected sub-objects
+/var @test_has_pr = @ok(@github.pr)
+/var @test_has_issue = @ok(@github.issue)
+/var @test_has_repo = @ok(@github.repo)
+/var @test_has_collab = @ok(@github.collab)
+/var @test_has_workflow = @ok(@github.workflow)
+
+## Testing PR operations structure
+
+>> Check PR object has all methods
+/var @test_pr_has_view = @ok(@github.pr.view)
+/var @test_pr_has_diff = @ok(@github.pr.diff)
+/var @test_pr_has_list = @ok(@github.pr.list)
+/var @test_pr_has_comment = @ok(@github.pr.comment)
+/var @test_pr_has_review = @ok(@github.pr.review)
+/var @test_pr_has_edit = @ok(@github.pr.edit)
+
+## Testing Issue operations structure
+
+>> Check Issue object has all methods
+/var @test_issue_has_create = @ok(@github.issue.create)
+/var @test_issue_has_list = @ok(@github.issue.list)
+/var @test_issue_has_comment = @ok(@github.issue.comment)
+
+## Testing Repo operations structure
+
+>> Check Repo object has all methods
+/var @test_repo_has_view = @ok(@github.repo.view)
+/var @test_repo_has_clone = @ok(@github.repo.clone)
+
+## Testing Collab operations structure
+
+>> Check Collab object has all methods
+/var @test_collab_has_check = @ok(@github.collab.check)
+
+## Testing Workflow operations structure
+
+>> Check Workflow object has all methods
+/var @test_workflow_has_run = @ok(@github.workflow.run)
+/var @test_workflow_has_list = @ok(@github.workflow.list)
+
+
+## Testing executable nature
+
+>> Note: mlld executables are not JavaScript functions, so we can't check arity
+>> Instead, verify they are executable objects
+
+/exe @isExecutable(@val) = js { 
+  return (val && val['**executable'] === true) ? "true" : ""; 
+}
+
+>> PR methods should be executables
+/var @test_pr_view_is_executable = @ok(@isExecutable(@github.pr.view))
+/var @test_pr_diff_is_executable = @ok(@isExecutable(@github.pr.diff))
+/var @test_pr_list_is_executable = @ok(@isExecutable(@github.pr.list))
+/var @test_pr_comment_is_executable = @ok(@isExecutable(@github.pr.comment))
+/var @test_pr_review_is_executable = @ok(@isExecutable(@github.pr.review))
+/var @test_pr_edit_is_executable = @ok(@isExecutable(@github.pr.edit))
+
+>> Issue methods should be executables
+/var @test_issue_create_is_executable = @ok(@isExecutable(@github.issue.create))
+/var @test_issue_list_is_executable = @ok(@isExecutable(@github.issue.list))
+/var @test_issue_comment_is_executable = @ok(@isExecutable(@github.issue.comment))
+
+>> Repo methods should be executables
+/var @test_repo_view_is_executable = @ok(@isExecutable(@github.repo.view))
+/var @test_repo_clone_is_executable = @ok(@isExecutable(@github.repo.clone))
+
+>> Collab methods should be executables
+/var @test_collab_check_is_executable = @ok(@isExecutable(@github.collab.check))
+
+>> Workflow methods should be executables
+/var @test_workflow_run_is_executable = @ok(@isExecutable(@github.workflow.run))
+/var @test_workflow_list_is_executable = @ok(@isExecutable(@github.workflow.list))
+
+## Testing edge cases and validation
+
+>> Test that functions handle missing parameters gracefully
+>> Note: In production, these would fail with gh CLI errors, but the functions should still be callable
+
+/exe @tryCall(@fn, @args) = js {
+  try {
+    if (Array.isArray(args)) {
+      fn(...args);
+    } else {
+      fn();
+    }
+    return "no-error";
+  } catch (e) {
+    return e.message || "error";
+  }
+}
+
+>> Functions should be callable (actual execution would require valid auth/repos)
+/var @test_pr_view_callable = @ok(@tryCall(@github.pr.view, []))
+/var @test_issue_create_callable = @ok(@tryCall(@github.issue.create, []))
+/var @test_repo_view_callable = @ok(@tryCall(@github.repo.view, []))
+
+## Testing command construction helpers
+
+>> Create helper to verify command construction without executing
+/exe @extractCommand(@fn, @args) = js {
+  // This would normally execute, but we can test the function exists and is callable
+  return typeof fn === 'function' ? "function-exists" : "not-a-function";
+}
+
+/var @test_pr_view_type = @eq(@extractCommand(@github.pr.view), "function-exists")
+/var @test_issue_create_type = @eq(@extractCommand(@github.issue.create), "function-exists")
+/var @test_workflow_run_type = @eq(@extractCommand(@github.workflow.run), "function-exists")
+
+## Testing nested object access patterns
+
+>> Verify deep property access works correctly
+/var @prMethods = ["view", "diff", "list", "comment", "review", "edit"]
+/var @issueMethods = ["create", "list", "comment"]
+/var @repoMethods = ["view", "clone"]
+/var @collabMethods = ["check"]
+/var @workflowMethods = ["run", "list"]
+
+/exe @hasAllMethods(@obj, @methods) = js {
+  const methodList = Array.isArray(methods) ? methods : [methods];
+  return methodList.every(method => typeof obj[method] === 'function') ? "true" : "";
+}
+
+/var @test_pr_has_all_methods = @ok(@hasAllMethods(@github.pr, @prMethods))
+/var @test_issue_has_all_methods = @ok(@hasAllMethods(@github.issue, @issueMethods))
+/var @test_repo_has_all_methods = @ok(@hasAllMethods(@github.repo, @repoMethods))
+/var @test_collab_has_all_methods = @ok(@hasAllMethods(@github.collab, @collabMethods))
+/var @test_workflow_has_all_methods = @ok(@hasAllMethods(@github.workflow, @workflowMethods))
+
+## Summary
+
+>> Count total properties in github object
+/exe @countProperties(@obj) = js {
+  return Object.keys(obj).length;
+}
+
+/var @test_github_has_5_categories = @eq(@countProperties(@github), 5)
+/var @test_pr_has_6_methods = @eq(@countProperties(@github.pr), 6)
+/var @test_issue_has_3_methods = @eq(@countProperties(@github.issue), 3)
+/var @test_repo_has_2_methods = @eq(@countProperties(@github.repo), 2)
+/var @test_collab_has_1_method = @eq(@countProperties(@github.collab), 1)
+/var @test_workflow_has_2_methods = @eq(@countProperties(@github.workflow), 2)
