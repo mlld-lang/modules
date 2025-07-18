@@ -1,7 +1,7 @@
 >> Tests for @mlld/ai module
 
 /import { ok, eq } from @local/test
-/import { claude, llm, codex } from @local/ai
+/import { claude, llm, codex } from @local/ai-cli
 
 ## Test that main objects exist
 /var @test_claude_exists = @ok(@claude)
