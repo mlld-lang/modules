@@ -1,17 +1,17 @@
 ---
-name: ai
+name: ai-cli
 author: mlld
 version: 1.0.0
 about: LLM cli wrappers
 needs: ["sh"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
-keywords: ["llm", "ai", "openai", "anthropic", "google", "claude", "codex", "gemini"]
+keywords: ["llm", "ai", "openai", "anthropic", "google", "claude", "codex", "gemini", "cli"]
 license: CC0
 mlldVersion: "*"
 ---
 
-# @mlld/ai
+# @mlld/ai-cli
 
 Simple wrappers for AI CLI tools (llm, claude, codex, gemini) to integrate language models into mlld workflows.
 
@@ -20,7 +20,7 @@ Simple wrappers for AI CLI tools (llm, claude, codex, gemini) to integrate langu
 Easy AI integration for your mlld scripts:
 
 ```mlld
-/import { claude, llm, codex, gemini } from @mlld/ai
+/import { claude, llm, codex, gemini } from @mlld/ai-cli
 
 /var @response = @claude.ask("What's the capital of France?")
 /show `Claude says: @response`
