@@ -213,91 +213,87 @@ GitHub operations via the GitHub REST API:
 ```mlld-run
 >> GitHub API helper functions
 /exe @github_request(@method, @endpoint, @body) = js {
-  return (async () => {
-    const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
-    if (!token) {
-      return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
-    }
+  const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
+  if (!token) {
+    return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
+  }
 
-    const url = endpoint.startsWith('https://') ? endpoint : `https://api.github.com/${endpoint}`;
+  const url = endpoint.startsWith('https://') ? endpoint : `https://api.github.com/${endpoint}`;
+  
+  const options = {
+    method: method || 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'mlld-github-module',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  };
+
+  if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
+    options.headers['Content-Type'] = 'application/json';
+    options.body = typeof body === 'string' ? body : JSON.stringify(body);
+  }
+
+  try {
+    const response = await fetch(url, options);
     
-    const options = {
-      method: method || 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'mlld-github-module',
-        'X-GitHub-Api-Version': '2022-11-28'
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorText;
+      } catch {
+        errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`;
       }
-    };
-
-    if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
-      options.headers['Content-Type'] = 'application/json';
-      options.body = typeof body === 'string' ? body : JSON.stringify(body);
-    }
-
-    try {
-      const response = await fetch(url, options);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage;
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorText;
-        } catch {
-          errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`;
-        }
-        
-        return { 
-          error: `GitHub API error: ${errorMessage}`,
-          status: response.status,
-          statusText: response.statusText
-        };
-      }
-
-      // Handle empty responses (204 No Content)
-      if (response.status === 204) {
-        return { success: true };
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      return { error: `Request failed: ${error.message}` };
+      return { 
+        error: `GitHub API error: ${errorMessage}`,
+        status: response.status,
+        statusText: response.statusText
+      };
     }
-  })();
+
+    // Handle empty responses (204 No Content)
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return { error: `Request failed: ${error.message}` };
+  }
 }
 
 >> Now functions can access github_request from the shadow environment
 >> Pull Request operations
 /exe @pr_view(@number, @repo, @fields) = js {
-  return (async () => {
-    const result = await github_request('GET', `repos/${repo}/pulls/${number}`);
-    
-    if (result.error) {
-      return result;
-    }
-
-    // Always ensure files is an array to prevent undefined errors
-    if (!result.files) {
-      result.files = [];
-    }
-
-    // If specific fields requested, filter the response
-    if (fields) {
-      const fieldArray = fields.split(',').map(f => f.trim());
-      const filtered = {};
-      fieldArray.forEach(field => {
-        if (result[field] !== undefined) {
-          filtered[field] = result[field];
-        }
-      });
-      return filtered;
-    }
-
+  const result = await github_request('GET', `repos/${repo}/pulls/${number}`);
+  
+  if (result.error) {
     return result;
-  })();
+  }
+
+  // Always ensure files is an array to prevent undefined errors
+  if (!result.files) {
+    result.files = [];
+  }
+
+  // If specific fields requested, filter the response
+  if (fields) {
+    const fieldArray = fields.split(',').map(f => f.trim());
+    const filtered = {};
+    fieldArray.forEach(field => {
+      if (result[field] !== undefined) {
+        filtered[field] = result[field];
+      }
+    });
+    return filtered;
+  }
+
+  return result;
 }
 
 /exe @pr_diff(@number, @repo, @paths) = js {
@@ -349,35 +345,33 @@ GitHub operations via the GitHub REST API:
 }
 
 /exe @pr_list(@repo, @options) = js {
-  return (async () => {
-    let endpoint = `repos/${repo}/pulls`;
-    const params = new URLSearchParams();
+  let endpoint = `repos/${repo}/pulls`;
+  const params = new URLSearchParams();
+  
+  // Parse common options
+  if (options) {
+    if (options.includes('--state open')) params.set('state', 'open');
+    if (options.includes('--state closed')) params.set('state', 'closed');
+    if (options.includes('--state all')) params.set('state', 'all');
     
-    // Parse common options
-    if (options) {
-      if (options.includes('--state open')) params.set('state', 'open');
-      if (options.includes('--state closed')) params.set('state', 'closed');
-      if (options.includes('--state all')) params.set('state', 'all');
-      
-      // Parse author
-      const authorMatch = options.match(/--author\s+(\S+)/);
-      if (authorMatch) {
-        params.set('head', `${authorMatch[1]}:`);
-      }
-      
-      // Parse label
-      const labelMatch = options.match(/--label\s+(\S+)/);
-      if (labelMatch) {
-        params.set('labels', labelMatch[1]);
-      }
+    // Parse author
+    const authorMatch = options.match(/--author\s+(\S+)/);
+    if (authorMatch) {
+      params.set('head', `${authorMatch[1]}:`);
     }
     
-    if (params.toString()) {
-      endpoint += `?${params.toString()}`;
+    // Parse label
+    const labelMatch = options.match(/--label\s+(\S+)/);
+    if (labelMatch) {
+      params.set('labels', labelMatch[1]);
     }
+  }
+  
+  if (params.toString()) {
+    endpoint += `?${params.toString()}`;
+  }
 
-    return await github_request('GET', endpoint);
-  })();
+  return await github_request('GET', endpoint);
 }
 
 /exe @pr_comment(@number, @repo, @body) = js {
@@ -428,33 +422,31 @@ GitHub operations via the GitHub REST API:
 }
 
 /exe @issue_list(@repo, @options) = js {
-  return (async () => {
-    let endpoint = `repos/${repo}/issues`;
-    const params = new URLSearchParams();
+  let endpoint = `repos/${repo}/issues`;
+  const params = new URLSearchParams();
+  
+  // Parse options
+  if (options) {
+    if (options.includes('--state open')) params.set('state', 'open');
+    if (options.includes('--state closed')) params.set('state', 'closed');
+    if (options.includes('--state all')) params.set('state', 'all');
     
-    // Parse options
-    if (options) {
-      if (options.includes('--state open')) params.set('state', 'open');
-      if (options.includes('--state closed')) params.set('state', 'closed');
-      if (options.includes('--state all')) params.set('state', 'all');
-      
-      const assigneeMatch = options.match(/--assignee\s+(\S+)/);
-      if (assigneeMatch) {
-        params.set('assignee', assigneeMatch[1] === '@me' ? '' : assigneeMatch[1]);
-      }
-      
-      const labelMatch = options.match(/--label\s+(\S+)/);
-      if (labelMatch) {
-        params.set('labels', labelMatch[1]);
-      }
+    const assigneeMatch = options.match(/--assignee\s+(\S+)/);
+    if (assigneeMatch) {
+      params.set('assignee', assigneeMatch[1] === '@me' ? '' : assigneeMatch[1]);
     }
     
-    if (params.toString()) {
-      endpoint += `?${params.toString()}`;
+    const labelMatch = options.match(/--label\s+(\S+)/);
+    if (labelMatch) {
+      params.set('labels', labelMatch[1]);
     }
+  }
+  
+  if (params.toString()) {
+    endpoint += `?${params.toString()}`;
+  }
 
-    return await github_request('GET', endpoint);
-  })();
+  return await github_request('GET', endpoint);
 }
 
 /exe @issue_comment(@number, @repo, @body) = js {
@@ -465,91 +457,83 @@ GitHub operations via the GitHub REST API:
 
 >> Repository operations
 /exe @repo_view(@repo, @fields) = js {
-  return (async () => {
-    const result = await github_request('GET', `repos/${repo}`);
-    
-    if (result.error) {
-      return result;
-    }
-
-    // If specific fields requested, filter the response
-    if (fields) {
-      const fieldArray = fields.split(',').map(f => f.trim());
-      const filtered = {};
-      fieldArray.forEach(field => {
-        if (result[field] !== undefined) {
-          filtered[field] = result[field];
-        }
-      });
-      return filtered;
-    }
-
+  const result = await github_request('GET', `repos/${repo}`);
+  
+  if (result.error) {
     return result;
-  })();
+  }
+
+  // If specific fields requested, filter the response
+  if (fields) {
+    const fieldArray = fields.split(',').map(f => f.trim());
+    const filtered = {};
+    fieldArray.forEach(field => {
+      if (result[field] !== undefined) {
+        filtered[field] = result[field];
+      }
+    });
+    return filtered;
+  }
+
+  return result;
 }
 
 /exe @repo_clone(@repo, @dir) = js {
-  return (async () => {
-    // Note: This returns clone information, not actual cloning
-    // For actual git operations, use shell commands or git APIs
-    const result = await github_request('GET', `repos/${repo}`);
-    
-    if (result.error) {
-      return result;
-    }
+  // Note: This returns clone information, not actual cloning
+  // For actual git operations, use shell commands or git APIs
+  const result = await github_request('GET', `repos/${repo}`);
+  
+  if (result.error) {
+    return result;
+  }
 
-    return {
-      clone_url: result.clone_url,
-      ssh_url: result.ssh_url,
-      git_url: result.git_url,
-      directory: dir || result.name,
-      instructions: `git clone ${result.clone_url} ${dir || result.name}`
-    };
-  })();
+  return {
+    clone_url: result.clone_url,
+    ssh_url: result.ssh_url,
+    git_url: result.git_url,
+    directory: dir || result.name,
+    instructions: `git clone ${result.clone_url} ${dir || result.name}`
+  };
 }
 
 >> Collaborator checks
 /exe @collab_check(@user, @repo) = js {
-  return (async () => {
-    const result = await github_request('GET', `repos/${repo}/collaborators/${user}`);
-    
-    // Return boolean string for compatibility
-    if (result.error) {
-      return ""; // Not a collaborator or error
-    }
-    
-    return "true"; // Is a collaborator
-  })();
+  const result = await github_request('GET', `repos/${repo}/collaborators/${user}`);
+  
+  // Return boolean string for compatibility
+  if (result.error) {
+    return ""; // Not a collaborator or error
+  }
+  
+  return "true"; // Is a collaborator
 }
 
 >> Workflow operations
 /exe @workflow_run(@repo, @workflow, @options) = js {
-  return (async () => {
-    // First, get the workflow ID if a name was provided
-    let workflowId = workflow;
+  // First, get the workflow ID if a name was provided
+  let workflowId = workflow;
+  
+  if (isNaN(workflow)) {
+    // It's a workflow name, need to find the ID
+    const workflows = await github_request('GET', `repos/${repo}/actions/workflows`);
+    if (workflows.error) return workflows;
     
-    if (isNaN(workflow)) {
-      // It's a workflow name, need to find the ID
-      const workflows = await github_request('GET', `repos/${repo}/actions/workflows`);
-      if (workflows.error) return workflows;
-      
-      const found = workflows.workflows.find(w => w.name === workflow || w.path.includes(workflow));
-      if (!found) {
-        return { error: `Workflow '${workflow}' not found` };
-      }
-      workflowId = found.id;
+    const found = workflows.workflows.find(w => w.name === workflow || w.path.includes(workflow));
+    if (!found) {
+      return { error: `Workflow '${workflow}' not found` };
     }
-    
-    const dispatchData = { ref: 'main' };
-    
-    // Parse options for ref and inputs
-    if (options) {
-      const refMatch = options.match(/--ref\s+(\S+)/);
-      if (refMatch) dispatchData.ref = refMatch[1];
-    }
-    
-    return await github_request('POST', `repos/${repo}/actions/workflows/${workflowId}/dispatches`, dispatchData);
-  })();
+    workflowId = found.id;
+  }
+  
+  const dispatchData = { ref: 'main' };
+  
+  // Parse options for ref and inputs
+  if (options) {
+    const refMatch = options.match(/--ref\s+(\S+)/);
+    if (refMatch) dispatchData.ref = refMatch[1];
+  }
+  
+  return await github_request('POST', `repos/${repo}/actions/workflows/${workflowId}/dispatches`, dispatchData);
 }
 
 /exe @workflow_list(@repo) = js {
