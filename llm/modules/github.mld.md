@@ -213,60 +213,63 @@ GitHub operations via the GitHub REST API:
 ```mlld-run
 >> GitHub API helper functions
 /exe @github_request(@method, @endpoint, @body) = js {
-  const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
-  if (!token) {
-    return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
-  }
-
-  const url = endpoint.startsWith('https://') ? endpoint : `https://api.github.com/${endpoint}`;
-  
-  const options = {
-    method: method || 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'mlld-github-module',
-      'X-GitHub-Api-Version': '2022-11-28'
+  return (async () => {
+    const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
+    if (!token) {
+      return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
     }
-  };
 
-  if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
-    options.headers['Content-Type'] = 'application/json';
-    options.body = typeof body === 'string' ? body : JSON.stringify(body);
-  }
-
-  try {
-    const response = await fetch(url, options);
+    const url = endpoint.startsWith('https://') ? endpoint : `https://api.github.com/${endpoint}`;
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.message || errorText;
-      } catch {
-        errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`;
+    const options = {
+      method: method || 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'mlld-github-module',
+        'X-GitHub-Api-Version': '2022-11-28'
       }
+    };
+
+    if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
+
+    try {
+      const response = await fetch(url, options);
       
-      return { 
-        error: `GitHub API error: ${errorMessage}`,
-        status: response.status,
-        statusText: response.statusText
-      };
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.message || errorText;
+        } catch {
+          errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`;
+        }
+        
+        return { 
+          error: `GitHub API error: ${errorMessage}`,
+          status: response.status,
+          statusText: response.statusText
+        };
+      }
 
-    // Handle empty responses (204 No Content)
-    if (response.status === 204) {
-      return { success: true };
-    }
+      // Handle empty responses (204 No Content)
+      if (response.status === 204) {
+        return { success: true };
+      }
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return { error: `Request failed: ${error.message}` };
-  }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { error: `Request failed: ${error.message}` };
+    }
+  })();
 }
 
+>> Now functions can access github_request from the shadow environment
 >> Pull Request operations
 /exe @pr_view(@number, @repo, @fields) = js {
   return (async () => {
@@ -553,15 +556,8 @@ GitHub operations via the GitHub REST API:
   return github_request('GET', `repos/${repo}/actions/runs`);
 }
 
->> Set up JavaScript shadow environment
-/exe @js = { 
-  github_request,
-  pr_view, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
-  issue_create, issue_list, issue_comment,
-  repo_view, repo_clone,
-  collab_check,
-  workflow_run, workflow_list
-}
+>> Set up initial JavaScript shadow environment with github_request
+/exe @js = { github_request }
 
 >> Export module structure
 /var @pr = {
@@ -591,6 +587,16 @@ GitHub operations via the GitHub REST API:
 /var @workflow = {
   run: @workflow_run,
   list: @workflow_list
+}
+
+>> Update JavaScript shadow environment with all functions
+/exe @js = { 
+  github_request,
+  pr_view, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
+  issue_create, issue_list, issue_comment,
+  repo_view, repo_clone,
+  collab_check,
+  workflow_run, workflow_list
 }
 
 /var @github = {
