@@ -556,9 +556,6 @@ GitHub operations via the GitHub REST API:
   return github_request('GET', `repos/${repo}/actions/runs`);
 }
 
->> Set up initial JavaScript shadow environment with github_request
-/exe @js = { github_request }
-
 >> Export module structure
 /var @pr = {
   view: @pr_view,
@@ -589,7 +586,15 @@ GitHub operations via the GitHub REST API:
   list: @workflow_list
 }
 
->> Update JavaScript shadow environment with all functions
+/var @github = {
+  pr: @pr,
+  issue: @issue,
+  repo: @repo,
+  collab: @collab,
+  workflow: @workflow
+}
+
+>> Set up JavaScript shadow environment with all functions
 /exe @js = { 
   github_request,
   pr_view, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
@@ -597,13 +602,5 @@ GitHub operations via the GitHub REST API:
   repo_view, repo_clone,
   collab_check,
   workflow_run, workflow_list
-}
-
-/var @github = {
-  pr: @pr,
-  issue: @issue,
-  repo: @repo,
-  collab: @collab,
-  workflow: @workflow
 }
 ```
