@@ -269,30 +269,32 @@ GitHub operations via the GitHub REST API:
 
 >> Pull Request operations
 /exe @pr_view(@number, @repo, @fields) = js {
-  const result = await github_request('GET', `repos/${repo}/pulls/${number}`);
-  
-  if (result.error) {
+  return (async () => {
+    const result = await github_request('GET', `repos/${repo}/pulls/${number}`);
+    
+    if (result.error) {
+      return result;
+    }
+
+    // Always ensure files is an array to prevent undefined errors
+    if (!result.files) {
+      result.files = [];
+    }
+
+    // If specific fields requested, filter the response
+    if (fields) {
+      const fieldArray = fields.split(',').map(f => f.trim());
+      const filtered = {};
+      fieldArray.forEach(field => {
+        if (result[field] !== undefined) {
+          filtered[field] = result[field];
+        }
+      });
+      return filtered;
+    }
+
     return result;
-  }
-
-  // Always ensure files is an array to prevent undefined errors
-  if (!result.files) {
-    result.files = [];
-  }
-
-  // If specific fields requested, filter the response
-  if (fields) {
-    const fieldArray = fields.split(',').map(f => f.trim());
-    const filtered = {};
-    fieldArray.forEach(field => {
-      if (result[field] !== undefined) {
-        filtered[field] = result[field];
-      }
-    });
-    return filtered;
-  }
-
-  return result;
+  })();
 }
 
 /exe @pr_diff(@number, @repo, @paths) = js {
@@ -344,37 +346,39 @@ GitHub operations via the GitHub REST API:
 }
 
 /exe @pr_list(@repo, @options) = js {
-  let endpoint = `repos/${repo}/pulls`;
-  const params = new URLSearchParams();
-  
-  // Parse common options
-  if (options) {
-    if (options.includes('--state open')) params.set('state', 'open');
-    if (options.includes('--state closed')) params.set('state', 'closed');
-    if (options.includes('--state all')) params.set('state', 'all');
+  return (async () => {
+    let endpoint = `repos/${repo}/pulls`;
+    const params = new URLSearchParams();
     
-    // Parse author
-    const authorMatch = options.match(/--author\s+(\S+)/);
-    if (authorMatch) {
-      params.set('head', `${authorMatch[1]}:`);
+    // Parse common options
+    if (options) {
+      if (options.includes('--state open')) params.set('state', 'open');
+      if (options.includes('--state closed')) params.set('state', 'closed');
+      if (options.includes('--state all')) params.set('state', 'all');
+      
+      // Parse author
+      const authorMatch = options.match(/--author\s+(\S+)/);
+      if (authorMatch) {
+        params.set('head', `${authorMatch[1]}:`);
+      }
+      
+      // Parse label
+      const labelMatch = options.match(/--label\s+(\S+)/);
+      if (labelMatch) {
+        params.set('labels', labelMatch[1]);
+      }
     }
     
-    // Parse label
-    const labelMatch = options.match(/--label\s+(\S+)/);
-    if (labelMatch) {
-      params.set('labels', labelMatch[1]);
+    if (params.toString()) {
+      endpoint += `?${params.toString()}`;
     }
-  }
-  
-  if (params.toString()) {
-    endpoint += `?${params.toString()}`;
-  }
 
-  return await github_request('GET', endpoint);
+    return await github_request('GET', endpoint);
+  })();
 }
 
 /exe @pr_comment(@number, @repo, @body) = js {
-  return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
+  return github_request('POST', `repos/${repo}/issues/${number}/comments`, {
     body: body
   });
 }
@@ -388,7 +392,7 @@ GitHub operations via the GitHub REST API:
   
   const reviewEvent = eventMap[event] || event.toUpperCase();
   
-  return await github_request('POST', `repos/${repo}/pulls/${number}/reviews`, {
+  return github_request('POST', `repos/${repo}/pulls/${number}/reviews`, {
     event: reviewEvent,
     body: body
   });
@@ -409,134 +413,144 @@ GitHub operations via the GitHub REST API:
     if (labelMatch) updateData.labels = labelMatch[1].split(',');
   }
   
-  return await github_request('PATCH', `repos/${repo}/pulls/${number}`, updateData);
+  return github_request('PATCH', `repos/${repo}/pulls/${number}`, updateData);
 }
 
 >> Issue operations
 /exe @issue_create(@repo, @title, @body) = js {
-  return await github_request('POST', `repos/${repo}/issues`, {
+  return github_request('POST', `repos/${repo}/issues`, {
     title: title,
     body: body
   });
 }
 
 /exe @issue_list(@repo, @options) = js {
-  let endpoint = `repos/${repo}/issues`;
-  const params = new URLSearchParams();
-  
-  // Parse options
-  if (options) {
-    if (options.includes('--state open')) params.set('state', 'open');
-    if (options.includes('--state closed')) params.set('state', 'closed');
-    if (options.includes('--state all')) params.set('state', 'all');
+  return (async () => {
+    let endpoint = `repos/${repo}/issues`;
+    const params = new URLSearchParams();
     
-    const assigneeMatch = options.match(/--assignee\s+(\S+)/);
-    if (assigneeMatch) {
-      params.set('assignee', assigneeMatch[1] === '@me' ? '' : assigneeMatch[1]);
+    // Parse options
+    if (options) {
+      if (options.includes('--state open')) params.set('state', 'open');
+      if (options.includes('--state closed')) params.set('state', 'closed');
+      if (options.includes('--state all')) params.set('state', 'all');
+      
+      const assigneeMatch = options.match(/--assignee\s+(\S+)/);
+      if (assigneeMatch) {
+        params.set('assignee', assigneeMatch[1] === '@me' ? '' : assigneeMatch[1]);
+      }
+      
+      const labelMatch = options.match(/--label\s+(\S+)/);
+      if (labelMatch) {
+        params.set('labels', labelMatch[1]);
+      }
     }
     
-    const labelMatch = options.match(/--label\s+(\S+)/);
-    if (labelMatch) {
-      params.set('labels', labelMatch[1]);
+    if (params.toString()) {
+      endpoint += `?${params.toString()}`;
     }
-  }
-  
-  if (params.toString()) {
-    endpoint += `?${params.toString()}`;
-  }
 
-  return await github_request('GET', endpoint);
+    return await github_request('GET', endpoint);
+  })();
 }
 
 /exe @issue_comment(@number, @repo, @body) = js {
-  return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
+  return github_request('POST', `repos/${repo}/issues/${number}/comments`, {
     body: body
   });
 }
 
 >> Repository operations
 /exe @repo_view(@repo, @fields) = js {
-  const result = await github_request('GET', `repos/${repo}`);
-  
-  if (result.error) {
+  return (async () => {
+    const result = await github_request('GET', `repos/${repo}`);
+    
+    if (result.error) {
+      return result;
+    }
+
+    // If specific fields requested, filter the response
+    if (fields) {
+      const fieldArray = fields.split(',').map(f => f.trim());
+      const filtered = {};
+      fieldArray.forEach(field => {
+        if (result[field] !== undefined) {
+          filtered[field] = result[field];
+        }
+      });
+      return filtered;
+    }
+
     return result;
-  }
-
-  // If specific fields requested, filter the response
-  if (fields) {
-    const fieldArray = fields.split(',').map(f => f.trim());
-    const filtered = {};
-    fieldArray.forEach(field => {
-      if (result[field] !== undefined) {
-        filtered[field] = result[field];
-      }
-    });
-    return filtered;
-  }
-
-  return result;
+  })();
 }
 
 /exe @repo_clone(@repo, @dir) = js {
-  // Note: This returns clone information, not actual cloning
-  // For actual git operations, use shell commands or git APIs
-  const result = await github_request('GET', `repos/${repo}`);
-  
-  if (result.error) {
-    return result;
-  }
+  return (async () => {
+    // Note: This returns clone information, not actual cloning
+    // For actual git operations, use shell commands or git APIs
+    const result = await github_request('GET', `repos/${repo}`);
+    
+    if (result.error) {
+      return result;
+    }
 
-  return {
-    clone_url: result.clone_url,
-    ssh_url: result.ssh_url,
-    git_url: result.git_url,
-    directory: dir || result.name,
-    instructions: `git clone ${result.clone_url} ${dir || result.name}`
-  };
+    return {
+      clone_url: result.clone_url,
+      ssh_url: result.ssh_url,
+      git_url: result.git_url,
+      directory: dir || result.name,
+      instructions: `git clone ${result.clone_url} ${dir || result.name}`
+    };
+  })();
 }
 
 >> Collaborator checks
 /exe @collab_check(@user, @repo) = js {
-  const result = await github_request('GET', `repos/${repo}/collaborators/${user}`);
-  
-  // Return boolean string for compatibility
-  if (result.error) {
-    return ""; // Not a collaborator or error
-  }
-  
-  return "true"; // Is a collaborator
+  return (async () => {
+    const result = await github_request('GET', `repos/${repo}/collaborators/${user}`);
+    
+    // Return boolean string for compatibility
+    if (result.error) {
+      return ""; // Not a collaborator or error
+    }
+    
+    return "true"; // Is a collaborator
+  })();
 }
 
 >> Workflow operations
 /exe @workflow_run(@repo, @workflow, @options) = js {
-  // First, get the workflow ID if a name was provided
-  let workflowId = workflow;
-  
-  if (isNaN(workflow)) {
-    // It's a workflow name, need to find the ID
-    const workflows = await github_request('GET', `repos/${repo}/actions/workflows`);
-    if (workflows.error) return workflows;
+  return (async () => {
+    // First, get the workflow ID if a name was provided
+    let workflowId = workflow;
     
-    const found = workflows.workflows.find(w => w.name === workflow || w.path.includes(workflow));
-    if (!found) {
-      return { error: `Workflow '${workflow}' not found` };
+    if (isNaN(workflow)) {
+      // It's a workflow name, need to find the ID
+      const workflows = await github_request('GET', `repos/${repo}/actions/workflows`);
+      if (workflows.error) return workflows;
+      
+      const found = workflows.workflows.find(w => w.name === workflow || w.path.includes(workflow));
+      if (!found) {
+        return { error: `Workflow '${workflow}' not found` };
+      }
+      workflowId = found.id;
     }
-    workflowId = found.id;
-  }
-  
-  const dispatchData = { ref: 'main' };
-  
-  // Parse options for ref and inputs
-  if (options) {
-    const refMatch = options.match(/--ref\s+(\S+)/);
-    if (refMatch) dispatchData.ref = refMatch[1];
-  }
-  
-  return await github_request('POST', `repos/${repo}/actions/workflows/${workflowId}/dispatches`, dispatchData);
+    
+    const dispatchData = { ref: 'main' };
+    
+    // Parse options for ref and inputs
+    if (options) {
+      const refMatch = options.match(/--ref\s+(\S+)/);
+      if (refMatch) dispatchData.ref = refMatch[1];
+    }
+    
+    return await github_request('POST', `repos/${repo}/actions/workflows/${workflowId}/dispatches`, dispatchData);
+  })();
 }
 
 /exe @workflow_list(@repo) = js {
-  return await github_request('GET', `repos/${repo}/actions/runs`);
+  return github_request('GET', `repos/${repo}/actions/runs`);
 }
 
 >> Set up JavaScript shadow environment
