@@ -2,18 +2,18 @@
 name: github
 author: mlld
 version: 1.0.0
-about: GitHub CLI wrapper for PR, issue, and repository operations
-needs: ["sh"]
+about: GitHub API client for PR, issue, and repository operations
+needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
-keywords: ["github", "gh", "pr", "pull-request", "issue", "repository", "api", "cli"]
+keywords: ["github", "api", "pr", "pull-request", "issue", "repository", "fetch", "rest"]
 license: CC0
 mlldVersion: "*"
 ---
 
 # @mlld/github
 
-GitHub operations via the `gh` CLI tool. Simplifies working with pull requests, issues, repositories, and more in mlld workflows.
+GitHub operations via the GitHub REST API. Simplifies working with pull requests, issues, repositories, and more in mlld workflows using direct API calls.
 
 ## tldr
 
@@ -38,16 +38,20 @@ Common GitHub operations made easy:
 
 ### Prerequisites
 
-Requires the GitHub CLI (`gh`) to be installed and authenticated:
+Requires a GitHub Personal Access Token with appropriate permissions:
 
 ```bash
-# Install
-brew install gh  # macOS
-# or see: https://cli.github.com/
-
-# Authenticate
-gh auth login
+# Set your GitHub token as an environment variable
+export GITHUB_TOKEN="ghp_your_token_here"
+# or
+export MLLD_GITHUB_TOKEN="ghp_your_token_here"
 ```
+
+**Required token permissions:**
+- `repo` - For private repository access
+- `public_repo` - For public repository access  
+- `pull_requests` - For PR operations
+- `issues` - For issue operations
 
 ### Pull Request Operations
 
@@ -204,102 +208,345 @@ List workflow runs.
 
 ## module
 
-GitHub operations via the gh CLI:
+GitHub operations via the GitHub REST API:
 
 ```mlld-run
+>> GitHub API helper functions
+/exe @github_request(@method, @endpoint, @body) = js {
+  const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
+  if (!token) {
+    return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
+  }
+
+  const url = endpoint.startsWith('https://') ? endpoint : `https://api.github.com/${endpoint}`;
+  
+  const options = {
+    method: method || 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'mlld-github-module',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  };
+
+  if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
+    options.headers['Content-Type'] = 'application/json';
+    options.body = typeof body === 'string' ? body : JSON.stringify(body);
+  }
+
+  try {
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorText;
+      } catch {
+        errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`;
+      }
+      
+      return { 
+        error: `GitHub API error: ${errorMessage}`,
+        status: response.status,
+        statusText: response.statusText
+      };
+    }
+
+    // Handle empty responses (204 No Content)
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return { error: `Request failed: ${error.message}` };
+  }
+}
+
 >> Pull Request operations
-/exe @pr_view(@number, @repo, @fields) = sh {
-  if [ -z "$fields" ]; then
-    gh pr view $number --repo $repo --json number,title,author,files,state,body,labels,createdAt
-  else
-    gh pr view $number --repo $repo --json $fields
-  fi
+/exe @pr_view(@number, @repo, @fields) = js {
+  const result = await github_request('GET', `repos/${repo}/pulls/${number}`);
+  
+  if (result.error) {
+    return result;
+  }
+
+  // Always ensure files is an array to prevent undefined errors
+  if (!result.files) {
+    result.files = [];
+  }
+
+  // If specific fields requested, filter the response
+  if (fields) {
+    const fieldArray = fields.split(',').map(f => f.trim());
+    const filtered = {};
+    fieldArray.forEach(field => {
+      if (result[field] !== undefined) {
+        filtered[field] = result[field];
+      }
+    });
+    return filtered;
+  }
+
+  return result;
 }
 
-/exe @pr_diff(@number, @repo, @paths) = sh {
-  if [ -z "$paths" ]; then
-    gh pr diff $number --repo $repo
-  else
-    gh pr diff $number --repo $repo -- $paths
-  fi
+/exe @pr_diff(@number, @repo, @paths) = js {
+  const headers = {
+    'Accept': 'application/vnd.github.v3.diff'
+  };
+  
+  const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
+  if (!token) {
+    return { error: "GitHub token not found in environment variables" };
+  }
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}`, {
+      headers: {
+        ...headers,
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'mlld-github-module'
+      }
+    });
+
+    if (!response.ok) {
+      return { error: `Failed to fetch diff: ${response.status} ${response.statusText}` };
+    }
+
+    const diff = await response.text();
+    
+    // If paths specified, filter the diff (basic implementation)
+    if (paths) {
+      const lines = diff.split('\n');
+      const filteredLines = [];
+      let inRelevantFile = false;
+      
+      for (const line of lines) {
+        if (line.startsWith('diff --git')) {
+          inRelevantFile = paths.split(',').some(path => line.includes(path.trim()));
+        }
+        if (inRelevantFile || line.startsWith('diff --git')) {
+          filteredLines.push(line);
+        }
+      }
+      return filteredLines.join('\n');
+    }
+
+    return diff;
+  } catch (error) {
+    return { error: `Request failed: ${error.message}` };
+  }
 }
 
-/exe @pr_list(@repo, @options) = sh {
-  if [ -z "$options" ]; then
-    gh pr list --repo $repo --json number,title,author,state,labels
-  else
-    gh pr list --repo $repo $options --json number,title,author,state,labels
-  fi
+/exe @pr_list(@repo, @options) = js {
+  let endpoint = `repos/${repo}/pulls`;
+  const params = new URLSearchParams();
+  
+  // Parse common options
+  if (options) {
+    if (options.includes('--state open')) params.set('state', 'open');
+    if (options.includes('--state closed')) params.set('state', 'closed');
+    if (options.includes('--state all')) params.set('state', 'all');
+    
+    // Parse author
+    const authorMatch = options.match(/--author\s+(\S+)/);
+    if (authorMatch) {
+      params.set('head', `${authorMatch[1]}:`);
+    }
+    
+    // Parse label
+    const labelMatch = options.match(/--label\s+(\S+)/);
+    if (labelMatch) {
+      params.set('labels', labelMatch[1]);
+    }
+  }
+  
+  if (params.toString()) {
+    endpoint += `?${params.toString()}`;
+  }
+
+  return await github_request('GET', endpoint);
 }
 
-/exe @pr_comment(@number, @repo, @body) = sh {
-  gh pr comment $number --repo $repo --body "$body"
+/exe @pr_comment(@number, @repo, @body) = js {
+  return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
+    body: body
+  });
 }
 
-/exe @pr_review(@number, @repo, @event, @body) = sh {
-  gh pr review $number --repo $repo --$event --body "$body"
+/exe @pr_review(@number, @repo, @event, @body) = js {
+  const eventMap = {
+    'approve': 'APPROVE',
+    'request-changes': 'REQUEST_CHANGES', 
+    'comment': 'COMMENT'
+  };
+  
+  const reviewEvent = eventMap[event] || event.toUpperCase();
+  
+  return await github_request('POST', `repos/${repo}/pulls/${number}/reviews`, {
+    event: reviewEvent,
+    body: body
+  });
 }
 
-/exe @pr_edit(@number, @repo, @options) = sh {
-  gh pr edit $number --repo $repo $options
+/exe @pr_edit(@number, @repo, @options) = js {
+  const updateData = {};
+  
+  // Parse common edit options
+  if (options) {
+    const titleMatch = options.match(/--title\s+['"]([^'"]+)['"]/);
+    if (titleMatch) updateData.title = titleMatch[1];
+    
+    const bodyMatch = options.match(/--body\s+['"]([^'"]+)['"]/);
+    if (bodyMatch) updateData.body = bodyMatch[1];
+    
+    const labelMatch = options.match(/--add-label\s+([^\s]+)/);
+    if (labelMatch) updateData.labels = labelMatch[1].split(',');
+  }
+  
+  return await github_request('PATCH', `repos/${repo}/pulls/${number}`, updateData);
 }
 
 >> Issue operations
-/exe @issue_create(@repo, @title, @body) = sh {
-  gh issue create --repo $repo --title "$title" --body "$body" --json number,url
+/exe @issue_create(@repo, @title, @body) = js {
+  return await github_request('POST', `repos/${repo}/issues`, {
+    title: title,
+    body: body
+  });
 }
 
-/exe @issue_list(@repo, @options) = sh {
-  if [ -z "$options" ]; then
-    gh issue list --repo $repo --json number,title,author,state,labels
-  else
-    gh issue list --repo $repo $options --json number,title,author,state,labels
-  fi
+/exe @issue_list(@repo, @options) = js {
+  let endpoint = `repos/${repo}/issues`;
+  const params = new URLSearchParams();
+  
+  // Parse options
+  if (options) {
+    if (options.includes('--state open')) params.set('state', 'open');
+    if (options.includes('--state closed')) params.set('state', 'closed');
+    if (options.includes('--state all')) params.set('state', 'all');
+    
+    const assigneeMatch = options.match(/--assignee\s+(\S+)/);
+    if (assigneeMatch) {
+      params.set('assignee', assigneeMatch[1] === '@me' ? '' : assigneeMatch[1]);
+    }
+    
+    const labelMatch = options.match(/--label\s+(\S+)/);
+    if (labelMatch) {
+      params.set('labels', labelMatch[1]);
+    }
+  }
+  
+  if (params.toString()) {
+    endpoint += `?${params.toString()}`;
+  }
+
+  return await github_request('GET', endpoint);
 }
 
-/exe @issue_comment(@number, @repo, @body) = sh {
-  gh issue comment $number --repo $repo --body "$body"
+/exe @issue_comment(@number, @repo, @body) = js {
+  return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
+    body: body
+  });
 }
 
 >> Repository operations
-/exe @repo_view(@repo, @fields) = sh {
-  if [ -z "$fields" ]; then
-    gh repo view $repo --json name,owner,description,stargazerCount,forkCount,url
-  else
-    gh repo view $repo --json $fields
-  fi
+/exe @repo_view(@repo, @fields) = js {
+  const result = await github_request('GET', `repos/${repo}`);
+  
+  if (result.error) {
+    return result;
+  }
+
+  // If specific fields requested, filter the response
+  if (fields) {
+    const fieldArray = fields.split(',').map(f => f.trim());
+    const filtered = {};
+    fieldArray.forEach(field => {
+      if (result[field] !== undefined) {
+        filtered[field] = result[field];
+      }
+    });
+    return filtered;
+  }
+
+  return result;
 }
 
-/exe @repo_clone(@repo, @dir) = sh {
-  if [ -z "$dir" ]; then
-    gh repo clone $repo
-  else
-    gh repo clone $repo $dir
-  fi
+/exe @repo_clone(@repo, @dir) = js {
+  // Note: This returns clone information, not actual cloning
+  // For actual git operations, use shell commands or git APIs
+  const result = await github_request('GET', `repos/${repo}`);
+  
+  if (result.error) {
+    return result;
+  }
+
+  return {
+    clone_url: result.clone_url,
+    ssh_url: result.ssh_url,
+    git_url: result.git_url,
+    directory: dir || result.name,
+    instructions: `git clone ${result.clone_url} ${dir || result.name}`
+  };
 }
 
 >> Collaborator checks
-/exe @collab_check(@user, @repo) = sh {
-  # Check if user is a collaborator
-  # Returns "true" if they are, empty string if not
-  if gh api "repos/$repo/collaborators/$user" --silent 2>/dev/null; then
-    echo "true"
-  else
-    echo ""
-  fi
+/exe @collab_check(@user, @repo) = js {
+  const result = await github_request('GET', `repos/${repo}/collaborators/${user}`);
+  
+  // Return boolean string for compatibility
+  if (result.error) {
+    return ""; // Not a collaborator or error
+  }
+  
+  return "true"; // Is a collaborator
 }
 
 >> Workflow operations
-/exe @workflow_run(@repo, @workflow, @options) = sh {
-  if [ -z "$options" ]; then
-    gh workflow run $workflow --repo $repo
-  else
-    gh workflow run $workflow --repo $repo $options
-  fi
+/exe @workflow_run(@repo, @workflow, @options) = js {
+  // First, get the workflow ID if a name was provided
+  let workflowId = workflow;
+  
+  if (isNaN(workflow)) {
+    // It's a workflow name, need to find the ID
+    const workflows = await github_request('GET', `repos/${repo}/actions/workflows`);
+    if (workflows.error) return workflows;
+    
+    const found = workflows.workflows.find(w => w.name === workflow || w.path.includes(workflow));
+    if (!found) {
+      return { error: `Workflow '${workflow}' not found` };
+    }
+    workflowId = found.id;
+  }
+  
+  const dispatchData = { ref: 'main' };
+  
+  // Parse options for ref and inputs
+  if (options) {
+    const refMatch = options.match(/--ref\s+(\S+)/);
+    if (refMatch) dispatchData.ref = refMatch[1];
+  }
+  
+  return await github_request('POST', `repos/${repo}/actions/workflows/${workflowId}/dispatches`, dispatchData);
 }
 
-/exe @workflow_list(@repo) = sh {
-  gh run list --repo $repo --json databaseId,name,status,conclusion,headBranch
+/exe @workflow_list(@repo) = js {
+  return await github_request('GET', `repos/${repo}/actions/runs`);
+}
+
+>> Set up JavaScript shadow environment
+/exe @js = { 
+  github_request,
+  pr_view, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
+  issue_create, issue_list, issue_comment,
+  repo_view, repo_clone,
+  collab_check,
+  workflow_run, workflow_list
 }
 
 >> Export module structure
