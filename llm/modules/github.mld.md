@@ -375,7 +375,7 @@ GitHub operations via the GitHub REST API:
 }
 
 /exe @pr_comment(@number, @repo, @body) = js {
-  return github_request('POST', `repos/${repo}/issues/${number}/comments`, {
+  return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
     body: body
   });
 }
@@ -389,7 +389,7 @@ GitHub operations via the GitHub REST API:
   
   const reviewEvent = eventMap[event] || event.toUpperCase();
   
-  return github_request('POST', `repos/${repo}/pulls/${number}/reviews`, {
+  return await github_request('POST', `repos/${repo}/pulls/${number}/reviews`, {
     event: reviewEvent,
     body: body
   });
@@ -410,12 +410,12 @@ GitHub operations via the GitHub REST API:
     if (labelMatch) updateData.labels = labelMatch[1].split(',');
   }
   
-  return github_request('PATCH', `repos/${repo}/pulls/${number}`, updateData);
+  return await github_request('PATCH', `repos/${repo}/pulls/${number}`, updateData);
 }
 
 >> Issue operations
 /exe @issue_create(@repo, @title, @body) = js {
-  return github_request('POST', `repos/${repo}/issues`, {
+  return await github_request('POST', `repos/${repo}/issues`, {
     title: title,
     body: body
   });
@@ -450,7 +450,7 @@ GitHub operations via the GitHub REST API:
 }
 
 /exe @issue_comment(@number, @repo, @body) = js {
-  return github_request('POST', `repos/${repo}/issues/${number}/comments`, {
+  return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
     body: body
   });
 }
@@ -537,7 +537,7 @@ GitHub operations via the GitHub REST API:
 }
 
 /exe @workflow_list(@repo) = js {
-  return github_request('GET', `repos/${repo}/actions/runs`);
+  return await github_request('GET', `repos/${repo}/actions/runs`);
 }
 
 >> Export module structure
