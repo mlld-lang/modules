@@ -267,6 +267,10 @@ GitHub operations via the GitHub REST API:
   }
 }
 
+>> Set up JavaScript shadow environment immediately after defining github_request
+>> This must happen BEFORE any functions that use github_request are defined
+/exe @js = { github_request }
+
 >> Now functions can access github_request from the shadow environment
 >> Pull Request operations
 /exe @pr_view(@number, @repo, @fields) = js {
@@ -578,7 +582,8 @@ GitHub operations via the GitHub REST API:
   workflow: @workflow
 }
 
->> Set up JavaScript shadow environment with all functions
+>> Update shadow environment to include all functions
+>> This allows functions to call each other if needed
 /exe @js = { 
   github_request,
   pr_view, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
