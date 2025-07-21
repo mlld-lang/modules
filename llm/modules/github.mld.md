@@ -67,6 +67,25 @@ Get PR data as JSON. Default fields include number, title, author, state, body, 
 /var @prDetails = @github.pr.view(123, "owner/repo", "number,title,labels,milestone")
 ```
 
+#### `pr.files(number, repo)`
+
+Get the list of files changed in a PR with metadata.
+
+```mlld
+/var @files = @github.pr.files(123, "owner/repo")
+/for @file in @files => /show `@file.filename: +@file.additions -@file.deletions`
+
+>> Each file object includes:
+>> - filename: path to the file
+>> - status: added, removed, modified, renamed
+>> - additions: lines added
+>> - deletions: lines removed
+>> - changes: total lines changed
+>> - blob_url: link to file in GitHub
+>> - raw_url: direct link to raw file content
+>> - patch: the diff patch for this file
+```
+
 #### `pr.diff(number, repo, paths?)`
 
 Get the diff for a PR, optionally filtered by paths.
@@ -300,6 +319,19 @@ GitHub operations via the GitHub REST API:
       return filtered;
     }
 
+    return result;
+  })();
+}
+
+/exe @pr_files(@number, @repo) = js {
+  return (async () => {
+    const result = await github_request('GET', `repos/${repo}/pulls/${number}/files`);
+    
+    if (result.error) {
+      return result;
+    }
+    
+    // GitHub returns an array of file objects
     return result;
   })();
 }
@@ -578,7 +610,7 @@ GitHub operations via the GitHub REST API:
 >> This ensures all functions are available to each other
 /exe @js = { 
   github_request,
-  pr_view, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
+  pr_view, pr_files, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
   issue_create, issue_list, issue_comment,
   repo_view, repo_clone,
   collab_check,
@@ -588,6 +620,7 @@ GitHub operations via the GitHub REST API:
 >> STEP 5: Export module structure
 /var @pr = {
   view: @pr_view,
+  files: @pr_files,
   diff: @pr_diff,
   list: @pr_list,
   comment: @pr_comment,
