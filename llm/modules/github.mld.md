@@ -59,6 +59,16 @@ export MLLD_GITHUB_TOKEN="ghp_your_token_here"
 
 Get PR data as JSON. Default fields include number, title, author, state, body, files.
 
+**Returns:** PR object with GitHub API fields
+- `number`: PR number
+- `title`: PR title string
+- `state`: "open" | "closed" | "merged"
+- `author`: { login, id, avatar_url, ... }
+- `body`: PR description text
+- `created_at`, `updated_at`, `closed_at`: ISO date strings
+- `head`, `base`: branch information objects
+- `error`: Error message if request fails
+
 ```mlld
 /var @pr = @github.pr.view(123, "mlld-lang/mlld")
 /show `PR #@pr.number: @pr.title by @pr.author.login`
@@ -71,24 +81,43 @@ Get PR data as JSON. Default fields include number, title, author, state, body, 
 
 Get the list of files changed in a PR with metadata.
 
+**Returns:** Array of file objects, each containing:
+- `filename`: Path to the file (NOT `path` - this is important!)
+- `status`: "added" | "removed" | "modified" | "renamed"
+- `additions`: Number of lines added
+- `deletions`: Number of lines removed
+- `changes`: Total lines changed
+- `blob_url`: Link to file in GitHub web UI
+- `raw_url`: Direct link to raw file content
+- `contents_url`: API URL for file contents
+- `patch`: The diff patch for this file
+- `sha`: File SHA hash
+
 ```mlld
 /var @files = @github.pr.files(123, "owner/repo")
 /for @file in @files => /show `@file.filename: +@file.additions -@file.deletions`
 
->> Each file object includes:
->> - filename: path to the file
->> - status: added, removed, modified, renamed
->> - additions: lines added
->> - deletions: lines removed
->> - changes: total lines changed
->> - blob_url: link to file in GitHub
->> - raw_url: direct link to raw file content
->> - patch: the diff patch for this file
+>> Example file object:
+>> {
+>>   "filename": "src/utils.js",
+>>   "status": "modified",
+>>   "additions": 25,
+>>   "deletions": 10,
+>>   "changes": 35,
+>>   "blob_url": "https://github.com/owner/repo/blob/abc123/src/utils.js",
+>>   "raw_url": "https://github.com/owner/repo/raw/abc123/src/utils.js",
+>>   "patch": "@@ -10,7 +10,12 @@\n-old code\n+new code"
+>> }
 ```
 
 #### `pr.diff(number, repo, paths?)`
 
 Get the diff for a PR, optionally filtered by paths.
+
+**Returns:** String containing unified diff format
+- Full git diff output as a single string
+- Includes file headers, hunks, and line changes
+- Empty string if no changes or error
 
 ```mlld
 >> Get full diff
@@ -96,11 +125,27 @@ Get the diff for a PR, optionally filtered by paths.
 
 >> Get diff for specific paths
 /var @srcDiff = @github.pr.diff(123, "owner/repo", "src/**/*.js")
+
+>> Example output:
+>> "diff --git a/file.js b/file.js
+>> index abc123..def456 100644
+>> --- a/file.js
+>> +++ b/file.js
+>> @@ -1,3 +1,4 @@
+>> +// New comment
+>>  function example() {
+>>    return true;
+>>  }"
 ```
 
 #### `pr.list(repo, options?)`
 
 List PRs with various filters.
+
+**Returns:** Array of PR objects, each containing:
+- Same fields as `pr.view()` but in summary form
+- Common fields: number, title, state, author, created_at, updated_at
+- Array is empty if no PRs match filters
 
 ```mlld
 >> List open PRs
@@ -117,6 +162,13 @@ List PRs with various filters.
 
 Add a comment to a PR.
 
+**Returns:** Comment object with:
+- `id`: Comment ID
+- `body`: Comment text
+- `user`: Author object { login, id, ... }
+- `created_at`: ISO date string
+- `html_url`: Web URL for the comment
+
 ```mlld
 /run @github.pr.comment(456, "owner/repo", "Thanks for the contribution!")
 ```
@@ -124,6 +176,13 @@ Add a comment to a PR.
 #### `pr.review(number, repo, event, body)`
 
 Create a PR review with approve/request-changes/comment.
+
+**Returns:** Review object with:
+- `id`: Review ID
+- `state`: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED"
+- `body`: Review comment text
+- `user`: Reviewer object
+- `submitted_at`: ISO date string
 
 ```mlld
 /run @github.pr.review(789, "owner/repo", "approve", "LGTM!")
@@ -134,6 +193,8 @@ Create a PR review with approve/request-changes/comment.
 #### `pr.edit(number, repo, options)`
 
 Edit PR properties like title, labels, or assignees.
+
+**Returns:** Updated PR object with all fields (same as pr.view())
 
 ```mlld
 >> Add labels
@@ -152,6 +213,15 @@ Edit PR properties like title, labels, or assignees.
 
 Create a new issue.
 
+**Returns:** Issue object with:
+- `number`: Issue number
+- `title`: Issue title
+- `state`: "open"
+- `body`: Issue description
+- `user`: Creator object
+- `created_at`: ISO date string
+- `html_url`: Web URL for the issue
+
 ```mlld
 /var @issue = @github.issue.create("owner/repo", "Bug: App crashes on startup", "Details: ...")
 /show `Created issue #@issue.number`
@@ -160,6 +230,14 @@ Create a new issue.
 #### `issue.list(repo, options?)`
 
 List issues with filters.
+
+**Returns:** Array of issue objects, each containing:
+- `number`: Issue number
+- `title`: Issue title
+- `state`: "open" | "closed"
+- `labels`: Array of label objects
+- `assignees`: Array of user objects
+- `created_at`, `updated_at`: ISO date strings
 
 ```mlld
 >> List open issues
@@ -173,6 +251,8 @@ List issues with filters.
 
 Add a comment to an issue.
 
+**Returns:** Comment object (same structure as pr.comment())
+
 ```mlld
 /run @github.issue.comment(456, "owner/repo", "I can reproduce this issue")
 ```
@@ -183,6 +263,18 @@ Add a comment to an issue.
 
 Get repository information.
 
+**Returns:** Repository object with:
+- `name`: Repository name
+- `full_name`: "owner/repo" format
+- `description`: Repository description
+- `owner`: Owner object { login, id, type, ... }
+- `private`: Boolean
+- `stargazerCount`: Number of stars
+- `forkCount`: Number of forks
+- `language`: Primary language
+- `created_at`, `updated_at`: ISO date strings
+- `default_branch`: Usually "main" or "master"
+
 ```mlld
 /var @repo = @github.repo.view("mlld-lang/mlld")
 /show `Stars: @repo.stargazerCount, Forks: @repo.forkCount`
@@ -191,6 +283,8 @@ Get repository information.
 #### `repo.clone(repo, dir?)`
 
 Clone a repository.
+
+**Returns:** String with clone confirmation message or error
 
 ```mlld
 /run @github.repo.clone("owner/repo", "./local-copy")
@@ -201,6 +295,10 @@ Clone a repository.
 #### `collab.check(user, repo)`
 
 Check if a user is a collaborator (has write access).
+
+**Returns:** Boolean
+- `true` if user has write access
+- `false` if user does not have write access or on error
 
 ```mlld
 /var @hasAccess = @github.collab.check("alice", "owner/repo")
@@ -213,6 +311,14 @@ Check if a user is a collaborator (has write access).
 
 Trigger a GitHub Actions workflow.
 
+**Returns:** Workflow run object with:
+- `id`: Run ID
+- `name`: Workflow name
+- `head_branch`: Branch that triggered the run
+- `status`: "queued" | "in_progress" | "completed"
+- `conclusion`: "success" | "failure" | "cancelled" | null
+- `created_at`: ISO date string
+
 ```mlld
 /run @github.workflow.run("owner/repo", "deploy.yml", "--ref main")
 ```
@@ -221,8 +327,27 @@ Trigger a GitHub Actions workflow.
 
 List workflow runs.
 
+**Returns:** Array of workflow run objects (same structure as workflow.run())
+
 ```mlld
 /var @runs = @github.workflow.list("owner/repo")
+/show `Latest run: @runs.0.name - @runs.0.conclusion`
+```
+
+### Error Handling
+
+All methods return an object with an `error` property when requests fail:
+
+```mlld
+/var @result = @github.repo.view("nonexistent/repo")
+/when @result.error => /show `Error: @result.error`
+
+>> Common error responses:
+>> - 404: Repository, PR, or issue not found
+>> - 401: Invalid or missing authentication token
+>> - 403: Insufficient permissions
+>> - 422: Invalid parameters
+>> - 429: Rate limit exceeded
 ```
 
 ## module
@@ -233,6 +358,11 @@ GitHub operations via the GitHub REST API:
 >> STEP 1: Define the helper function (must be async)
 /exe @github_request(@method, @endpoint, @body) = js {
   return (async () => {
+    // DEBUG: Check what env vars are available in JS context
+    console.log('JS DEBUG: process.env.MLLD_GITHUB_TOKEN =', process.env.MLLD_GITHUB_TOKEN ? 'SET' : 'NOT SET');
+    console.log('JS DEBUG: process.env.GITHUB_TOKEN =', process.env.GITHUB_TOKEN ? 'SET' : 'NOT SET');
+    console.log('JS DEBUG: All MLLD_ vars =', Object.keys(process.env).filter(k => k.startsWith('MLLD_')));
+    
     const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
     if (!token) {
       return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
@@ -290,7 +420,7 @@ GitHub operations via the GitHub REST API:
 
 >> STEP 2: Set up the shadow environment with github_request IMMEDIATELY
 >> This must happen BEFORE defining any functions that use github_request
-/exe @js = { github_request }
+/exe js = { github_request }
 
 >> STEP 3: Now define all functions that use github_request
 >> Pull Request operations
