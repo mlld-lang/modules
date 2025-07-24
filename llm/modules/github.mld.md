@@ -42,8 +42,6 @@ Requires a GitHub Personal Access Token with appropriate permissions:
 
 ```bash
 # Set your GitHub token as an environment variable
-export GITHUB_TOKEN="ghp_your_token_here"
-# or
 export MLLD_GITHUB_TOKEN="ghp_your_token_here"
 ```
 
@@ -358,14 +356,9 @@ GitHub operations via the GitHub REST API:
 >> STEP 1: Define the helper function (must be async)
 /exe @github_request(@method, @endpoint, @body) = js {
   return (async () => {
-    // DEBUG: Check what env vars are available in JS context
-    console.log('JS DEBUG: process.env.MLLD_GITHUB_TOKEN =', process.env.MLLD_GITHUB_TOKEN ? 'SET' : 'NOT SET');
-    console.log('JS DEBUG: process.env.GITHUB_TOKEN =', process.env.GITHUB_TOKEN ? 'SET' : 'NOT SET');
-    console.log('JS DEBUG: All MLLD_ vars =', Object.keys(process.env).filter(k => k.startsWith('MLLD_')));
-    
-    const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
+    const token = process.env.MLLD_GITHUB_TOKEN;
     if (!token) {
-      return { error: "GitHub token not found in GITHUB_TOKEN or MLLD_GITHUB_TOKEN environment variables" };
+      return { error: "GitHub token not found in MLLD_GITHUB_TOKEN environment variable" };
     }
 
     const url = endpoint.startsWith('https://') ? endpoint : `https://api.github.com/${endpoint}`;
@@ -472,9 +465,9 @@ GitHub operations via the GitHub REST API:
       'Accept': 'application/vnd.github.v3.diff'
     };
     
-    const token = process.env.GITHUB_TOKEN || process.env.MLLD_GITHUB_TOKEN;
+    const token = process.env.MLLD_GITHUB_TOKEN;
     if (!token) {
-      return { error: "GitHub token not found in environment variables" };
+      return { error: "GitHub token not found in MLLD_GITHUB_TOKEN environment variable" };
     }
 
     try {
