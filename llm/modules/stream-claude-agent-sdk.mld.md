@@ -1,7 +1,7 @@
 ---
 name: stream-claude-agent-sdk
 author: mlld
-version: 1.0.0
+version: 1.0.1
 about: Streaming format adapter for Claude Agent SDK NDJSON output
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
@@ -48,8 +48,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         chunk: ["event.delta.text", "event.delta.partial_json"]
       },
       templates: {
-        text: "@evt.chunk",
-        ansi: "@evt.chunk"
+        text: '@evt.chunk',
+        ansi: '@evt.chunk'
       },
       visibility: "always"
     },
@@ -63,8 +63,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         outputTokens: "event.usage.output_tokens"
       },
       templates: {
-        text: "Tokens: @evt.inputTokens in / @evt.outputTokens out",
-        ansi: "%dim%Tokens: @evt.inputTokens in / @evt.outputTokens out%reset%"
+        text: 'Tokens: @evt.inputTokens in / @evt.outputTokens out',
+        ansi: '%dim%Tokens: @evt.inputTokens in / @evt.outputTokens out%reset%'
       },
       visibility: "optional"
     },
@@ -77,8 +77,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         text: ["thinking", "content", "message"]
       },
       templates: {
-        text: "@evt.text",
-        ansi: "%dim%@evt.text%reset%"
+        text: '@evt.text',
+        ansi: '%dim%@evt.text%reset%'
       },
       visibility: "optional"
     },
@@ -91,8 +91,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         chunk: ["text", "content", "delta.text"]
       },
       templates: {
-        text: "@evt.chunk",
-        ansi: "@evt.chunk"
+        text: '@evt.chunk',
+        ansi: '@evt.chunk'
       },
       visibility: "always"
     },
@@ -107,8 +107,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         id: ["id", "tool_use_id"]
       },
       templates: {
-        text: "[@evt.name] @evt.input",
-        ansi: "%cyan%[@evt.name]%reset% @evt.input"
+        text: '[@evt.name] @evt.input',
+        ansi: '%cyan%[@evt.name]%reset% @evt.input'
       },
       visibility: "optional"
     },
@@ -124,8 +124,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         isError: "is_error"
       },
       templates: {
-        text: "[@evt.toolUseId] @evt.result",
-        ansi: "%green%[@evt.toolUseId]%reset% @evt.result"
+        text: '[@evt.toolUseId] @evt.result',
+        ansi: '%green%[@evt.toolUseId]%reset% @evt.result'
       },
       visibility: "optional"
     },
@@ -139,8 +139,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         code: ["code", "error.code"]
       },
       templates: {
-        text: "Error: @evt.message",
-        ansi: "%red%Error:%reset% @evt.message"
+        text: 'Error: @evt.message',
+        ansi: '%red%Error:%reset% @evt.message'
       },
       visibility: "always"
     },
@@ -155,8 +155,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         model: "model"
       },
       templates: {
-        text: "Tokens: @evt.inputTokens in / @evt.outputTokens out",
-        ansi: "%dim%Tokens: @evt.inputTokens in / @evt.outputTokens out%reset%"
+        text: 'Tokens: @evt.inputTokens in / @evt.outputTokens out',
+        ansi: '%dim%Tokens: @evt.inputTokens in / @evt.outputTokens out%reset%'
       },
       visibility: "optional"
     },
@@ -169,8 +169,8 @@ Provides schema definitions for parsing various Claude CLI streaming event types
         chunk: ["delta.text", "delta.partial_json"]
       },
       templates: {
-        text: "@evt.chunk",
-        ansi: "@evt.chunk"
+        text: '@evt.chunk',
+        ansi: '@evt.chunk'
       },
       visibility: "always"
     },
