@@ -7,7 +7,7 @@ bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: [llm, ai, openai, anthropic, google, claude, codex, gemini, cli]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
 
 /needs {

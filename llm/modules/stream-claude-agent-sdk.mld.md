@@ -3,7 +3,10 @@ name: stream-claude-agent-sdk
 author: mlld
 version: 1.0.0
 about: Streaming format adapter for Claude Agent SDK NDJSON output
-license: MIT
+bugs: https://github.com/mlld-lang/modules/issues
+repo: https://github.com/mlld-lang/modules
+license: CC0
+mlldVersion: ">=2.0.0-rc78"
 ---
 
 /needs {}

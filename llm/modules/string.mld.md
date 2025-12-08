@@ -7,7 +7,7 @@ bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["length", "transformation", "camelCase", "snake_case", "kebab-case", "SCREAMING_SNAKE", "SNAKE-KEBAB", "substring", "slice", "split", "join", "pad", "replace", "starsWith", "endsWith", "escape", "unescape", "encode"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
 
 /needs {

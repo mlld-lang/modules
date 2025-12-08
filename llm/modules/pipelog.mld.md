@@ -7,7 +7,7 @@ bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["logging", "debug", "pipeline", "stderr", "pass-through", "development", "testing", "verbose", "json"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
 
 /needs {

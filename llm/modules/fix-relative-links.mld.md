@@ -7,7 +7,7 @@ bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["markdown", "relative", "links", "paths", "pipeline"]
 license: CC0
-mlldVersion: ">=1.4.1"
+mlldVersion: ">=2.0.0-rc78"
 ---
 
 /needs {
