@@ -1,7 +1,7 @@
 >> Tests for @mlld/string module
 
-/import { ok, notOk, eq, deepEq } from @local/test
-/import { endsWith, includes, indexOf, join, padEnd, padStart, repeat, replace, replaceAll, slice, split, startsWith, substring, lower, upper, trim } from @local/string
+/import { @ok, @notOk, @eq, @deepEq } from @local/test
+/import { @endsWith, @includes, @indexOf, @join, @padEnd, @padStart, @repeat, @replace, @replaceAll, @slice, @split, @startsWith, @substring, @lower, @upper, @trim } from @local/string
 
 ## Test trim
 /var @test_trim_spaces = @eq(@trim("  hello world  "), "hello world")

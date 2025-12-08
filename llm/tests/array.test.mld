@@ -1,7 +1,7 @@
 >> Tests for @mlld/array module
 
-/import { ok, eq, deepEq } from @local/test
-/import { filter, length, pluck, find, includes, sortBy, groupBy, range, first, last, slice, reverse, sum, avg, unique } from @local/array
+/import { @ok, @eq, @deepEq } from @local/test
+/import { @filter, @length, @pluck, @find, @includes, @sortBy, @groupBy, @range, @first, @last, @slice, @reverse, @sum, @avg, @unique } from @local/array
 
 ## Test filter
 /var @items = [
@@ -97,7 +97,9 @@
 
 ## Test groupBy
 /var @grouped = @groupBy(@items, "category")
-/var @test_groupBy_has_fruit = @ok(@grouped.fruit)
-/var @test_groupBy_has_vegetable = @ok(@grouped.vegetable)
-/var @test_groupBy_fruit_count = @eq(@length(@grouped.fruit), 2)
-/var @test_groupBy_vegetable_count = @eq(@length(@grouped.vegetable), 1)
+/exe @getProp(obj, key) = js { return obj[key] }
+/exe @hasProp(obj, key) = js { return obj && obj.hasOwnProperty(key) }
+/var @test_groupBy_has_fruit = @ok(@hasProp(@grouped, "fruit"))
+/var @test_groupBy_has_vegetable = @ok(@hasProp(@grouped, "vegetable"))
+/var @test_groupBy_fruit_count = @eq(@length(@getProp(@grouped, "fruit")), 2)
+/var @test_groupBy_vegetable_count = @eq(@length(@getProp(@grouped, "vegetable")), 1)

@@ -23,8 +23,8 @@ Tests use the local test helpers:
 
 >> Comprehensive tests for @mlld/time module
 
-/import { ok, notOk, eq, contains, gt } from @local/test
-/import { time } from @local/time
+/import { @ok, @notOk, @eq, @contains, @gt } from @local/test
+/import { @time } from @local/time
 
 ## Test format function
 /var @testDate = "2025-07-08T10:30:45Z"

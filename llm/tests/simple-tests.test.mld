@@ -1,6 +1,6 @@
 >> Simple tests for core functionality to demonstrate test system
 
-/import { ok, notOk, eq, deepEq } from @local/test
+/import { @ok, @notOk, @eq, @deepEq } from @local/test
 
 ## Test basic string operations
 /var @hello = "Hello"

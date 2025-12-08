@@ -1,6 +1,6 @@
 >>  Simple test to verify test system works
 
-/import { ok, notOk, eq } from @local/test
+/import { @ok, @notOk, @eq } from @local/test
 
 >>  Basic tests
 /var @test_true_is_true = @ok(true)

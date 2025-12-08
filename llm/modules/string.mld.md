@@ -3,13 +3,16 @@ name: string
 author: mlld
 version: 1.0.0
 about: String operations
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["length", "transformation", "camelCase", "snake_case", "kebab-case", "SCREAMING_SNAKE", "SNAKE-KEBAB", "substring", "slice", "split", "join", "pad", "replace", "starsWith", "endsWith", "escape", "unescape", "encode"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/string
 
@@ -226,8 +229,6 @@ All string operations use JavaScript's native string methods with consistent beh
 
 >> Shadow environment to make functions available to each other
 /exe js = { length, trim, trimStart, trimEnd, upper, lower, capitalize, title, camelCase, snakeCase, kebabCase, split, splitLines, splitWords, join, joinLines, substring, slice, left, right, indexOf, includes, startsWith, endsWith, replace, replaceAll, padStart, padEnd, repeat, reverse, isEmpty, isBlank, isNumeric, escape, encodeUri, encodeUriComponent, isEmail, isUrl, slugify }
+
+/export { @length, @trim, @trimStart, @trimEnd, @upper, @lower, @capitalize, @title, @camelCase, @snakeCase, @kebabCase, @split, @splitLines, @splitWords, @join, @joinLines, @substring, @slice, @left, @right, @indexOf, @includes, @startsWith, @endsWith, @replace, @replaceAll, @padStart, @padEnd, @repeat, @reverse, @isEmpty, @isBlank, @isNumeric, @escape, @encodeUri, @encodeUriComponent, @isEmail, @isUrl, @slugify }
 ```
-
-## Module Export
-
-All functions are exported by default in mlld modules. The @module pattern would require grammar updates to support variable references in object literals.

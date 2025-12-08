@@ -3,13 +3,16 @@ name: fs
 author: mlld
 version: 1.0.0
 about: Filesystem operations
-needs: ["sh"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["fs", "filesystem"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
+
+/needs {
+  sh
+}
 
 # @mlld/fs
 
@@ -85,9 +88,6 @@ These functions use shell commands to check file system state and return "true" 
     echo ""
   fi
 }
+
+/export { @fileExists, @dirExists, @pathExists }
 ```
-
-## Module Export
-
-All functions are exported by default in mlld modules.
-

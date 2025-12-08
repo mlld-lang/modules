@@ -3,13 +3,16 @@ name: http
 author: mlld
 version: 1.0.0
 about: HTTP methods using fetch with native return values
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["http", "api", "get", "put", "post", "delete", "rest"]
 license: CC0
-mlldVersion: ">=1.4.1"
+mlldVersion: ">=2.0.0-rc78"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/http
 
@@ -399,6 +402,6 @@ Display methods for formatted output:
 
 >> Shadow environment - make functions available to each other
 /exe js = { get, post, put, patch, authGet, authPost, request, getData, postData, putData, patchData, deleteData, displayGet, displayPost }
-```
 
-This module uses a structured export to provide both individual methods and organized interfaces, defined in the main `mlld-run` block above.
+/export { @http, @get, @post, @put, @patch, @authGet, @authPost, @request, @getData, @postData, @putData, @patchData, @deleteData, @displayGet, @displayPost }
+```

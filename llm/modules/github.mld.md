@@ -3,13 +3,16 @@ name: github
 author: mlld
 version: 1.0.0
 about: GitHub API client for PR, issue, and repository operations
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["github", "api", "pr", "pull-request", "issue", "repository", "fetch", "rest"]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/github
 
@@ -778,4 +781,6 @@ GitHub operations via the GitHub REST API:
   collab: @collab,
   workflow: @workflow
 }
+
+/export { @github, @pr, @issue, @repo, @collab, @workflow }
 ```

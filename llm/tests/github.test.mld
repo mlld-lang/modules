@@ -1,8 +1,7 @@
 > Comprehensive testing of @mlld/github module
 
-/import { ok, notOk, eq, deepEq, contains, throws, len } from @local/test
-/import { github } from @local/github
-/import { MLLD_GITHUB_TOKEN } from @input
+/import { @ok, @notOk, @eq, @deepEq, @contains, @throws, @len } from @local/test
+/import { @github } from @local/github
 
 ## Module Structure Tests
 
@@ -144,18 +143,21 @@
 /var @test_files_is_array = @ok(@isArray(@files))
 
 >> Verify pr.files returns array of documented file objects
-/when @files.0 => /var @test_file_has_filename = @ok(@files.0.filename)
-/when @files.0 => /var @test_file_not_path = @notOk(@files.0.path)
-/when @files.0 => /var @test_file_has_status = @ok(@files.0.status)
-/when @files.0 => /var @test_file_has_additions = @ok(@files.0.additions !== undefined)
-/when @files.0 => /var @test_file_has_deletions = @ok(@files.0.deletions !== undefined)
-/when @files.0 => /var @test_file_has_changes = @ok(@files.0.changes !== undefined)
-/when @files.0 => /var @test_file_has_blob_url = @ok(@files.0.blob_url)
-/when @files.0 => /var @test_file_has_raw_url = @ok(@files.0.raw_url)
-/when @files.0 => /var @test_file_has_contents_url = @ok(@files.0.contents_url)
-/when @files.0 => /var @test_file_has_patch = @ok(@files.0.patch !== undefined)
-/when @files.0 => /var @test_file_has_sha = @ok(@files.0.sha)
-/when @files.0 => /var @test_file_status_valid = @contains(["added", "removed", "modified", "renamed"], @files.0.status)
+/exe @getProp(obj, key) = js { return obj && obj[key] }
+/exe @hasArr(arr) = js { return Array.isArray(arr) && arr.length > 0 }
+/var @firstFile = js { return Array.isArray(files) && files.length > 0 ? files[0] : null }
+/var @test_file_has_filename = @ok(@getProp(@firstFile, "filename"))
+/var @test_file_not_path = @notOk(@getProp(@firstFile, "path"))
+/var @test_file_has_status = @ok(@getProp(@firstFile, "status"))
+/var @test_file_has_additions = @ok(@getProp(@firstFile, "additions") !== undefined)
+/var @test_file_has_deletions = @ok(@getProp(@firstFile, "deletions") !== undefined)
+/var @test_file_has_changes = @ok(@getProp(@firstFile, "changes") !== undefined)
+/var @test_file_has_blob_url = @ok(@getProp(@firstFile, "blob_url"))
+/var @test_file_has_raw_url = @ok(@getProp(@firstFile, "raw_url"))
+/var @test_file_has_contents_url = @ok(@getProp(@firstFile, "contents_url"))
+/var @test_file_has_patch = @ok(@getProp(@firstFile, "patch") !== undefined)
+/var @test_file_has_sha = @ok(@getProp(@firstFile, "sha"))
+/var @test_file_status_valid = @contains(["added", "removed", "modified", "renamed"], @getProp(@firstFile, "status"))
 
 ### Test PR diff
 /var @diff = @github.pr.diff(82, "mlld-lang/registry")
@@ -169,14 +171,15 @@
 /var @test_issues_is_array = @ok(@isArray(@issues))
 
 >> Verify issue.list returns array of documented issue objects
-/when @issues.0 => /var @test_issue_has_number = @ok(@issues.0.number)
-/when @issues.0 => /var @test_issue_has_title = @ok(@issues.0.title)
-/when @issues.0 => /var @test_issue_has_state = @ok(@issues.0.state)
-/when @issues.0 => /var @test_issue_has_labels = @ok(@isArray(@issues.0.labels))
-/when @issues.0 => /var @test_issue_has_assignees = @ok(@isArray(@issues.0.assignees))
-/when @issues.0 => /var @test_issue_has_created_at = @ok(@issues.0.created_at)
-/when @issues.0 => /var @test_issue_has_updated_at = @ok(@issues.0.updated_at)
-/when @issues.0 => /var @test_issue_state_valid = @contains(["open", "closed"], @issues.0.state)
+/var @firstIssue = js { return Array.isArray(issues) && issues.length > 0 ? issues[0] : null }
+/var @test_issue_has_number = @ok(@getProp(@firstIssue, "number"))
+/var @test_issue_has_title = @ok(@getProp(@firstIssue, "title"))
+/var @test_issue_has_state = @ok(@getProp(@firstIssue, "state"))
+/var @test_issue_has_labels = @ok(@isArray(@getProp(@firstIssue, "labels")))
+/var @test_issue_has_assignees = @ok(@isArray(@getProp(@firstIssue, "assignees")))
+/var @test_issue_has_created_at = @ok(@getProp(@firstIssue, "created_at"))
+/var @test_issue_has_updated_at = @ok(@getProp(@firstIssue, "updated_at"))
+/var @test_issue_state_valid = @contains(["open", "closed"], @getProp(@firstIssue, "state"))
 
 ### Test collaborator check (returns boolean)
 /var @collab_check = @github.collab.check("adamavenir", "mlld-lang/registry")

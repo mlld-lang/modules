@@ -1,7 +1,7 @@
 >> Tests for @mlld/conditions module
 
-/import { ok, notOk, eq } from @local/test
-/import { and, or, not, exists, xor } from @local/conditions
+/import { @ok, @notOk, @eq } from @local/test
+/import { @and, @or, @not, @exists, @xor } from @local/conditions
 
 ## Test and
 /var @test_and_true_true = @ok(@and(true, true))

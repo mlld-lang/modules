@@ -1,260 +1,212 @@
 ---
 name: ai-cli
 author: mlld
-version: 1.0.0
-about: LLM cli wrappers
-needs: ["sh"]
+version: 2.0.0
+about: CLI wrappers for Claude Code, Codex, and Gemini with unified, ergonomic API
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
-keywords: ["llm", "ai", "openai", "anthropic", "google", "claude", "codex", "gemini", "cli"]
+keywords: [llm, ai, openai, anthropic, google, claude, codex, gemini, cli]
 license: CC0
-mlldVersion: "*"
+mlldVersion: ">=2.0.0-rc78"
 ---
+
+/needs {
+  sh
+}
 
 # @mlld/ai-cli
 
-Simple wrappers for AI CLI tools (llm, claude, codex, gemini) to integrate language models into mlld workflows.
+Unified wrappers for AI CLI tools. Simple functions for common cases, all using stdin piping for reliability.
 
 ## tldr
 
-Easy AI integration for your mlld scripts:
-
 ```mlld
-/import { claude, llm, codex, gemini } from @mlld/ai-cli
+/import { @claude, @claudeJson, @codex, @gemini } from @mlld/ai-cli
 
-/var @response = @claude.ask("What's the capital of France?")
-/show `Claude says: @response`
+/show @claude("What is 2+2?")
+/show @codex("Write a Python fibonacci function")
+/show @gemini("Explain quantum computing")
 
-/var @answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-/show `LLM says: @answer`
+/var @result = @claudeJson("Analyze this code")
+/show `Cost: $@result.total_cost_usd, Tokens: @result.usage.output_tokens`
 ```
 
 ## docs
 
-### Claude Integration
+### Claude Code
 
-#### `claude.ask(prompt)`
+Requires: `npm install -g @anthropic-ai/claude-code`
 
-Direct interface to Claude via the claude CLI tool.
+All Claude functions use stdin piping for safety and reliability.
+
+#### `claude(prompt)`
+Basic query, returns plain text.
 
 ```mlld
-/var @analysis = @claude.ask("Analyze this code for potential issues: function add(a,b) { return a + b }")
-/show `Code review: @analysis`
+/show @claude("Explain CORS in one sentence")
+/var @answer = @claude("What is the capital of Spain?")
 ```
 
-### LLM CLI Integration
-
-#### `llm.ask(system, prompt)`
-
-Basic LLM interaction with system prompt.
+#### `claudeJson(prompt)`
+Returns structured JSON with metadata (cost, tokens, duration, session_id).
 
 ```mlld
-/var @haiku = @llm.ask("You are a poet", "Write a haiku about programming")
-/show @haiku
+/var @result = @claudeJson("What is machine learning?")
+/show `Answer: @result.result`
+/show `Cost: $@result.total_cost_usd`
+/show `Input tokens: @result.usage.input_tokens`
+/show `Output tokens: @result.usage.output_tokens`
+/show `Duration: @result.duration_ms ms`
 ```
 
-#### `llm.media(system, prompt, media_path)`
-
-Include images or files in your prompts.
+#### `claudeModel(prompt, model)`
+Use a specific Claude model.
 
 ```mlld
-/var @description = @llm.media("You are an image analyst", "Describe this diagram", "architecture.png")
-/show `Analysis: @description`
+/show @claudeModel("Complex reasoning task", "claude-opus-4")
+/show @claudeModel("Quick question", "claude-sonnet-4-5")
 ```
 
-#### `llm.tools(system, prompt, tools)`
-
-Use LLM with tool capabilities.
+#### `claudeTools(prompt, tools)`
+Restrict Claude to specific tools (comma-separated: Bash, Read, Write, Edit, Glob, Grep, etc).
 
 ```mlld
-/var @weather = @llm.tools("You can check weather", "What's the weather in NYC?", "weather")
-/show @weather
+/show @claudeTools("List files in current directory", "Bash")
+/show @claudeTools("Read the package.json file", "Read")
+/show @claudeTools("Search for TODO comments", "Grep")
+/show @claudeTools("Find and read config files", "Glob,Read")
 ```
 
-#### `llm.all(system, prompt, parameters)`
+### Codex
 
-Full control over LLM parameters.
+Requires: `npm install -g @openai/codex`
+
+All Codex functions use stdin piping and automatically skip git repo checks.
+
+#### `codex(prompt)`
+Basic code generation and explanation.
 
 ```mlld
-/var @creative = @llm.all("You are creative", "Write a story opening", "--temperature 0.9 --max-tokens 200")
-/show @creative
+/show @codex("Write a Python function to calculate fibonacci numbers")
+/var @code = @codex("Explain async/await in JavaScript")
 ```
 
-### Codex Integration
-
-#### `codex.ask(prompt)`
-
-Generate code with OpenAI Codex or similar.
+#### `codexModel(prompt, model)`
+Use a specific model (gpt-4, gpt-5-codex, etc).
 
 ```mlld
-/var @code = @codex.ask("Write a Python function to calculate fibonacci numbers")
+/show @codexModel("Refactor this code for clarity", "gpt-4")
+```
+
+#### `codexDir(prompt, dir)`
+Run codex in a specific working directory.
+
+```mlld
+/show @codexDir("What files are in this project?", "/path/to/project")
+/show @codexDir("Run the test suite", "./my-app")
+```
+
+### Gemini
+
+Requires: `npm install -g @google/gemini-cli`
+
+All Gemini functions use headless mode with stdin piping.
+
+#### `gemini(prompt)`
+Basic query via Gemini CLI.
+
+```mlld
+/show @gemini("Explain quantum computing in simple terms")
+/var @answer = @gemini("What are the benefits of TypeScript?")
+```
+
+#### `geminiJson(prompt)`
+Returns structured JSON output with metadata.
+
+```mlld
+/var @result = @geminiJson("Analyze this algorithm")
+/show `Response: @result`
+```
+
+#### `geminiModel(prompt, model)`
+Use a specific Gemini model (gemini-2.0-flash, etc).
+
+```mlld
+/show @geminiModel("Complex analysis task", "gemini-2.0-flash")
+```
+
+## examples
+
+### Cost tracking across multiple queries
+
+```mlld
+/import { @claudeJson } from @mlld/ai-cli
+
+/var @queries = [
+  "What is REST?",
+  "What is GraphQL?",
+  "What is gRPC?"
+]
+
+/var @results = foreach @claudeJson(@queries)
+/var @totalCost = js {
+  return @results.reduce((sum, r) => sum + r.total_cost_usd, 0)
+}
+
+/show `Total cost: $@totalCost`
+```
+
+### Multi-tool code generation workflow
+
+```mlld
+/import { @claude, @codex } from @mlld/ai-cli
+
+>> Get requirements from Claude
+/var @spec = @claude("Describe the requirements for a URL shortener API")
+
+>> Generate code with Codex
+/var @code = @codex(`Write a Node.js URL shortener based on: @spec`)
+
+>> Review with Claude (restricted to just reading)
+/var @review = @claudeTools(`Review this code: @code`, "Read")
+
+/show `Specification:`
+/show @spec
 /show `Generated code:`
 /show @code
-```
-
-#### `codex.media(prompt, media_path)`
-
-Convert diagrams or images to code.
-
-```mlld
-/var @implementation = @codex.media("Convert this flowchart to Python code", "algorithm.png")
-/show @implementation
-```
-
-### Gemini Integration
-
-#### `gemini.ask(prompt)`
-
-Direct interface to Google's Gemini via the gemini CLI tool.
-
-```mlld
-/var @analysis = @gemini.ask("Explain quantum computing in simple terms")
-/show `Explanation: @analysis`
-```
-
-#### `gemini.media(prompt, media_path)`
-
-Multimodal prompts with Gemini.
-
-```mlld
-/var @description = @gemini.media("What's happening in this image?", "photo.jpg")
-/show @description
+/show `Review:`
+/show @review
 ```
 
 ## module
 
-Wrappers for popular AI CLI tools:
-
 ```mlld-run
-/exe @claude_ask(@prompt) = sh {
-  # Requires claude CLI tool installed
-  if ! command -v claude >/dev/null 2>&1; then
-    echo "Error: claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
-    exit 1
-  fi
-  
-  result=$(claude -p "$prompt" 2>&1)
-  exit_code=$?
-  
-  if [ $exit_code -eq 0 ]; then
-    echo "$result"
-  elif echo "$result" | grep -q "Invalid API key"; then
-    echo "Error: Invalid Claude API key. Set ANTHROPIC_API_KEY environment variable."
-  else
-    echo "Error: $result"
-  fi
-}
+>> Claude Code - stdin-based for reliability
+/exe @claude(prompt) = run @prompt | { claude --print }
 
-/exe @llm_ask(@system, @prompt) = sh {
-  # Requires llm CLI tool installed
-  if ! command -v llm >/dev/null 2>&1; then
-    echo "Error: llm CLI not found. Install with: pip install llm"
-    exit 1
-  fi
-  
-  result=$(llm "$system - $prompt" 2>&1)
-  exit_code=$?
-  
-  if [ $exit_code -eq 0 ]; then
-    echo "$result"
-  elif echo "$result" | grep -q "No API key"; then
-    echo "Error: No LLM API key found. Configure with: llm keys set openai"
-  else
-    echo "Error: $result"
-  fi
-}
+/exe @claudeJson(prompt) = run @prompt | { claude --print --output-format json } | @json
 
-/exe @llm_media(@system, @prompt, @media) = sh {
-  # LLM with media attachment
-  if [ -f "$media" ]; then
-    llm -a "$media" "$system - $prompt" 2>/dev/null || echo "Error: llm CLI not found or media file missing"
-  else
-    echo "Error: Media file not found: $media"
-  fi
-}
+/exe @claudeModel(prompt, model) = run @prompt | { claude --print --model @model }
 
-/exe @llm_tools(@system, @prompt, @tools) = sh {
-  # LLM with tools enabled
-  llm --tools "$tools" "$system - $prompt" 2>/dev/null || echo "Error: llm CLI not found or tools not available"
-}
+/exe @claudeTools(prompt, tools) = run @prompt | { claude --print --allowedTools @tools }
 
-/exe @llm_all(@system, @prompt, @parameters) = sh {
-  # LLM with custom parameters
-  llm $parameters "$system - $prompt" 2>/dev/null || echo "Error: llm CLI not found"
-}
+>> Codex - stdin-based, skip git checks for flexibility
+/exe @codex(prompt) = run @prompt | { codex exec --skip-git-repo-check }
 
-/exe @codex_ask(@prompt) = sh {
-  # Requires codex or compatible CLI
-  # Codex tries to do interactive auth, so we need to handle it carefully
-  if command -v codex >/dev/null 2>&1; then
-    # Check if API key is set to avoid interactive prompt
-    if [ -n "$OPENAI_API_KEY" ]; then
-      codex "$prompt" 2>/dev/null || echo "Error: Codex failed. Check your OPENAI_API_KEY."
-    else
-      echo "Error: OPENAI_API_KEY not set. Export OPENAI_API_KEY environment variable."
-    fi
-  elif command -v llm >/dev/null 2>&1; then
-    llm -m gpt-4 "$prompt" 2>/dev/null || echo "Error: LLM fallback failed"
-  else
-    echo "Error: codex CLI not found. Install with: npm install -g @openai/codex"
-  fi
-}
+/exe @codexModel(prompt, model) = run @prompt | { codex exec --skip-git-repo-check --model @model }
 
-/exe @codex_media(@prompt, @media) = sh {
-  # Codex with media input
-  if [ -f "$media" ]; then
-    codex -a "$media" "$prompt" 2>/dev/null || llm -m gpt-4-vision -a "$media" "$prompt" 2>/dev/null || echo "Error: codex CLI not found or media file missing"
-  else
-    echo "Error: Media file not found: $media"
-  fi
-}
+/exe @codexDir(prompt, dir) = run @prompt | { codex exec --skip-git-repo-check --cd @dir }
 
-/exe @gemini_ask(@prompt) = sh {
-  # Requires gemini CLI tool installed
-  if ! command -v gemini >/dev/null 2>&1; then
-    echo "Error: gemini CLI not found. Install with: npm install -g @google/gemini-cli"
-    exit 1
-  fi
-  
-  result=$(gemini -p "$prompt" 2>&1)
-  exit_code=$?
-  
-  if [ $exit_code -eq 0 ]; then
-    echo "$result"
-  elif echo "$result" | grep -q "API key"; then
-    echo "Error: Invalid Gemini API key. Set GOOGLE_API_KEY environment variable."
-  else
-    echo "Error: $result"
-  fi
-}
+>> Gemini - headless mode with stdin
+/exe @gemini(prompt) = run @prompt | { gemini --prompt - }
 
-/exe @gemini_media(@prompt, @media) = sh {
-  # Gemini with media input
-  if [ -f "$media" ]; then
-    gemini -a "$media" -p "$prompt" 2>/dev/null || echo "Error: gemini CLI not found or media file missing. Install with: npm install -g @google/gemini-cli"
-  else
-    echo "Error: Media file not found: $media"
-  fi
-}
+/exe @geminiJson(prompt) = run @prompt | { gemini --prompt - --output-format json } | @json
 
-/var @claude = {
-  ask: @claude_ask
-}
+/exe @geminiModel(prompt, model) = run @prompt | { gemini --prompt - --model @model }
 
-/var @llm = {
-  ask: @llm_ask,
-  media: @llm_media,
-  tools: @llm_tools,
-  all: @llm_all
-}
-
-/var @codex = {
-  ask: @codex_ask,
-  media: @codex_media
-}
-
-/var @gemini = {
-  ask: @gemini_ask,
-  media: @gemini_media
+/export {
+  @claude, @claudeJson, @claudeModel, @claudeTools,
+  @codex, @codexModel, @codexDir,
+  @gemini, @geminiJson, @geminiModel
 }
 ```
