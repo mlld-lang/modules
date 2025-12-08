@@ -3,13 +3,16 @@ name: env
 author: mlld
 version: 1.0.0
 about: Environment variable validation and management
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["environment", "env", "validation", "config", "secrets", "ci", "variables"]
 license: CC0
 mlldVersion: "*"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/env
 
@@ -341,4 +344,6 @@ Environment variable utilities:
   load: @load,
   export: @setEnv
 }
+
+/export { @env, @get, @set, @has, @isSet, @nodeEnv, @isProd, @isDev, @isTest, @isCI, @ciProvider, @load, @setEnv }
 ```

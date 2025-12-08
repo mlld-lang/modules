@@ -3,13 +3,16 @@ name: fix-relative-links
 author: mlld
 version: 2.0.0
 about: Fix relative markdown links based on context
-needs: ["node"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["markdown", "relative", "links", "paths", "pipeline"]
 license: CC0
 mlldVersion: ">=1.4.1"
 ---
+
+/needs {
+  node: []
+}
 
 # @mlld/fix-relative-links
 
@@ -162,7 +165,9 @@ See the [main docs](../../README.md) for more.
       return match;
     }
   });
-  
+
   return result;
 }
+
+/export { @fixRelativeLinks }
 ```

@@ -3,13 +3,16 @@ name: conditions
 author: mlld
 version: 1.0.0
 about: Conditional checks for /when
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["conditions", "checks", "tests", "when", "truthy", "equals", "includes", "has", "is"]
 license: CC0
 mlldVersion: "*"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/conditions
 
@@ -186,4 +189,6 @@ These functions convert various conditions to empty/non-empty strings for mlld's
 
 >> Shadow environment to make functions available to each other
 /exe js = { isTrue, isFalse, not, equals, strictEquals, notEquals, gt, gte, lt, lte, contains, startsWith, endsWith, matches, isEmpty, notEmpty, includes, hasLength, hasMinLength, isString, isNumber, isArray, isObject, and, or, xor, exists, defined }
+
+/export { @isTrue, @isFalse, @not, @equals, @strictEquals, @notEquals, @gt, @gte, @lt, @lte, @contains, @startsWith, @endsWith, @matches, @isEmpty, @notEmpty, @includes, @hasLength, @hasMinLength, @isString, @isNumber, @isArray, @isObject, @and, @or, @xor, @exists, @defined }
 ```

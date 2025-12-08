@@ -3,13 +3,17 @@ name: time
 author: mlld
 version: 1.0.0
 about: Time and date operations with structured exports
-needs: ["js", "node"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["time", "date", "format", "parse", "timezone", "duration"]
 license: CC0
 mlldVersion: "*"
 ---
+
+/needs {
+  js: []
+  node: []
+}
 
 # @mlld/time
 
@@ -574,4 +578,6 @@ Divide all duration values.
 >> Shadow environment
 /exe js = { format, parse, add, subtract, diff, before, after, equal, between, iso, unix, dateOnly, timeOnly, isBizDay, addBizDays, getCurrentTimezone, getOffset, startOf, endOf, relative, durationWeeks, durationDays, durationHours, durationMinutes, durationSeconds, durationCompose, durationMultiply, durationDivide }
 /exe node = { format, add, subtract, diff, addBizDays, getOffset, startOf, endOf, relative }
+
+/export { @time, @format, @parse, @add, @subtract, @diff, @before, @after, @equal, @between, @iso, @unix, @dateOnly, @timeOnly, @isBizDay, @addBizDays, @getCurrentTimezone, @getOffset, @startOf, @endOf, @relative, @duration }
 ```

@@ -1,44 +1,45 @@
->> Tests for @mlld/ai module
+>> Tests for @mlld/ai-cli module
 
-/import { ok, eq } from @local/test
-/import { claude, llm, codex } from @local/ai-cli
+/import { @ok, @eq } from @local/test
+/import { @claude, @claudeJson, @claudeModel, @claudeTools, @codex, @codexModel, @codexDir, @gemini, @geminiJson, @geminiModel } from @local/ai-cli
 
-## Test that main objects exist
+## Test Claude functions exist
 /var @test_claude_exists = @ok(@claude)
-/var @test_llm_exists = @ok(@llm)
+/var @test_claudeJson_exists = @ok(@claudeJson)
+/var @test_claudeModel_exists = @ok(@claudeModel)
+/var @test_claudeTools_exists = @ok(@claudeTools)
+
+## Test Codex functions exist
 /var @test_codex_exists = @ok(@codex)
+/var @test_codexModel_exists = @ok(@codexModel)
+/var @test_codexDir_exists = @ok(@codexDir)
 
-## Test claude object structure
-/exe @isObject(@val) = js { return typeof val === "object"; }
+## Test Gemini functions exist
+/var @test_gemini_exists = @ok(@gemini)
+/var @test_geminiJson_exists = @ok(@geminiJson)
+/var @test_geminiModel_exists = @ok(@geminiModel)
+
+## Test that functions are callable (type check)
 /exe @isFunction(@val) = js { return typeof val === "function"; }
-/var @test_claude_is_object = @ok(@isObject(@claude))
-/var @test_claude_has_ask = @ok(@claude.ask)
-/var @test_claude_ask_is_function = @ok(@isFunction(@claude.ask))
+/var @test_claude_is_function = @ok(@isFunction(@claude))
+/var @test_claudeJson_is_function = @ok(@isFunction(@claudeJson))
+/var @test_codex_is_function = @ok(@isFunction(@codex))
+/var @test_gemini_is_function = @ok(@isFunction(@gemini))
 
-## Test llm object structure
-/var @test_llm_is_object = @ok(@isObject(@llm))
-/var @test_llm_has_ask = @ok(@llm.ask)
-/var @test_llm_has_media = @ok(@llm.media)
-/var @test_llm_has_tools = @ok(@llm.tools)
-/var @test_llm_has_all = @ok(@llm.all)
-/var @test_llm_ask_is_function = @ok(@isFunction(@llm.ask))
-/var @test_llm_media_is_function = @ok(@isFunction(@llm.media))
-/var @test_llm_tools_is_function = @ok(@isFunction(@llm.tools))
-/var @test_llm_all_is_function = @ok(@isFunction(@llm.all))
+## Test actual function calls (basic smoke tests)
+>> Note: These make real API calls, so they're slow and may cost money
+>> Comment out if you want faster/free tests
 
-## Test codex object structure
-/var @test_codex_is_object = @ok(@isObject(@codex))
-/var @test_codex_has_ask = @ok(@codex.ask)
-/var @test_codex_has_media = @ok(@codex.media)
-/var @test_codex_ask_is_function = @ok(@isFunction(@codex.ask))
-/var @test_codex_media_is_function = @ok(@isFunction(@codex.media))
-
-## Test actual function calls
-/var @claude_response = @claude.ask("Say hello")
+/var @claude_response = @claude("Say hello")
 /var @test_claude_response = @ok(@claude_response)
+/var @test_claude_has_content = @ok(@claude_response.length() > 0)
 
-/var @llm_response = @llm.ask("You are a test bot", "Say test")
-/var @test_llm_response = @ok(@llm_response)
+/var @claudeJson_response = @claudeJson("What is 2+2?")
+/var @test_claudeJson_response = @ok(@claudeJson_response)
+/var @test_claudeJson_has_result = @ok(@claudeJson_response.result)
+/var @test_claudeJson_has_cost = @ok(@claudeJson_response.total_cost_usd)
+/var @test_claudeJson_has_usage = @ok(@claudeJson_response.usage)
 
-/var @codex_response = @codex.ask("Write a hello world function")
+/var @codex_response = @codex("What is 3+3?")
 /var @test_codex_response = @ok(@codex_response)
+/var @test_codex_has_content = @ok(@codex_response.length() > 0)

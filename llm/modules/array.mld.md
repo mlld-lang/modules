@@ -3,13 +3,16 @@ name: array
 author: mlld
 version: 2.0.0
 about: Array operations with native return values
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["arrays", "lodash", "filter", "map", "find", "includes", "math", "range", "zip", "range", "chunk"]
 license: CC0
 mlldVersion: ">=1.4.1"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/array
 
@@ -221,4 +224,6 @@ All array operations return native JavaScript values and handle edge cases safel
 
 >> Shadow environment to make functions available to each other
 /exe js = { length, first, last, at, slice, reverse, sort, sortBy, unique, filter, filterGreater, pluck, find, includes, sum, avg, groupBy, push, remove, range }
+
+/export { @length, @first, @last, @at, @slice, @reverse, @sort, @sortBy, @unique, @filter, @filterGreater, @pluck, @find, @includes, @sum, @avg, @groupBy, @push, @remove, @range }
 ```

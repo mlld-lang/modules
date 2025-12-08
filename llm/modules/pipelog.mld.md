@@ -3,13 +3,16 @@ name: pipelog
 author: mlld
 version: 1.0.0
 about: Pass-through pipeline debugging for mlld
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["logging", "debug", "pipeline", "stderr", "pass-through", "development", "testing", "verbose", "json"]
 license: CC0
 mlldVersion: "*"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/pipelog
 
@@ -309,6 +312,8 @@ The loggers complement mlld's built-in @debug variable:
 
 >> Shadow environment to make functions available to each other
 /exe js = { log, logVerbose, logJson }
+
+/export { @log, @logVerbose, @logJson }
 ```
 
 ## interface

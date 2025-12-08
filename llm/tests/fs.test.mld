@@ -1,7 +1,7 @@
 >> Tests for @mlld/fs module
 
-/import { ok, notOk } from @local/test
-/import { fileExists, dirExists, pathExists } from @local/fs
+/import { @ok, @notOk } from @local/test
+/import { @fileExists, @dirExists, @pathExists } from @local/fs
 
 ## Test fileExists
 >> Test with files that should exist on most systems

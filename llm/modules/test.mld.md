@@ -3,13 +3,16 @@ name: test
 author: mlld
 version: 1.0.0
 about: Core assertion functions for mlld testing framework
-needs: ["js"]
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: ["test", "assert", "testing", "assertions", "unit-test"]
 license: CC0
 mlldVersion: "*"
 ---
+
+/needs {
+  js: []
+}
 
 # @mlld/test
 
@@ -175,4 +178,6 @@ Check if a function throws an error.
 
 >> Shadow environment to make functions available to each other
 /exe js = { eq, deepEq, ok, notOk, gt, gte, lt, lte, includes, contains, len, throws }
+
+/export { @eq, @deepEq, @ok, @notOk, @gt, @gte, @lt, @lte, @includes, @contains, @len, @throws }
 ```

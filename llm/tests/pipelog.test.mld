@@ -1,7 +1,7 @@
 >> Tests for @mlld/pipelog module
 
-/import { ok, eq, deepEq } from @local/test
-/import { log, logVerbose, logJson } from @local/pipelog
+/import { @ok, @eq, @deepEq } from @local/test
+/import { @log, @logVerbose, @logJson } from @local/pipelog
 
 ## Test basic logging functions exist
 /var @test_log_exists = @ok(@log)
