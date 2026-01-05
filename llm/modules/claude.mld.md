@@ -37,10 +37,10 @@ Pure Claude invocation primitives. Simple executors for prose execution and dire
 
 ### Model shortcuts
 
-Simple executors with no tools (pure text generation). These are ideal for prose execution.
+Simple executors with no tools (pure text generation).
 
 #### `@opus(prompt)`
-Claude Opus 4.5 - most capable, required for OpenProse execution.
+Claude Opus 4.5 - most capable model.
 
 ```mlld
 /show @opus("Complex reasoning task requiring sophistication")
@@ -97,7 +97,6 @@ Add a custom system prompt (appends to Claude Code defaults).
 
 ```mlld-run
 >> Model-specific helpers (no tools for pure text tasks)
->> These are ideal for prose execution
 exe @haiku(prompt) = @prompt | cmd { claude -p --model haiku --tools "" }
 exe @sonnet(prompt) = @prompt | cmd { claude -p --model sonnet --tools "" }
 exe @opus(prompt) = @prompt | cmd { claude -p --model opus --tools "" }

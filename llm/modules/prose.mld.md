@@ -135,12 +135,15 @@ Configs are objects with these fields:
 ## module
 
 ```mlld-run
->> Import model executors from @mlld/claude
-import { @opus as @opusExe, @sonnet as @sonnetExe, @haiku as @haikuExe } from @mlld/claude
+>> Import @claude for configurable tool access
+import { @claude } from @mlld/claude
+
+>> Prose-specific executors (uses project/system Claude config for permissions)
+exe @opusExe(prompt) = @claude(@prompt, "opus", @base)
+exe @sonnetExe(prompt) = @claude(@prompt, "sonnet", @base)
+exe @haikuExe(prompt) = @claude(@prompt, "haiku", @base)
 
 >> Pre-configured prose execution configs
->> Each config references an executor from @mlld/claude
-
 var @opus = {
   model: @opusExe,
   skillName: "prose"
