@@ -1,7 +1,7 @@
 ---
 name: prose
 author: mlld
-version: 2.1.0
+version: 2.2.0
 about: Pre-configured prose execution configs for OpenProse
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
@@ -76,7 +76,7 @@ Configs are objects with these fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `model` | executable | Model executor (e.g., `@opus` from `@mlld/claude`) |
-| `skillName` | string | Interpreter skill (default: "prose" for OpenProse) |
+| `skills` | array | Skills to invoke (default: OpenProse plugin skills) |
 
 ### Creating custom configs
 
@@ -85,7 +85,7 @@ Configs are objects with these fields:
 
 /var @myConfig = {
   model: @opus,
-  skillName: "prose"
+  skills: ["open-prose:prose-boot", "open-prose:prose-compile", "open-prose:prose-run"]
 }
 
 /exe @workflow(ctx) = prose:@myConfig { session "Process @ctx" }
@@ -118,12 +118,12 @@ Configs are objects with these fields:
 ### Custom interpreter
 
 ```mlld
-/import { @proseConfig } from @mlld/prose
+/import { @opus } from @mlld/claude
 
->> Use a custom skill instead of OpenProse
+>> Use custom skills instead of OpenProse
 /var @myDsl = {
-  model: "claude-opus-4.5",
-  skillName: "myDSL"
+  model: @opus,
+  skills: ["my-dsl:boot", "my-dsl:run"]
 }
 
 /exe @process(data) = prose:@myDsl {
@@ -144,19 +144,26 @@ exe @sonnetExe(prompt) = @claude(@prompt, "sonnet", @base)
 exe @haikuExe(prompt) = @claude(@prompt, "haiku", @base)
 
 >> Pre-configured prose execution configs
+>> Default skills for OpenProse plugin
+var @defaultSkills = [
+  "open-prose:prose-boot",
+  "open-prose:prose-compile",
+  "open-prose:prose-run"
+]
+
 var @opus = {
   model: @opusExe,
-  skillName: "prose"
+  skills: @defaultSkills
 }
 
 var @sonnet = {
   model: @sonnetExe,
-  skillName: "prose"
+  skills: @defaultSkills
 }
 
 var @haiku = {
   model: @haikuExe,
-  skillName: "prose"
+  skills: @defaultSkills
 }
 
 export { @opus, @sonnet, @haiku }
