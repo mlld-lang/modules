@@ -1,7 +1,7 @@
 ---
 name: prose
 author: mlld
-version: 2.0.0
+version: 2.1.0
 about: Pre-configured prose execution configs for OpenProse
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
