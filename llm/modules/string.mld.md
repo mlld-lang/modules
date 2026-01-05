@@ -131,32 +131,32 @@ Content validation for data processing.
 All string operations use JavaScript's native string methods with consistent behavior:
 
 ```mlld-run
-/exe @length(@str) = js {(String(str).length)}
-/exe @trim(@str) = js {(String(str).trim())}
-/exe @trimStart(@str) = js {(String(str).trimStart())}
-/exe @trimEnd(@str) = js {(String(str).trimEnd())}
+exe @length(@str) = js {(String(str).length)}
+exe @trim(@str) = js {(String(str).trim())}
+exe @trimStart(@str) = js {(String(str).trimStart())}
+exe @trimEnd(@str) = js {(String(str).trimEnd())}
 
-/exe @upper(@str) = js {(String(str).toUpperCase())}
-/exe @lower(@str) = js {(String(str).toLowerCase())}
-/exe @capitalize(@str) = js {(String(str).charAt(0).toUpperCase() + String(str).slice(1).toLowerCase())}
-/exe @title(@str) = js {(
-  String(str).split(' ').map(word => 
+exe @upper(@str) = js {(String(str).toUpperCase())}
+exe @lower(@str) = js {(String(str).toLowerCase())}
+exe @capitalize(@str) = js {(String(str).charAt(0).toUpperCase() + String(str).slice(1).toLowerCase())}
+exe @title(@str) = js {(
+  String(str).split(' ').map(word =>
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   ).join(' ')
 )}
-/exe @camelCase(@str) = js {(
+exe @camelCase(@str) = js {(
   String(str)
     .replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase())
     .replace(/^[A-Z]/, chr => chr.toLowerCase())
 )}
-/exe @snakeCase(@str) = js {(
+exe @snakeCase(@str) = js {(
   String(str)
     .replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
     .replace(/^_/, '')
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .toLowerCase()
 )}
-/exe @kebabCase(@str) = js {(
+exe @kebabCase(@str) = js {(
   String(str)
     .replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
     .replace(/^-/, '')
@@ -164,34 +164,34 @@ All string operations use JavaScript's native string methods with consistent beh
     .toLowerCase()
 )}
 
-/exe @split(@str, @separator) = js {(JSON.stringify(String(str).split(separator || '')))}
-/exe @splitLines(@str) = js {(JSON.stringify(String(str).split(/\r?\n/)))}
-/exe @splitWords(@str) = js {(JSON.stringify(String(str).match(/\S+/g) || []))}
-/exe @join(@array, @separator) = js {(Array.isArray(array) ? array.join(separator || '') : String(array))}
-/exe @joinLines(@array) = js {(Array.isArray(array) ? array.join('\n') : String(array))}
+exe @split(@str, @separator) = js {(JSON.stringify(String(str).split(separator || '')))}
+exe @splitLines(@str) = js {(JSON.stringify(String(str).split(/\r?\n/)))}
+exe @splitWords(@str) = js {(JSON.stringify(String(str).match(/\S+/g) || []))}
+exe @join(@array, @separator) = js {(Array.isArray(array) ? array.join(separator || '') : String(array))}
+exe @joinLines(@array) = js {(Array.isArray(array) ? array.join('\n') : String(array))}
 
-/exe @substring(@str, @start, @end) = js {(String(str).substring(start, end))}
-/exe @slice(@str, @start, @end) = js {(String(str).slice(start, end))}
-/exe @left(@str, @n) = js {(String(str).slice(0, n))}
-/exe @right(@str, @n) = js {(String(str).slice(-n))}
+exe @substring(@str, @start, @end) = js {(String(str).substring(start, end))}
+exe @slice(@str, @start, @end) = js {(String(str).slice(start, end))}
+exe @left(@str, @n) = js {(String(str).slice(0, n))}
+exe @right(@str, @n) = js {(String(str).slice(-n))}
 
-/exe @indexOf(@str, @search) = js {(String(str).indexOf(search))}
-/exe @includes(@str, @search) = js {(String(str).includes(search) ? "true" : "")}
-/exe @startsWith(@str, @search) = js {(String(str).startsWith(search) ? "true" : "")}
-/exe @endsWith(@str, @search) = js {(String(str).endsWith(search) ? "true" : "")}
-/exe @replace(@str, @search, @replacement) = js {(String(str).replace(search, replacement))}
-/exe @replaceAll(@str, @search, @replacement) = js {(String(str).replaceAll(search, replacement))}
+exe @indexOf(@str, @search) = js {(String(str).indexOf(search))}
+exe @includes(@str, @search) = js {(String(str).includes(search) ? "true" : "")}
+exe @startsWith(@str, @search) = js {(String(str).startsWith(search) ? "true" : "")}
+exe @endsWith(@str, @search) = js {(String(str).endsWith(search) ? "true" : "")}
+exe @replace(@str, @search, @replacement) = js {(String(str).replace(search, replacement))}
+exe @replaceAll(@str, @search, @replacement) = js {(String(str).replaceAll(search, replacement))}
 
-/exe @padStart(@str, @targetLength, @padChar) = js {(String(str).padStart(targetLength, padChar || ' '))}
-/exe @padEnd(@str, @targetLength, @padChar) = js {(String(str).padEnd(targetLength, padChar || ' '))}
-/exe @repeat(@str, @count) = js {(String(str).repeat(count))}
+exe @padStart(@str, @targetLength, @padChar) = js {(String(str).padStart(targetLength, padChar || ' '))}
+exe @padEnd(@str, @targetLength, @padChar) = js {(String(str).padEnd(targetLength, padChar || ' '))}
+exe @repeat(@str, @count) = js {(String(str).repeat(count))}
 
-/exe @reverse(@str) = js {(String(str).split('').reverse().join(''))}
-/exe @isEmpty(@str) = js {(String(str).length === 0 ? "true" : "")}
-/exe @isBlank(@str) = js {(String(str).trim().length === 0 ? "true" : "")}
-/exe @isNumeric(@str) = js {(!isNaN(str) && !isNaN(parseFloat(str)) ? "true" : "")}
+exe @reverse(@str) = js {(String(str).split('').reverse().join(''))}
+exe @isEmpty(@str) = js {(String(str).length === 0 ? "true" : "")}
+exe @isBlank(@str) = js {(String(str).trim().length === 0 ? "true" : "")}
+exe @isNumeric(@str) = js {(!isNaN(str) && !isNaN(parseFloat(str)) ? "true" : "")}
 
-/exe @escape(@str) = js {(
+exe @escape(@str) = js {(
   String(str)
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
@@ -200,15 +200,15 @@ All string operations use JavaScript's native string methods with consistent beh
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t')
 )}
-/exe @encodeUri(@str) = js {(encodeURI(String(str)))}
-/exe @encodeUriComponent(@str) = js {(encodeURIComponent(String(str)))}
+exe @encodeUri(@str) = js {(encodeURI(String(str)))}
+exe @encodeUriComponent(@str) = js {(encodeURIComponent(String(str)))}
 
 >> Email and URL validation
-/exe @isEmail(@str) = js {(
+exe @isEmail(@str) = js {(
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   emailRegex.test(String(str)) ? "true" : ""
 )}
-/exe @isUrl(@str) = js {(
+exe @isUrl(@str) = js {(
   try {
     new URL(String(str));
     return "true";
@@ -218,7 +218,7 @@ All string operations use JavaScript's native string methods with consistent beh
 )}
 
 >> Slugify for URL-friendly strings
-/exe @slugify(@str) = js {(
+exe @slugify(@str) = js {(
   String(str)
     .toLowerCase()
     .trim()
@@ -228,7 +228,7 @@ All string operations use JavaScript's native string methods with consistent beh
 )}
 
 >> Shadow environment to make functions available to each other
-/exe js = { length, trim, trimStart, trimEnd, upper, lower, capitalize, title, camelCase, snakeCase, kebabCase, split, splitLines, splitWords, join, joinLines, substring, slice, left, right, indexOf, includes, startsWith, endsWith, replace, replaceAll, padStart, padEnd, repeat, reverse, isEmpty, isBlank, isNumeric, escape, encodeUri, encodeUriComponent, isEmail, isUrl, slugify }
+exe js = { length, trim, trimStart, trimEnd, upper, lower, capitalize, title, camelCase, snakeCase, kebabCase, split, splitLines, splitWords, join, joinLines, substring, slice, left, right, indexOf, includes, startsWith, endsWith, replace, replaceAll, padStart, padEnd, repeat, reverse, isEmpty, isBlank, isNumeric, escape, encodeUri, encodeUriComponent, isEmail, isUrl, slugify }
 
-/export { @length, @trim, @trimStart, @trimEnd, @upper, @lower, @capitalize, @title, @camelCase, @snakeCase, @kebabCase, @split, @splitLines, @splitWords, @join, @joinLines, @substring, @slice, @left, @right, @indexOf, @includes, @startsWith, @endsWith, @replace, @replaceAll, @padStart, @padEnd, @repeat, @reverse, @isEmpty, @isBlank, @isNumeric, @escape, @encodeUri, @encodeUriComponent, @isEmail, @isUrl, @slugify }
+export { @length, @trim, @trimStart, @trimEnd, @upper, @lower, @capitalize, @title, @camelCase, @snakeCase, @kebabCase, @split, @splitLines, @splitWords, @join, @joinLines, @substring, @slice, @left, @right, @indexOf, @includes, @startsWith, @endsWith, @replace, @replaceAll, @padStart, @padEnd, @repeat, @reverse, @isEmpty, @isBlank, @isNumeric, @escape, @encodeUri, @encodeUriComponent, @isEmail, @isUrl, @slugify }
 ```

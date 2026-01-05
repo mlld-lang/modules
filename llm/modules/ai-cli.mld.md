@@ -182,29 +182,29 @@ Use a specific Gemini model (gemini-2.0-flash, etc).
 
 ```mlld-run
 >> Claude Code - stdin-based for reliability
-/exe @claude(prompt) = run @prompt | { claude --print }
+exe @claude(prompt) = run @prompt | { claude --print }
 
-/exe @claudeJson(prompt) = run @prompt | { claude --print --output-format json } | @json
+exe @claudeJson(prompt) = run @prompt | { claude --print --output-format json } | @json
 
-/exe @claudeModel(prompt, model) = run @prompt | { claude --print --model @model }
+exe @claudeModel(prompt, model) = run @prompt | { claude --print --model @model }
 
-/exe @claudeTools(prompt, tools) = run @prompt | { claude --print --allowedTools @tools }
+exe @claudeTools(prompt, tools) = run @prompt | { claude --print --allowedTools @tools }
 
 >> Codex - stdin-based, skip git checks for flexibility
-/exe @codex(prompt) = run @prompt | { codex exec --skip-git-repo-check }
+exe @codex(prompt) = run @prompt | { codex exec --skip-git-repo-check }
 
-/exe @codexModel(prompt, model) = run @prompt | { codex exec --skip-git-repo-check --model @model }
+exe @codexModel(prompt, model) = run @prompt | { codex exec --skip-git-repo-check --model @model }
 
-/exe @codexDir(prompt, dir) = run @prompt | { codex exec --skip-git-repo-check --cd @dir }
+exe @codexDir(prompt, dir) = run @prompt | { codex exec --skip-git-repo-check --cd @dir }
 
 >> Gemini - headless mode with stdin
-/exe @gemini(prompt) = run @prompt | { gemini --prompt - }
+exe @gemini(prompt) = run @prompt | { gemini --prompt - }
 
-/exe @geminiJson(prompt) = run @prompt | { gemini --prompt - --output-format json } | @json
+exe @geminiJson(prompt) = run @prompt | { gemini --prompt - --output-format json } | @json
 
-/exe @geminiModel(prompt, model) = run @prompt | { gemini --prompt - --model @model }
+exe @geminiModel(prompt, model) = run @prompt | { gemini --prompt - --model @model }
 
-/export {
+export {
   @claude, @claudeJson, @claudeModel, @claudeTools,
   @codex, @codexModel, @codexDir,
   @gemini, @geminiJson, @geminiModel

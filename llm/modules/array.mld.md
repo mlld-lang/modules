@@ -137,16 +137,16 @@ Create and modify arrays.
 All array operations return native JavaScript values and handle edge cases safely. Boolean operations return actual booleans, numeric operations return numbers, and array operations return arrays or objects:
 
 ```mlld-run
-/exe @length(array) = js {(Array.isArray(array) ? array.length : 0)}
-/exe @first(array) = js {(Array.isArray(array) && array.length > 0 ? array[0] : null)}
-/exe @last(array) = js {(Array.isArray(array) && array.length > 0 ? array[array.length - 1] : null)}
-/exe @at(array, index) = js {(Array.isArray(array) ? array[index] : null)}
-/exe @slice(array, start, end) = js {(Array.isArray(array) ? array.slice(start, end) : [])}
+exe @length(array) = js {(Array.isArray(array) ? array.length : 0)}
+exe @first(array) = js {(Array.isArray(array) && array.length > 0 ? array[0] : null)}
+exe @last(array) = js {(Array.isArray(array) && array.length > 0 ? array[array.length - 1] : null)}
+exe @at(array, index) = js {(Array.isArray(array) ? array[index] : null)}
+exe @slice(array, start, end) = js {(Array.isArray(array) ? array.slice(start, end) : [])}
 
-/exe @reverse(array) = js {(Array.isArray(array) ? array.slice().reverse() : [])}
-/exe @sort(array) = js {(Array.isArray(array) ? array.slice().sort() : [])}
-/exe @sortBy(array, key) = js {(
-  Array.isArray(array) 
+exe @reverse(array) = js {(Array.isArray(array) ? array.slice().reverse() : [])}
+exe @sort(array) = js {(Array.isArray(array) ? array.slice().sort() : [])}
+exe @sortBy(array, key) = js {(
+  Array.isArray(array)
     ? array.slice().sort((a, b) => {
         const aVal = a[key];
         const bVal = b[key];
@@ -156,47 +156,47 @@ All array operations return native JavaScript values and handle edge cases safel
       })
     : []
 )}
-/exe @unique(array) = js {(Array.isArray(array) ? [...new Set(array)] : [])}
+exe @unique(array) = js {(Array.isArray(array) ? [...new Set(array)] : [])}
 
-/exe @filter(array, key, value) = js {(
-  Array.isArray(array) 
+exe @filter(array, key, value) = js {(
+  Array.isArray(array)
     ? array.filter(item => item[key] == value)
     : []
 )}
-/exe @filterGreater(array, key, value) = js {(
-  Array.isArray(array) 
+exe @filterGreater(array, key, value) = js {(
+  Array.isArray(array)
     ? array.filter(item => Number(item[key]) > Number(value))
     : []
 )}
 
-/exe @pluck(array, key) = js {(
-  Array.isArray(array) 
+exe @pluck(array, key) = js {(
+  Array.isArray(array)
     ? array.map(item => item[key])
     : []
 )}
 
-/exe @find(array, key, value) = js {(
-  Array.isArray(array) 
+exe @find(array, key, value) = js {(
+  Array.isArray(array)
     ? array.find(item => item[key] == value) || null
     : null
 )}
-/exe @includes(array, value) = js {(
+exe @includes(array, value) = js {(
   Array.isArray(array) && array.includes(value)
 )}
 
-/exe @sum(array, key) = js {(
-  Array.isArray(array) 
+exe @sum(array, key) = js {(
+  Array.isArray(array)
     ? array.reduce((sum, item) => sum + Number(key ? item[key] : item), 0)
     : 0
 )}
-/exe @avg(array, key) = js {(
+exe @avg(array, key) = js {(
   Array.isArray(array) && array.length > 0
     ? array.reduce((sum, item) => sum + Number(key ? item[key] : item), 0) / array.length
     : 0
 )}
 
-/exe @groupBy(array, key) = js {(
-  Array.isArray(array) 
+exe @groupBy(array, key) = js {(
+  Array.isArray(array)
     ? array.reduce((groups, item) => {
         const group = String(item[key]);
         if (!groups[group]) groups[group] = [];
@@ -206,16 +206,16 @@ All array operations return native JavaScript values and handle edge cases safel
     : {}
 )}
 
-/exe @push(array, value) = js {(
+exe @push(array, value) = js {(
   [...(Array.isArray(array) ? array : []), value]
 )}
-/exe @remove(array, index) = js {(
-  Array.isArray(array) 
+exe @remove(array, index) = js {(
+  Array.isArray(array)
     ? array.filter((_, i) => i !== Number(index))
     : []
 )}
 
-/exe @range(start, end, step) = js {(
+exe @range(start, end, step) = js {(
   Array.from(
     { length: Math.ceil((end - start) / (step || 1)) },
     (_, i) => start + i * (step || 1)
@@ -223,7 +223,7 @@ All array operations return native JavaScript values and handle edge cases safel
 )}
 
 >> Shadow environment to make functions available to each other
-/exe js = { length, first, last, at, slice, reverse, sort, sortBy, unique, filter, filterGreater, pluck, find, includes, sum, avg, groupBy, push, remove, range }
+exe js = { length, first, last, at, slice, reverse, sort, sortBy, unique, filter, filterGreater, pluck, find, includes, sum, avg, groupBy, push, remove, range }
 
-/export { @length, @first, @last, @at, @slice, @reverse, @sort, @sortBy, @unique, @filter, @filterGreater, @pluck, @find, @includes, @sum, @avg, @groupBy, @push, @remove, @range }
+export { @length, @first, @last, @at, @slice, @reverse, @sort, @sortBy, @unique, @filter, @filterGreater, @pluck, @find, @includes, @sum, @avg, @groupBy, @push, @remove, @range }
 ```

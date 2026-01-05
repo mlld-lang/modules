@@ -23,18 +23,18 @@ GitHub operations via the GitHub REST API. Simplifies working with pull requests
 Common GitHub operations made easy:
 
 ```mlld
-/import { github } from @mlld/github
+import { github } from @mlld/github
 
 >> Get PR information
-/var @prData = @github.pr.view(123, "owner/repo")
-/show `PR Title: @prData.title`
+var @prData = @github.pr.view(123, "owner/repo")
+show `PR Title: @prData.title`
 
 >> Post a comment
-/run @github.pr.comment(123, "owner/repo", "LGTM! 🚀")
+run @github.pr.comment(123, "owner/repo", "LGTM! 🚀")
 
 >> Check if user is a collaborator
-/var @isCollab = @github.collab.check("octocat", "owner/repo")
-/when @isCollab => /show "User has write access"
+var @isCollab = @github.collab.check("octocat", "owner/repo")
+when @isCollab => show "User has write access"
 ```
 
 ## docs
@@ -71,11 +71,11 @@ Get PR data as JSON. Default fields include number, title, author, state, body, 
 - `error`: Error message if request fails
 
 ```mlld
-/var @pr = @github.pr.view(123, "mlld-lang/mlld")
-/show `PR #@pr.number: @pr.title by @pr.author.login`
+var @pr = @github.pr.view(123, "mlld-lang/mlld")
+show `PR #@pr.number: @pr.title by @pr.author.login`
 
 >> Custom fields
-/var @prDetails = @github.pr.view(123, "owner/repo", "number,title,labels,milestone")
+var @prDetails = @github.pr.view(123, "owner/repo", "number,title,labels,milestone")
 ```
 
 #### `pr.files(number, repo)`
@@ -95,8 +95,8 @@ Get the list of files changed in a PR with metadata.
 - `sha`: File SHA hash
 
 ```mlld
-/var @files = @github.pr.files(123, "owner/repo")
-/for @file in @files => /show `@file.filename: +@file.additions -@file.deletions`
+var @files = @github.pr.files(123, "owner/repo")
+for @file in @files => show `@file.filename: +@file.additions -@file.deletions`
 
 >> Example file object:
 >> {
@@ -122,10 +122,10 @@ Get the diff for a PR, optionally filtered by paths.
 
 ```mlld
 >> Get full diff
-/var @diff = @github.pr.diff(123, "owner/repo")
+var @diff = @github.pr.diff(123, "owner/repo")
 
 >> Get diff for specific paths
-/var @srcDiff = @github.pr.diff(123, "owner/repo", "src/**/*.js")
+var @srcDiff = @github.pr.diff(123, "owner/repo", "src/**/*.js")
 
 >> Example output:
 >> "diff --git a/file.js b/file.js
@@ -150,13 +150,13 @@ List PRs with various filters.
 
 ```mlld
 >> List open PRs
-/var @openPRs = @github.pr.list("owner/repo")
+var @openPRs = @github.pr.list("owner/repo")
 
 >> List PRs by author
-/var @myPRs = @github.pr.list("owner/repo", "--author @me")
+var @myPRs = @github.pr.list("owner/repo", "--author @me")
 
 >> List PRs with specific labels
-/var @bugPRs = @github.pr.list("owner/repo", "--label bug")
+var @bugPRs = @github.pr.list("owner/repo", "--label bug")
 ```
 
 #### `pr.comment(number, repo, body)`
@@ -171,7 +171,7 @@ Add a comment to a PR.
 - `html_url`: Web URL for the comment
 
 ```mlld
-/run @github.pr.comment(456, "owner/repo", "Thanks for the contribution!")
+run @github.pr.comment(456, "owner/repo", "Thanks for the contribution!")
 ```
 
 #### `pr.review(number, repo, event, body)`
@@ -186,9 +186,9 @@ Create a PR review with approve/request-changes/comment.
 - `submitted_at`: ISO date string
 
 ```mlld
-/run @github.pr.review(789, "owner/repo", "approve", "LGTM!")
-/run @github.pr.review(789, "owner/repo", "request-changes", "Please update the tests")
-/run @github.pr.review(789, "owner/repo", "comment", "Looking good so far")
+run @github.pr.review(789, "owner/repo", "approve", "LGTM!")
+run @github.pr.review(789, "owner/repo", "request-changes", "Please update the tests")
+run @github.pr.review(789, "owner/repo", "comment", "Looking good so far")
 ```
 
 #### `pr.edit(number, repo, options)`
@@ -199,13 +199,13 @@ Edit PR properties like title, labels, or assignees.
 
 ```mlld
 >> Add labels
-/run @github.pr.edit(123, "owner/repo", "--add-label bug,priority-high")
+run @github.pr.edit(123, "owner/repo", "--add-label bug,priority-high")
 
 >> Change title
-/run @github.pr.edit(123, "owner/repo", "--title 'fix: resolve memory leak'")
+run @github.pr.edit(123, "owner/repo", "--title 'fix: resolve memory leak'")
 
 >> Assign reviewers
-/run @github.pr.edit(123, "owner/repo", "--add-reviewer alice,bob")
+run @github.pr.edit(123, "owner/repo", "--add-reviewer alice,bob")
 ```
 
 ### Issue Operations
@@ -224,8 +224,8 @@ Create a new issue.
 - `html_url`: Web URL for the issue
 
 ```mlld
-/var @issue = @github.issue.create("owner/repo", "Bug: App crashes on startup", "Details: ...")
-/show `Created issue #@issue.number`
+var @issue = @github.issue.create("owner/repo", "Bug: App crashes on startup", "Details: ...")
+show `Created issue #@issue.number`
 ```
 
 #### `issue.list(repo, options?)`
@@ -242,10 +242,10 @@ List issues with filters.
 
 ```mlld
 >> List open issues
-/var @issues = @github.issue.list("owner/repo")
+var @issues = @github.issue.list("owner/repo")
 
 >> List bugs assigned to me
-/var @myBugs = @github.issue.list("owner/repo", "--assignee @me --label bug")
+var @myBugs = @github.issue.list("owner/repo", "--assignee @me --label bug")
 ```
 
 #### `issue.comment(number, repo, body)`
@@ -255,7 +255,7 @@ Add a comment to an issue.
 **Returns:** Comment object (same structure as pr.comment())
 
 ```mlld
-/run @github.issue.comment(456, "owner/repo", "I can reproduce this issue")
+run @github.issue.comment(456, "owner/repo", "I can reproduce this issue")
 ```
 
 ### Repository Operations
@@ -277,8 +277,8 @@ Get repository information.
 - `default_branch`: Usually "main" or "master"
 
 ```mlld
-/var @repo = @github.repo.view("mlld-lang/mlld")
-/show `Stars: @repo.stargazerCount, Forks: @repo.forkCount`
+var @repo = @github.repo.view("mlld-lang/mlld")
+show `Stars: @repo.stargazerCount, Forks: @repo.forkCount`
 ```
 
 #### `repo.clone(repo, dir?)`
@@ -288,7 +288,7 @@ Clone a repository.
 **Returns:** String with clone confirmation message or error
 
 ```mlld
-/run @github.repo.clone("owner/repo", "./local-copy")
+run @github.repo.clone("owner/repo", "./local-copy")
 ```
 
 ### Collaborator & Permission Checks
@@ -302,8 +302,8 @@ Check if a user is a collaborator (has write access).
 - `false` if user does not have write access or on error
 
 ```mlld
-/var @hasAccess = @github.collab.check("alice", "owner/repo")
-/when @hasAccess => /run @github.pr.review(123, "owner/repo", "approve", "Auto-approved for collaborator")
+var @hasAccess = @github.collab.check("alice", "owner/repo")
+when @hasAccess => /run @github.pr.review(123, "owner/repo", "approve", "Auto-approved for collaborator")
 ```
 
 ### Workflow Operations
@@ -321,7 +321,7 @@ Trigger a GitHub Actions workflow.
 - `created_at`: ISO date string
 
 ```mlld
-/run @github.workflow.run("owner/repo", "deploy.yml", "--ref main")
+run @github.workflow.run("owner/repo", "deploy.yml", "--ref main")
 ```
 
 #### `workflow.list(repo)`
@@ -331,8 +331,8 @@ List workflow runs.
 **Returns:** Array of workflow run objects (same structure as workflow.run())
 
 ```mlld
-/var @runs = @github.workflow.list("owner/repo")
-/show `Latest run: @runs.0.name - @runs.0.conclusion`
+var @runs = @github.workflow.list("owner/repo")
+show `Latest run: @runs.0.name - @runs.0.conclusion`
 ```
 
 ### Error Handling
@@ -340,8 +340,8 @@ List workflow runs.
 All methods return an object with an `error` property when requests fail:
 
 ```mlld
-/var @result = @github.repo.view("nonexistent/repo")
-/when @result.error => /show `Error: @result.error`
+var @result = @github.repo.view("nonexistent/repo")
+when @result.error => show `Error: @result.error`
 
 >> Common error responses:
 >> - 404: Repository, PR, or issue not found
@@ -357,7 +357,7 @@ GitHub operations via the GitHub REST API:
 
 ```mlld-run
 >> STEP 1: Define the helper function (must be async)
-/exe @github_request(@method, @endpoint, @body) = js {
+exe @github_request(@method, @endpoint, @body) = js {
   return (async () => {
     const token = process.env.MLLD_GITHUB_TOKEN;
     if (!token) {
@@ -416,11 +416,11 @@ GitHub operations via the GitHub REST API:
 
 >> STEP 2: Set up the shadow environment with github_request IMMEDIATELY
 >> This must happen BEFORE defining any functions that use github_request
-/exe js = { github_request }
+exe js = { github_request }
 
 >> STEP 3: Now define all functions that use github_request
 >> Pull Request operations
-/exe @pr_view(@number, @repo, @fields) = js {
+exe @pr_view(@number, @repo, @fields) = js {
   return (async () => {
     const result = await github_request('GET', `repos/${repo}/pulls/${number}`);
     
@@ -449,7 +449,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @pr_files(@number, @repo) = js {
+exe @pr_files(@number, @repo) = js {
   return (async () => {
     const result = await github_request('GET', `repos/${repo}/pulls/${number}/files`);
     
@@ -462,7 +462,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @pr_diff(@number, @repo, @paths) = js {
+exe @pr_diff(@number, @repo, @paths) = js {
   return (async () => {
     const headers = {
       'Accept': 'application/vnd.github.v3.diff'
@@ -512,7 +512,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @pr_list(@repo, @options) = js {
+exe @pr_list(@repo, @options) = js {
   return (async () => {
     let endpoint = `repos/${repo}/pulls`;
     const params = new URLSearchParams();
@@ -544,7 +544,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @pr_comment(@number, @repo, @body) = js {
+exe @pr_comment(@number, @repo, @body) = js {
   return (async () => {
     return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
       body: body
@@ -552,7 +552,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @pr_review(@number, @repo, @event, @body) = js {
+exe @pr_review(@number, @repo, @event, @body) = js {
   return (async () => {
     const eventMap = {
       'approve': 'APPROVE',
@@ -569,7 +569,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @pr_edit(@number, @repo, @options) = js {
+exe @pr_edit(@number, @repo, @options) = js {
   return (async () => {
     const updateData = {};
     
@@ -590,7 +590,7 @@ GitHub operations via the GitHub REST API:
 }
 
 >> Issue operations
-/exe @issue_create(@repo, @title, @body) = js {
+exe @issue_create(@repo, @title, @body) = js {
   return (async () => {
     return await github_request('POST', `repos/${repo}/issues`, {
       title: title,
@@ -599,7 +599,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @issue_list(@repo, @options) = js {
+exe @issue_list(@repo, @options) = js {
   return (async () => {
     let endpoint = `repos/${repo}/issues`;
     const params = new URLSearchParams();
@@ -629,7 +629,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @issue_comment(@number, @repo, @body) = js {
+exe @issue_comment(@number, @repo, @body) = js {
   return (async () => {
     return await github_request('POST', `repos/${repo}/issues/${number}/comments`, {
       body: body
@@ -638,7 +638,7 @@ GitHub operations via the GitHub REST API:
 }
 
 >> Repository operations
-/exe @repo_view(@repo, @fields) = js {
+exe @repo_view(@repo, @fields) = js {
   return (async () => {
     const result = await github_request('GET', `repos/${repo}`);
     
@@ -662,7 +662,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @repo_clone(@repo, @dir) = js {
+exe @repo_clone(@repo, @dir) = js {
   return (async () => {
     // Note: This returns clone information, not actual cloning
     // For actual git operations, use shell commands or git APIs
@@ -683,7 +683,7 @@ GitHub operations via the GitHub REST API:
 }
 
 >> Collaborator checks
-/exe @collab_check(@user, @repo) = js {
+exe @collab_check(@user, @repo) = js {
   return (async () => {
     const result = await github_request('GET', `repos/${repo}/collaborators/${user}`);
     
@@ -697,7 +697,7 @@ GitHub operations via the GitHub REST API:
 }
 
 >> Workflow operations
-/exe @workflow_run(@repo, @workflow, @options) = js {
+exe @workflow_run(@repo, @workflow, @options) = js {
   return (async () => {
     // First, get the workflow ID if a name was provided
     let workflowId = workflow;
@@ -726,7 +726,7 @@ GitHub operations via the GitHub REST API:
   })();
 }
 
-/exe @workflow_list(@repo) = js {
+exe @workflow_list(@repo) = js {
   return (async () => {
     return await github_request('GET', `repos/${repo}/actions/runs`);
   })();
@@ -734,7 +734,7 @@ GitHub operations via the GitHub REST API:
 
 >> STEP 4: Update shadow environment to include ALL functions
 >> This ensures all functions are available to each other
-/exe @js = { 
+exe @js = { 
   github_request,
   pr_view, pr_files, pr_diff, pr_list, pr_comment, pr_review, pr_edit,
   issue_create, issue_list, issue_comment,
@@ -744,7 +744,7 @@ GitHub operations via the GitHub REST API:
 }
 
 >> STEP 5: Export module structure
-/var @pr = {
+var @pr = {
   view: @pr_view,
   files: @pr_files,
   diff: @pr_diff,
@@ -754,27 +754,27 @@ GitHub operations via the GitHub REST API:
   edit: @pr_edit
 }
 
-/var @issue = {
+var @issue = {
   create: @issue_create,
   list: @issue_list,
   comment: @issue_comment
 }
 
-/var @repo = {
+var @repo = {
   view: @repo_view,
   clone: @repo_clone
 }
 
-/var @collab = {
+var @collab = {
   check: @collab_check
 }
 
-/var @workflow = {
+var @workflow = {
   run: @workflow_run,
   list: @workflow_list
 }
 
-/var @github = {
+var @github = {
   pr: @pr,
   issue: @issue,
   repo: @repo,
@@ -782,5 +782,5 @@ GitHub operations via the GitHub REST API:
   workflow: @workflow
 }
 
-/export { @github, @pr, @issue, @repo, @collab, @workflow }
+export { @github, @pr, @issue, @repo, @collab, @workflow }
 ```

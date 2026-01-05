@@ -23,19 +23,19 @@ Environment variable validation and management for mlld workflows. Ensures requi
 Essential environment management:
 
 ```mlld
-/import { env } from @mlld/env
+import { env } from @mlld/env
 
 >> Validate required variables
-/var @valid = @env.validate(["API_KEY", "DATABASE_URL"])
-/when @valid.valid => /show "All environment variables present"
-/when !@valid.valid => /show `Missing: @valid.missing`
+var @valid = @env.validate(["API_KEY", "DATABASE_URL"])
+when @valid.valid => show "All environment variables present"
+when !@valid.valid => show `Missing: @valid.missing`
 
 >> Get with fallback
-/var @port = @env.get("PORT", "3000")
-/show `Server running on port @port`
+var @port = @env.get("PORT", "3000")
+show `Server running on port @port`
 
 >> Check if in CI
-/when @env.isCI() => /show "Running in CI environment"
+when @env.isCI() => show "Running in CI environment"
 ```
 
 ## docs
@@ -48,16 +48,16 @@ Validate that environment variables exist and have content. Accepts a single var
 
 ```mlld
 >> Single variable
-/var @check = @env.validate("API_KEY")
-/show @check.summary
+var @check = @env.validate("API_KEY")
+show @check.summary
 
 >> Multiple variables
-/var @validation = @env.validate(["DATABASE_URL", "REDIS_URL", "SECRET_KEY"])
-/when !@validation.valid => /show `Missing variables: @validation.missing`
+var @validation = @env.validate(["DATABASE_URL", "REDIS_URL", "SECRET_KEY"])
+when !@validation.valid => show `Missing variables: @validation.missing`
 
 >> Access detailed results
-/var @details = @env.validate(["API_KEY", "TOKEN"])
-/show `Checked: @details.checked, Found: @details.found`
+var @details = @env.validate(["API_KEY", "TOKEN"])
+show `Checked: @details.checked, Found: @details.found`
 ```
 
 The validation result includes:
@@ -73,8 +73,8 @@ Like validate, but shows an error and returns empty string if any variables are 
 
 ```mlld
 >> This will show error and stop if variables are missing
-/var @ready = @env.require(["API_KEY", "DATABASE_URL"])
-/when @ready => /show "Environment ready"
+var @ready = @env.require(["API_KEY", "DATABASE_URL"])
+when @ready => show "Environment ready"
 ```
 
 ### Access
@@ -84,9 +84,9 @@ Like validate, but shows an error and returns empty string if any variables are 
 Get an environment variable with optional fallback value.
 
 ```mlld
-/var @apiUrl = @env.get("API_URL", "https://api.example.com")
-/var @debug = @env.get("DEBUG", "false")
-/var @workers = @env.get("WORKER_COUNT", "4")
+var @apiUrl = @env.get("API_URL", "https://api.example.com")
+var @debug = @env.get("DEBUG", "false")
+var @workers = @env.get("WORKER_COUNT", "4")
 ```
 
 #### `getAll(names)`
@@ -94,8 +94,8 @@ Get an environment variable with optional fallback value.
 Get multiple environment variables at once.
 
 ```mlld
-/var @config = @env.getAll(["PORT", "HOST", "PROTOCOL"])
-/show `Server: @config.PROTOCOL://@config.HOST:@config.PORT`
+var @config = @env.getAll(["PORT", "HOST", "PROTOCOL"])
+show `Server: @config.PROTOCOL://@config.HOST:@config.PORT`
 ```
 
 ### Security
@@ -105,9 +105,9 @@ Get multiple environment variables at once.
 Mask sensitive values for logging (shows first 3 and last 3 characters).
 
 ```mlld
-/var @token = @env.get("API_TOKEN")
-/var @masked = @env.mask(@token)
-/show `Using token: @masked`  >> "Using token: abc***xyz"
+var @token = @env.get("API_TOKEN")
+var @masked = @env.mask(@token)
+show `Using token: @masked`  >> "Using token: abc***xyz"
 ```
 
 #### `exists(name)`
@@ -115,7 +115,7 @@ Mask sensitive values for logging (shows first 3 and last 3 characters).
 Check if an environment variable exists without retrieving its value.
 
 ```mlld
-/when @env.exists("PRODUCTION") => /show "Production mode enabled"
+when @env.exists("PRODUCTION") => show "Production mode enabled"
 ```
 
 ### CI/CD Detection
@@ -125,9 +125,9 @@ Check if an environment variable exists without retrieving its value.
 Detect if running in a continuous integration environment.
 
 ```mlld
-/var @ci = @env.isCI()
-/when @ci => /show "Running in CI"
-/when !@ci => /show "Running locally"
+var @ci = @env.isCI()
+when @ci => show "Running in CI"
+when !@ci => show "Running locally"
 ```
 
 #### `ciProvider()`
@@ -135,8 +135,8 @@ Detect if running in a continuous integration environment.
 Get the name of the CI provider if detected.
 
 ```mlld
-/var @provider = @env.ciProvider()
-/show `CI Provider: @provider`  >> "GitHub Actions", "GitLab CI", etc.
+var @provider = @env.ciProvider()
+show `CI Provider: @provider`  >> "GitHub Actions", "GitLab CI", etc.
 ```
 
 ### Configuration
@@ -146,8 +146,8 @@ Get the name of the CI provider if detected.
 Load environment variables from a file (like .env).
 
 ```mlld
-/run @env.load(".env.local")
-/var @loaded = @env.get("NEW_VARIABLE")
+run @env.load(".env.local")
+var @loaded = @env.get("NEW_VARIABLE")
 ```
 
 #### `export(name, value)`
@@ -155,8 +155,8 @@ Load environment variables from a file (like .env).
 Export a new environment variable for child processes.
 
 ```mlld
-/run @env.export("MY_VAR", "my-value")
-/run {echo $MY_VAR}  >> "my-value"
+run @env.export("MY_VAR", "my-value")
+run {echo $MY_VAR}  >> "my-value"
 ```
 
 ## module
@@ -165,7 +165,7 @@ Environment variable utilities:
 
 ```mlld-run
 >> Validation
-/exe @validate(@required) = js {
+exe @validate(@required) = js {
   // Handle both single string and array inputs
   const vars = Array.isArray(required) ? required : [required];
   
@@ -195,7 +195,7 @@ Environment variable utilities:
   };
 }
 
-/exe @require(@variables) = js {
+exe @require(@variables) = js {
   // Duplicate the validation logic here since we can't call @validate from within js
   const vars = Array.isArray(variables) ? variables : [variables];
   
@@ -221,11 +221,11 @@ Environment variable utilities:
 }
 
 >> Access
-/exe @get(@name, @fallback) = js {
+exe @get(@name, @fallback) = js {
   return process.env[name] || fallback || '';
 }
 
-/exe @getAll(@names) = js {
+exe @getAll(@names) = js {
   const result = {};
   const varNames = Array.isArray(names) ? names : [names];
   varNames.forEach(name => {
@@ -235,19 +235,19 @@ Environment variable utilities:
 }
 
 >> Security
-/exe @mask(@value) = js {
+exe @mask(@value) = js {
   if (!value || value.length < 8) {
     return '***';
   }
   return value.substring(0, 3) + '***' + value.substring(value.length - 3);
 }
 
-/exe @exists(@name) = js {
+exe @exists(@name) = js {
   return process.env.hasOwnProperty(name) ? "true" : "";
 }
 
 >> CI/CD Detection
-/exe @isCI() = js {
+exe @isCI() = js {
   // Check common CI environment variables
   const ciVars = ['CI', 'CONTINUOUS_INTEGRATION', 'BUILD_ID', 'CI_NAME'];
   const providers = {
@@ -280,7 +280,7 @@ Environment variable utilities:
   return "";
 }
 
-/exe @ciProvider() = js {
+exe @ciProvider() = js {
   const providers = {
     'GITHUB_ACTIONS': 'GitHub Actions',
     'GITLAB_CI': 'GitLab CI',
@@ -314,7 +314,7 @@ Environment variable utilities:
 }
 
 >> Configuration
-/exe @load(@path) = sh {
+exe @load(@path) = sh {
   if [ -f "$path" ]; then
     # Export variables from file
     set -a
@@ -326,13 +326,13 @@ Environment variable utilities:
   fi
 }
 
-/exe @setEnv(@name, @value) = sh {
+exe @setEnv(@name, @value) = sh {
   export "$name"="$value"
   echo "✅ Exported $name"
 }
 
 >> Main export
-/var @env = {
+var @env = {
   validate: @validate,
   require: @require,
   get: @get,
@@ -345,5 +345,5 @@ Environment variable utilities:
   export: @setEnv
 }
 
-/export { @env, @get, @set, @has, @isSet, @nodeEnv, @isProd, @isDev, @isTest, @isCI, @ciProvider, @load, @setEnv }
+export { @env, @get, @set, @has, @isSet, @nodeEnv, @isProd, @isDev, @isTest, @isCI, @ciProvider, @load, @setEnv }
 ```

@@ -36,7 +36,7 @@ Provides schema definitions for parsing various Claude CLI streaming event types
 ## module
 
 ```mlld-run
-/var @claudeAgentSdkAdapter = {
+var @claudeAgentSdkAdapter = {
   name: "claude-agent-sdk",
   format: "ndjson",
   schemas: [
@@ -189,5 +189,5 @@ Provides schema definitions for parsing various Claude CLI streaming event types
   ]
 }
 
-/export { @claudeAgentSdkAdapter }
+export { @claudeAgentSdkAdapter }
 ```
