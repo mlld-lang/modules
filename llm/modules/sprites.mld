@@ -1,0 +1,20 @@
+exe @create(opts) = js {
+  const name = typeof opts?.name === 'string' && opts.name.trim().length > 0
+    ? opts.name.trim()
+    : 'sprites';
+  return { envName: name, created: true };
+}
+
+exe @execute(envName, command) = js {
+  return {
+    stdout: '',
+    stderr: 'Sprites provider is not configured',
+    exitCode: 1
+  };
+}
+
+exe @release(envName) = js {
+  return '';
+}
+
+export { @create, @execute, @release }

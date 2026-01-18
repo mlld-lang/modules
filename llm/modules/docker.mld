@@ -1,0 +1,163 @@
+exe @create(opts) = node {
+  const { spawnSync } = require('child_process');
+
+  const config = opts || {};
+  const name = typeof config.name === 'string' && config.name.trim().length > 0
+    ? config.name.trim()
+    : '';
+  const image = typeof config.from === 'string' && config.from.trim().length > 0
+    ? config.from.trim()
+    : (typeof config.image === 'string' && config.image.trim().length > 0
+      ? config.image.trim()
+      : '');
+
+  const runDocker = (args, input) => {
+    const result = spawnSync('docker', args, { encoding: 'utf8', input });
+    const status = typeof result.status === 'number' ? result.status : 1;
+    if (result.error) {
+      return { stdout: '', stderr: result.error.message, status };
+    }
+    return { stdout: result.stdout || '', stderr: result.stderr || '', status };
+  };
+
+  if (!image) {
+    throw new Error('Docker provider requires opts.image or opts.from');
+  }
+
+  if (name) {
+    const inspect = runDocker(['inspect', '-f', '{{.State.Running}}', name]);
+    if (inspect.status === 0) {
+      if (inspect.stdout.trim() !== 'true') {
+        const startResult = runDocker(['start', name]);
+        if (startResult.status !== 0) {
+          throw new Error(startResult.stderr || 'Docker start failed');
+        }
+      }
+      return { envName: name, created: false };
+    }
+  }
+
+  const args = ['run', '-d'];
+  if (name) {
+    args.push('--name', name);
+  }
+
+  if (config.net !== undefined && config.net !== null) {
+    if (config.net === 'none' || config.net === 'host' || config.net === 'bridge') {
+      args.push('--network', String(config.net));
+    } else {
+      throw new Error('Docker provider supports net: "none" | "host" | "bridge"');
+    }
+  }
+
+  const limits = config.limits || {};
+  const memory = limits.mem !== undefined && limits.mem !== null
+    ? limits.mem
+    : config.memory;
+  if (memory !== undefined && memory !== null) {
+    args.push('--memory', String(memory));
+  }
+  const cpu = limits.cpu !== undefined && limits.cpu !== null
+    ? limits.cpu
+    : config.cpu;
+  if (cpu !== undefined && cpu !== null) {
+    args.push('--cpus', String(cpu));
+  }
+
+  const addMounts = (mounts, readOnly) => {
+    if (!Array.isArray(mounts)) {
+      return;
+    }
+    for (const mount of mounts) {
+      if (!mount) {
+        continue;
+      }
+      let spec = String(mount);
+      if (readOnly && !spec.endsWith(':ro')) {
+        spec += ':ro';
+      }
+      args.push('-v', spec);
+    }
+  };
+
+  const fsConfig = config.fs || {};
+  addMounts(fsConfig.read, true);
+  addMounts(fsConfig.write, false);
+
+  args.push(image, 'sleep', 'infinity');
+
+  const runResult = runDocker(args);
+  if (runResult.status !== 0) {
+    throw new Error(runResult.stderr || 'Docker run failed');
+  }
+
+  const envName = name || runResult.stdout.trim();
+  if (!envName) {
+    throw new Error('Docker provider create did not return container id');
+  }
+
+  return { envName, created: true };
+}
+
+exe @execute(envName, command) = node {
+  const { spawnSync } = require('child_process');
+
+  if (!envName) {
+    return { stdout: '', stderr: 'Missing envName', exitCode: 1 };
+  }
+
+  const args = ['exec'];
+
+  if (command?.cwd) {
+    args.push('-w', String(command.cwd));
+  }
+
+  const env = {
+    ...(command?.vars || {}),
+    ...(command?.secrets || {})
+  };
+
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+    args.push('-e', `${key}=${String(value)}`);
+  }
+
+  args.push(String(envName));
+
+  const argv = Array.isArray(command?.argv) && command.argv.length > 0
+    ? command.argv.map(value => String(value))
+    : ['sh', '-lc', ''];
+  args.push(...argv);
+
+  const input = command?.stdin ?? undefined;
+  const result = spawnSync('docker', args, { encoding: 'utf8', input });
+
+  if (result.error) {
+    return {
+      stdout: '',
+      stderr: result.error.message,
+      exitCode: typeof result.status === 'number' ? result.status : 1
+    };
+  }
+
+  return {
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    exitCode: typeof result.status === 'number' ? result.status : 0
+  };
+}
+
+exe @release(envName) = node {
+  const { spawnSync } = require('child_process');
+
+  if (!envName) {
+    return '';
+  }
+
+  spawnSync('docker', ['rm', '-f', String(envName)], { encoding: 'utf8' });
+  return '';
+}
+
+export { @create, @execute, @release }
