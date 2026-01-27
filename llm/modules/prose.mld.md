@@ -10,6 +10,8 @@ license: CC0
 mlldVersion: ">=2.0.0-rc78"
 ---
 
+/needs {}
+
 # @mlld/prose
 
 Pre-configured execution configs for OpenProse. Use these with `prose:@config` syntax.
