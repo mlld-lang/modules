@@ -1,11 +1,11 @@
 ---
 name: array
 author: mlld
-version: 2.0.0
+version: 2.1.0
 about: Array operations with native return values
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
-keywords: ["arrays", "lodash", "filter", "map", "find", "includes", "math", "range", "zip", "range", "chunk"]
+keywords: ["arrays", "lodash", "filter", "map", "find", "includes", "math", "range", "zip", "chunk", "flat", "compact", "join", "concat"]
 license: CC0
 mlldVersion: ">=2.0.0-rc78"
 ---
@@ -23,7 +23,7 @@ Array operations for data processing, filtering, and transformation with native 
 Process data arrays with powerful operations:
 
 ```mlld
-/import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
+/import { filter, sortBy, pluck, sum, groupBy, flat, compact } from @mlld/array
 
 /var @users = [
   {"name": "alice", "age": 30, "dept": "engineering"},
@@ -118,6 +118,66 @@ Calculate statistics and group data.
 /var @total = @sum(@sales, "amount")
 /var @average = @avg(@sales, "amount")
 /var @byRegion = @groupBy(@sales, "region")
+```
+
+### Array Shape
+
+#### `flat(array, depth)`, `flatMap(array, key)`, `compact(array)`, `chunk(array, size)`
+
+Reshape nested or sparse arrays.
+
+```mlld
+/var @nested = [[1, 2], [3, 4], [5]]
+/var @flattened = @flat(@nested)
+/>> [1, 2, 3, 4, 5]
+
+/var @users = [{"tags": ["a", "b"]}, {"tags": ["c"]}]
+/var @allTags = @flatMap(@users, "tags")
+/>> ["a", "b", "c"]
+
+/var @sparse = [1, null, 2, false, 0, 3, ""]
+/var @clean = @compact(@sparse)
+/>> [1, 2, 3]
+
+/var @items = [1, 2, 3, 4, 5]
+/var @batches = @chunk(@items, 2)
+/>> [[1, 2], [3, 4], [5]]
+```
+
+### Combining & Searching
+
+#### `concat(a, b)`, `zip(a, b)`, `indexOf(array, value)`, `join(array, separator)`
+
+Combine arrays and convert to strings.
+
+```mlld
+/var @all = @concat([1, 2], [3, 4])
+/>> [1, 2, 3, 4]
+
+/var @keys = ["name", "age"]
+/var @vals = ["alice", 30]
+/var @pairs = @zip(@keys, @vals)
+/>> [["name", "alice"], ["age", 30]]
+
+/var @pos = @indexOf(["a", "b", "c"], "b")
+/>> 1
+
+/var @csv = @join(["alice", "bob", "charlie"], ", ")
+/>> "alice, bob, charlie"
+```
+
+### Boolean Tests
+
+#### `every(array, key, value)`, `some(array, key, value)`
+
+Test whether all or any elements match.
+
+```mlld
+/var @tasks = [{"done": true}, {"done": true}, {"done": false}]
+/var @allDone = @every(@tasks, "done", true)
+/>> false
+/var @anyDone = @some(@tasks, "done", true)
+/>> true
 ```
 
 ### Array Building
@@ -222,8 +282,55 @@ exe @range(start, end, step) = js {(
   )
 )}
 
->> Shadow environment to make functions available to each other
-exe js = { length, first, last, at, slice, reverse, sort, sortBy, unique, filter, filterGreater, pluck, find, includes, sum, avg, groupBy, push, remove, range }
+exe @flat(array, depth) = js {(
+  Array.isArray(array) ? array.flat(depth ?? 1) : []
+)}
+exe @flatMap(array, key) = js {(
+  Array.isArray(array)
+    ? array.flatMap(item => key ? item[key] : item)
+    : []
+)}
 
-export { @length, @first, @last, @at, @slice, @reverse, @sort, @sortBy, @unique, @filter, @filterGreater, @pluck, @find, @includes, @sum, @avg, @groupBy, @push, @remove, @range }
+exe @concat(a, b) = js {(
+  [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]
+)}
+
+exe @indexOf(array, value) = js {(
+  Array.isArray(array) ? array.indexOf(value) : -1
+)}
+
+exe @join(array, separator) = js {(
+  Array.isArray(array) ? array.join(separator ?? ",") : ""
+)}
+
+exe @every(array, key, value) = js {(
+  Array.isArray(array) && array.length > 0 && array.every(item => item[key] == value)
+)}
+exe @some(array, key, value) = js {(
+  Array.isArray(array) && array.some(item => item[key] == value)
+)}
+
+exe @compact(array) = js {(
+  Array.isArray(array) ? array.filter(Boolean) : []
+)}
+
+exe @chunk(array, size) = js {(
+  Array.isArray(array) && size > 0
+    ? Array.from(
+        { length: Math.ceil(array.length / size) },
+        (_, i) => array.slice(i * size, i * size + size)
+      )
+    : []
+)}
+
+exe @zip(a, b) = js {(
+  Array.isArray(a) && Array.isArray(b)
+    ? a.map((item, i) => [item, b[i] ?? null])
+    : []
+)}
+
+>> Shadow environment to make functions available to each other
+exe js = { length, first, last, at, slice, reverse, sort, sortBy, unique, filter, filterGreater, pluck, find, includes, sum, avg, groupBy, push, remove, range, flat, flatMap, concat, indexOf, join, every, some, compact, chunk, zip }
+
+export { @length, @first, @last, @at, @slice, @reverse, @sort, @sortBy, @unique, @filter, @filterGreater, @pluck, @find, @includes, @sum, @avg, @groupBy, @push, @remove, @range, @flat, @flatMap, @concat, @indexOf, @join, @every, @some, @compact, @chunk, @zip }
 ```
