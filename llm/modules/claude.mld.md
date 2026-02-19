@@ -1,13 +1,13 @@
 ---
 name: claude
 author: mlld
-version: 2.0.0
+version: 2.1.0
 about: Claude model primitives for prose execution and direct LLM invocation
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: [llm, ai, anthropic, claude, prose]
 license: CC0
-mlldVersion: ">=2.0.0-rc78"
+mlldVersion: ">=2.0.0-rc81"
 ---
 
 /needs {
@@ -97,22 +97,22 @@ Add a custom system prompt (appends to Claude Code defaults).
 
 ```mlld-run
 >> Model-specific helpers (no tools for pure text tasks)
-exe @haiku(prompt) = @prompt | cmd { claude -p --model haiku --tools "" }
-exe @sonnet(prompt) = @prompt | cmd { claude -p --model sonnet --tools "" }
-exe @opus(prompt) = @prompt | cmd { claude -p --model opus --tools "" }
+exe llm @haiku(prompt) = @prompt | cmd { claude -p --model haiku --tools "" }
+exe llm @sonnet(prompt) = @prompt | cmd { claude -p --model sonnet --tools "" }
+exe llm @opus(prompt) = @prompt | cmd { claude -p --model opus --tools "" }
 
 >> Agent invocation with working directory and tools
 >> - tools="" => disable all tools (--tools "")
 >> - tools="Read,Grep,..." => specific tools (--allowedTools "...")
 >> - tools=null/omitted => use Claude defaults (no flag)
-exe @claude(prompt, model, dir, tools) = when first [
+exe llm @claude(prompt, model, dir, tools) = when [
   @tools == "" => @prompt | cmd:@dir { claude -p --model @model --tools "" }
   @tools => @prompt | cmd:@dir { claude -p --model @model --allowedTools "@tools" }
   * => @prompt | cmd:@dir { claude -p --model @model }
 ]
 
 >> With system prompt (appends to Claude Code defaults)
-exe @claudeWithSystem(prompt, system, model, dir, tools) = when first [
+exe llm @claudeWithSystem(prompt, system, model, dir, tools) = when [
   @tools == "" => @prompt | cmd:@dir { claude -p --model @model --append-system-prompt "@system" --tools "" }
   @tools => @prompt | cmd:@dir { claude -p --model @model --append-system-prompt "@system" --allowedTools "@tools" }
   * => @prompt | cmd:@dir { claude -p --model @model --append-system-prompt "@system" }

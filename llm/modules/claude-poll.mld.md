@@ -1,13 +1,13 @@
 ---
 name: claude-poll
 author: mlld
-version: 1.1.0
+version: 1.2.0
 about: Claude invocation with file-polling completion detection. Works around claude -p process hang by running in background and polling for a marker file or JSONL pattern.
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 keywords: [llm, ai, anthropic, claude, async, polling, jsonl, events]
 license: CC0
-mlldVersion: ">=2.0.0-rc78"
+mlldVersion: ">=2.0.0-rc81"
 ---
 
 /needs {
