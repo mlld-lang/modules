@@ -1,3 +1,14 @@
+---
+name: bravesearch
+author: mlld
+version: 1.0.0
+about: Brave web search results tool
+bugs: https://github.com/mlld-lang/modules/issues
+repo: https://github.com/mlld-lang/modules
+license: CC0
+mlld-version: "2.0.0-rc82"
+---
+
 >> Brave Search API tool
 >> Uses standalone auth directive with keychain+env fallback
 
