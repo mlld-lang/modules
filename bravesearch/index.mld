@@ -1,0 +1,32 @@
+>> Brave Search API tool
+>> Uses standalone auth directive with keychain+env fallback
+
+auth @brave = "BRAVE_API_KEY"
+
+exe net:r @search(query: string, count: number) = node {
+  const limit = count || 5;
+  const res = await fetch(
+    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${limit}&spellcheck=0`,
+    { headers: { 'X-Subscription-Token': process.env.BRAVE_API_KEY } }
+  );
+  if (!res.ok) {
+    return JSON.stringify({ error: true, status: res.status, message: await res.text() });
+  }
+  const data = await res.json();
+  return JSON.stringify(data.web?.results?.map(r => ({
+    title: r.title,
+    url: r.url,
+    snippet: r.description
+  })) || []);
+} using auth:brave with { description: "Search the web using Brave Search API" }
+
+var tools @tools = {
+  search: {
+    mlld: @search,
+    expose: ["query", "count"],
+    labels: ["net:r"],
+    description: "Search the web using Brave Search API"
+  }
+}
+
+export { @search, @tools }

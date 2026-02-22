@@ -1,0 +1,72 @@
+>> Guardable alternative to built-in WebFetch tool
+>> Fetches markdownified content of websites
+>> Serve: mlld mcp mdfetch.mld --tools-collection @tools
+
+>> MLLD_ALLOWED_DOMAINS: comma-separated domains, or "*" for unrestricted
+>> Pass via: --env MLLD_ALLOWED_DOMAINS=github.com,docs.python.org
+
+import { @MLLD_ALLOWED_DOMAINS } from @input
+
+var @allowedDomains = @MLLD_ALLOWED_DOMAINS
+
+>> --- HTML to markdown ---
+
+exe @htmlToMarkdown(html, url) = node {
+  const raw = String(html);
+  const trimmed = raw.trimStart();
+  if (!trimmed.startsWith('<') && !trimmed.toLowerCase().startsWith('<!doctype')) {
+    return raw.slice(0, 50000);
+  }
+  const { JSDOM } = require('jsdom');
+  const { Readability } = require('@mozilla/readability');
+  const dom = new JSDOM(trimmed, { url });
+  const reader = new Readability(dom.window.document);
+  const article = reader.parse();
+  if (!article) {
+    return raw.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 50000);
+  }
+  return `# ${article.title}\n\n${article.textContent.trim()}`.slice(0, 50000);
+}
+
+>> --- Core fetch ---
+
+exe net:r @mdFetch(url: string) = [
+  >> Protocol check
+  when !@url.startsWith("https://") => [
+    => { error: true, message: "Only HTTPS URLs are allowed" }
+  ]
+
+  >> Domain extraction (pure string methods, no js dependency)
+  let @domain = @url.replace("https://", "").split("/")[0].split("?")[0].split(":")[0]
+
+  >> Domain allowlist check
+  when @allowedDomains != "*" && !@allowedDomains.split(",").includes(@domain) => [
+    => { error: true, message: `Domain not in allowlist: @domain` }
+  ]
+
+  >> Fetch with Accept: text/markdown (Cloudflare sites return markdown directly)
+  let @raw = sh { curl -sL -m 30 --max-filesize 5242880 -H "Accept: text/markdown" "$url" }
+
+  >> If response is still HTML, extract content with readability
+  let @content = @htmlToMarkdown(@raw, @url)
+
+  => { url: @url, domain: @domain, content: @content }
+] with { description: "Fetch markdownified web content from a provided HTTPS url" }
+
+>> --- Tool collection ---
+
+var tools @tools = {
+  mdFetch: {
+    mlld: @mdFetch,
+    expose: ["url"],
+    labels: ["net:r"],
+    description: "Fetch markdownified web content from provided HTTPS url"
+  }
+}
+
+export { @guardedFetch, @tools }

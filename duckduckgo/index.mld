@@ -1,0 +1,21 @@
+>> DuckDuckGo web search
+>> Requires: pip install ddgs
+
+exe net:r @search(query: string, maxResults: number) = py {
+  from ddgs import DDGS
+  import json
+  limit = int(maxResults) if maxResults else 5
+  results = DDGS().text(query, max_results=limit)
+  print(json.dumps(results))
+} with { description: "Search DuckDuckGo and return web results" }
+
+var tools @tools = {
+  search: {
+    mlld: @search,
+    expose: ["query", "maxResults"],
+    labels: ["net:r"],
+    description: "Search DuckDuckGo and return web results"
+  }
+}
+
+export { @search, @tools }

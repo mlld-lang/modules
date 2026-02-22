@@ -1,0 +1,6 @@
+name: md-fetch
+author: mlld
+type: library
+about: "Guardable alternative to built-in WebFetch tool. Fetches markdownified content of websites."
+version: 1.0.0
+license: CC0

@@ -1,0 +1,6 @@
+name: duckduckgo
+author: mlld
+type: library
+about: "DuckDuckGo search results tool"
+version: 1.0.0
+license: CC0
