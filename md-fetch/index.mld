@@ -69,4 +69,4 @@ var tools @tools = {
   }
 }
 
-export { @guardedFetch, @tools }
+export { @mdFetch, @tools }
