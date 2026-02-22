@@ -4,3 +4,6 @@ type: library
 about: "Guardable alternative to built-in WebFetch tool. Fetches markdownified content of websites."
 version: 1.0.0
 license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: "2.0.0-rc82"
