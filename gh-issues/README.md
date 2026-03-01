@@ -17,25 +17,29 @@ mlld keychain add GITHUB_TOKEN    # mlld keychain (use auth directive in your sc
 ```mlld
 import { @listIssues, @getIssue, @createIssue } from @mlld/gh-issues
 
-var @issues = @listIssues("owner", "repo") | @parse
+>> Auto-detects owner/repo from git context
+var @issues = @listIssues() | @parse
 show `Found @issues.length issues`
 
-var @issue = @getIssue("owner", "repo", 42) | @parse
+var @issue = @getIssue(null, null, 42) | @parse
 show `#@issue.number @issue.title`
 
-var @new = @createIssue("owner", "repo", "Bug report", "Details here") | @parse
+>> Or pass explicitly
+var @new = @createIssue("acme", "app", "Bug report", "Details here") | @parse
 show `Created #@new.number`
 ```
 
 ## Exports
 
+All functions auto-detect `owner`/`repo` from git context when not provided.
+
 | Function | Labels | Description |
 |----------|--------|-------------|
-| `@listIssues(owner, repo)` | `net:r` | List open issues |
-| `@getIssue(owner, repo, number)` | `net:r` | Get single issue |
-| `@createIssue(owner, repo, title, body)` | `net:rw` | Create issue |
-| `@addComment(owner, repo, number, comment)` | `net:rw` | Add comment |
-| `@closeIssue(owner, repo, number)` | `net:rw` | Close issue |
+| `@listIssues(owner?, repo?)` | `net:r` | List open issues |
+| `@getIssue(owner?, repo?, number)` | `net:r` | Get single issue |
+| `@createIssue(owner?, repo?, title, body)` | `net:rw` | Create issue |
+| `@addComment(owner?, repo?, number, comment)` | `net:rw` | Add comment |
+| `@closeIssue(owner?, repo?, number)` | `net:rw` | Close issue |
 | `@searchIssues(query)` | `net:r` | Search issues |
 | `@tools` | | MCP tools collection |
 
