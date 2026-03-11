@@ -1,0 +1,278 @@
+needs { node: [pg] }
+
+var @defaultLimit = 50
+
+exe @pgStore(action, config, request) = node {
+  const crypto = require('node:crypto');
+  const { Pool } = require('pg');
+
+  const assertIdentifier = (value, label) => {
+    if (typeof value !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+      throw new Error(`Invalid ${label}: ${String(value)}`);
+    }
+    return value;
+  };
+
+  const assertNonEmptyString = (value, label) => {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new Error(`Missing ${label}`);
+    }
+    return value.trim();
+  };
+
+  const toObject = value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value;
+  };
+
+  const toArray = value => Array.isArray(value) ? value : [];
+
+  const normalizeConfig = value => {
+    const cfg = toObject(value);
+    const schema = assertIdentifier(cfg.schema || 'public', 'config.schema');
+    const table = assertIdentifier(cfg.table || 'artifacts', 'config.table');
+    const pgConfig = { ...cfg };
+    if (cfg.url && !cfg.connectionString) {
+      pgConfig.connectionString = cfg.url;
+    }
+    if (cfg.socketPath && !cfg.host) {
+      pgConfig.host = cfg.socketPath;
+    }
+    delete pgConfig.schema;
+    delete pgConfig.table;
+    delete pgConfig.url;
+    delete pgConfig.socketPath;
+    return { schema, table, pgConfig };
+  };
+
+  const quote = value => `"${value}"`;
+
+  const toStoredRecord = (row, cfg) => {
+    if (!row) {
+      return null;
+    }
+    const normalizeId = value => {
+      if (typeof value === 'bigint') {
+        return Number(value);
+      }
+      if (typeof value === 'string' && /^[0-9]+$/.test(value)) {
+        const asNumber = Number(value);
+        return Number.isSafeInteger(asNumber) ? asNumber : value;
+      }
+      return value;
+    };
+    const toPlain = value => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      }
+      return value;
+    };
+    return {
+      backend: 'pg',
+      path: row.path || `${row.collection}/${row.artifact_key}`,
+      schema: cfg.schema,
+      table: cfg.table,
+      id: normalizeId(row.id),
+      collection: row.collection,
+      key: row.artifact_key,
+      payload: toPlain(row.payload_json),
+      meta: toPlain(row.meta_json) || {},
+      labels: toPlain(row.labels_json) || [],
+      provenance: toPlain(row.provenance_json) || {},
+      mx: toPlain(row.mx_json) || {},
+      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+      updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
+    };
+  };
+
+  const normalizeMeta = (meta, mx) => {
+    const mxObj = toObject(mx);
+    return {
+      meta: toObject(meta),
+      labels: toArray(mxObj.labels),
+      provenance: {
+        taint: toArray(mxObj.taint),
+        sources: toArray(mxObj.sources)
+      },
+      mx: mxObj
+    };
+  };
+
+  const cfg = normalizeConfig(config);
+  const req = toObject(request);
+  const schemaTable = `${quote(cfg.schema)}.${quote(cfg.table)}`;
+  const createdIndex = quote(`${cfg.table}_collection_created_idx`);
+  const pool = new Pool(cfg.pgConfig);
+
+  try {
+    await pool.query(`CREATE SCHEMA IF NOT EXISTS ${quote(cfg.schema)}`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaTable} (
+        id BIGSERIAL PRIMARY KEY,
+        collection TEXT NOT NULL,
+        artifact_key TEXT NOT NULL,
+        payload_json JSONB NOT NULL,
+        meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        labels_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        provenance_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        mx_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT ${quote(`${cfg.table}_collection_key_unique`)} UNIQUE (collection, artifact_key)
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS ${createdIndex}
+      ON ${schemaTable} (collection, created_at DESC, id DESC)
+    `);
+
+    if (action === 'ensure') {
+      return { backend: 'pg', schema: cfg.schema, table: cfg.table, ready: true };
+    }
+
+    if (action === 'put') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const key = assertNonEmptyString(req.key, 'key');
+      const record = normalizeMeta(req.meta, req.mx);
+      const result = await pool.query(`
+        INSERT INTO ${schemaTable} (
+          collection,
+          artifact_key,
+          payload_json,
+          meta_json,
+          labels_json,
+          provenance_json,
+          mx_json,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, NOW(), NOW())
+        ON CONFLICT (collection, artifact_key) DO UPDATE SET
+          payload_json = EXCLUDED.payload_json,
+          meta_json = EXCLUDED.meta_json,
+          labels_json = EXCLUDED.labels_json,
+          provenance_json = EXCLUDED.provenance_json,
+          mx_json = EXCLUDED.mx_json,
+          updated_at = NOW()
+        RETURNING id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+      `, [
+        collection,
+        key,
+        JSON.stringify(req.payload),
+        JSON.stringify(record.meta),
+        JSON.stringify(record.labels),
+        JSON.stringify(record.provenance),
+        JSON.stringify(record.mx)
+      ]);
+      return toStoredRecord({ ...result.rows[0], path: `${collection}/${key}` }, cfg);
+    }
+
+    if (action === 'append') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const key = req.key && String(req.key).trim().length > 0
+        ? String(req.key).trim()
+        : crypto.randomUUID();
+      const record = normalizeMeta(req.meta, req.mx);
+      const result = await pool.query(`
+        INSERT INTO ${schemaTable} (
+          collection,
+          artifact_key,
+          payload_json,
+          meta_json,
+          labels_json,
+          provenance_json,
+          mx_json,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, NOW(), NOW())
+        RETURNING id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+      `, [
+        collection,
+        key,
+        JSON.stringify(req.payload),
+        JSON.stringify(record.meta),
+        JSON.stringify(record.labels),
+        JSON.stringify(record.provenance),
+        JSON.stringify(record.mx)
+      ]);
+      return toStoredRecord({ ...result.rows[0], path: `${collection}/${key}` }, cfg);
+    }
+
+    if (action === 'get') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const key = assertNonEmptyString(req.key, 'key');
+      const result = await pool.query(`
+        SELECT id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+        FROM ${schemaTable}
+        WHERE collection = $1 AND artifact_key = $2
+      `, [collection, key]);
+      return toStoredRecord(result.rows[0], cfg);
+    }
+
+    if (action === 'list') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const limit = Number.isFinite(Number(req.limit)) && Number(req.limit) > 0
+        ? Number(req.limit)
+        : 50;
+      const result = await pool.query(`
+        SELECT id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+        FROM ${schemaTable}
+        WHERE collection = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT $2
+      `, [collection, limit]);
+      return result.rows.map(row => toStoredRecord(row, cfg));
+    }
+
+    throw new Error(`Unsupported action: ${String(action)}`);
+  } finally {
+    await pool.end();
+  }
+}
+
+exe @init(config) = @pgStore("ensure", @config, {})
+exe @ensureSchema(config) = @pgStore("ensure", @config, {})
+
+exe @putArtifact(config, collection, key, payload, meta) = [
+  let @details = @meta ? @meta : {}
+  => @pgStore("put", @config, {
+    collection: @collection,
+    key: @key,
+    payload: @payload,
+    meta: @details,
+    mx: @mx
+  })
+]
+
+exe @appendArtifact(config, collection, payload, meta) = [
+  let @details = @meta ? @meta : {}
+  => @pgStore("append", @config, {
+    collection: @collection,
+    payload: @payload,
+    meta: @details,
+    mx: @mx
+  })
+]
+
+exe @getArtifact(config, collection, key) = @pgStore("get", @config, {
+  collection: @collection,
+  key: @key
+})
+
+exe @listArtifacts(config, collection, limit) = [
+  let @take = @limit ? @limit : @defaultLimit
+  => @pgStore("list", @config, {
+    collection: @collection,
+    limit: @take
+  })
+]
+
+export { @init, @ensureSchema, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts }

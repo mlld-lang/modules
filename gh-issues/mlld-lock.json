@@ -1,0 +1,30 @@
+{
+  "lockfileVersion": 1,
+  "modules": {
+    "@mlld/airlock": {
+      "version": "latest",
+      "resolved": "3fc90b36450ec09a5845679ae360f64b15c01c2ceda6ec7e70ce242c871951ce",
+      "source": "registry://@mlld/airlock@1.0.0",
+      "integrity": "sha256:3fc90b36450ec09a5845679ae360f64b15c01c2ceda6ec7e70ce242c871951ce",
+      "fetchedAt": "2026-03-01T21:14:25.751Z"
+    },
+    "@mlld/claude": {
+      "version": "latest",
+      "resolved": "a96a9b4839d2f21eedac1f5139f28058140d00d8c731de685f6a512bee1370c3",
+      "source": "registry://@mlld/claude@2.1.0",
+      "integrity": "sha256:a96a9b4839d2f21eedac1f5139f28058140d00d8c731de685f6a512bee1370c3",
+      "fetchedAt": "2026-03-01T21:14:46.269Z"
+    },
+    "@mlld/gh-issues": {
+      "version": "latest",
+      "resolved": "5575eff5b6c06967f348986c5f5e8ce5e5e25bee37dcb140ad5b75a357bc6e9a",
+      "source": "registry://@mlld/gh-issues@1.1.0",
+      "integrity": "sha256:5575eff5b6c06967f348986c5f5e8ce5e5e25bee37dcb140ad5b75a357bc6e9a",
+      "fetchedAt": "2026-03-01T21:14:52.890Z"
+    }
+  },
+  "metadata": {
+    "createdAt": "2026-03-01T21:14:25.613Z",
+    "updatedAt": "2026-03-01T21:14:52.890Z"
+  }
+}

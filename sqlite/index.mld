@@ -1,0 +1,284 @@
+needs { node: [better-sqlite3] }
+
+var @defaultLimit = 50
+
+exe @sqliteStore(action, config, request) = node {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const crypto = require('node:crypto');
+  const Database = require('better-sqlite3');
+
+  const assertIdentifier = (value, label) => {
+    if (typeof value !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+      throw new Error(`Invalid ${label}: ${String(value)}`);
+    }
+    return value;
+  };
+
+  const assertNonEmptyString = (value, label) => {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new Error(`Missing ${label}`);
+    }
+    return value.trim();
+  };
+
+  const toObject = value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value;
+  };
+
+  const toArray = value => Array.isArray(value) ? value : [];
+
+  const safeParse = value => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value !== 'string') {
+      return value;
+    }
+    return JSON.parse(value);
+  };
+
+  const normalizeConfig = value => {
+    const cfg = toObject(value);
+    const dbPath = assertNonEmptyString(cfg.path, 'config.path');
+    const table = assertIdentifier(cfg.table || 'artifacts', 'config.table');
+    if (dbPath !== ':memory:') {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    }
+    return { path: dbPath, table };
+  };
+
+  const openDb = cfg => {
+    const db = new Database(cfg.path);
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+    return db;
+  };
+
+  const quote = value => `"${value}"`;
+
+  const ensureSchema = (db, cfg) => {
+    const table = quote(cfg.table);
+    const keyIndex = quote(`${cfg.table}_collection_key_idx`);
+    const createdIndex = quote(`${cfg.table}_collection_created_idx`);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ${table} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        collection TEXT NOT NULL,
+        artifact_key TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        meta_json TEXT NOT NULL,
+        labels_json TEXT NOT NULL,
+        provenance_json TEXT NOT NULL,
+        mx_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS ${keyIndex}
+        ON ${table} (collection, artifact_key);
+      CREATE INDEX IF NOT EXISTS ${createdIndex}
+        ON ${table} (collection, created_at DESC, id DESC);
+    `);
+  };
+
+  const toStoredRecord = (row, cfg) => {
+    if (!row) {
+      return null;
+    }
+    return {
+      backend: 'sqlite',
+      path: row.path || `${row.collection}/${row.artifact_key}`,
+      table: cfg.table,
+      id: row.id,
+      collection: row.collection,
+      key: row.artifact_key,
+      payload: safeParse(row.payload_json),
+      meta: safeParse(row.meta_json) || {},
+      labels: safeParse(row.labels_json) || [],
+      provenance: safeParse(row.provenance_json) || {},
+      mx: safeParse(row.mx_json) || {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  };
+
+  const normalizeMeta = (meta, mx) => {
+    const mxObj = toObject(mx);
+    return {
+      meta: toObject(meta),
+      labels: toArray(mxObj.labels),
+      provenance: {
+        taint: toArray(mxObj.taint),
+        sources: toArray(mxObj.sources)
+      },
+      mx: mxObj
+    };
+  };
+
+  const cfg = normalizeConfig(config);
+  const req = toObject(request);
+  const db = openDb(cfg);
+
+  try {
+    ensureSchema(db, cfg);
+
+    if (action === 'ensure') {
+      return { backend: 'sqlite', path: cfg.path, table: cfg.table, ready: true };
+    }
+
+    if (action === 'put') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const key = assertNonEmptyString(req.key, 'key');
+      const record = normalizeMeta(req.meta, req.mx);
+      const now = new Date().toISOString();
+      const pathKey = `${collection}/${key}`;
+      const stmt = db.prepare(`
+        INSERT INTO ${quote(cfg.table)} (
+          collection,
+          artifact_key,
+          payload_json,
+          meta_json,
+          labels_json,
+          provenance_json,
+          mx_json,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(collection, artifact_key) DO UPDATE SET
+          payload_json = excluded.payload_json,
+          meta_json = excluded.meta_json,
+          labels_json = excluded.labels_json,
+          provenance_json = excluded.provenance_json,
+          mx_json = excluded.mx_json,
+          updated_at = excluded.updated_at
+      `);
+      stmt.run(
+        collection,
+        key,
+        JSON.stringify(req.payload),
+        JSON.stringify(record.meta),
+        JSON.stringify(record.labels),
+        JSON.stringify(record.provenance),
+        JSON.stringify(record.mx),
+        now,
+        now
+      );
+      const row = db.prepare(`
+        SELECT id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+        FROM ${quote(cfg.table)}
+        WHERE collection = ? AND artifact_key = ?
+      `).get(collection, key);
+      return toStoredRecord({ ...row, path: pathKey }, cfg);
+    }
+
+    if (action === 'append') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const key = req.key && String(req.key).trim().length > 0
+        ? String(req.key).trim()
+        : crypto.randomUUID();
+      const record = normalizeMeta(req.meta, req.mx);
+      const now = new Date().toISOString();
+      const info = db.prepare(`
+        INSERT INTO ${quote(cfg.table)} (
+          collection,
+          artifact_key,
+          payload_json,
+          meta_json,
+          labels_json,
+          provenance_json,
+          mx_json,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        collection,
+        key,
+        JSON.stringify(req.payload),
+        JSON.stringify(record.meta),
+        JSON.stringify(record.labels),
+        JSON.stringify(record.provenance),
+        JSON.stringify(record.mx),
+        now,
+        now
+      );
+      const row = db.prepare(`
+        SELECT id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+        FROM ${quote(cfg.table)}
+        WHERE id = ?
+      `).get(info.lastInsertRowid);
+      return toStoredRecord({ ...row, path: `${collection}/${key}` }, cfg);
+    }
+
+    if (action === 'get') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const key = assertNonEmptyString(req.key, 'key');
+      const row = db.prepare(`
+        SELECT id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+        FROM ${quote(cfg.table)}
+        WHERE collection = ? AND artifact_key = ?
+      `).get(collection, key);
+      return toStoredRecord(row, cfg);
+    }
+
+    if (action === 'list') {
+      const collection = assertNonEmptyString(req.collection, 'collection');
+      const limit = Number.isFinite(Number(req.limit)) && Number(req.limit) > 0
+        ? Number(req.limit)
+        : 50;
+      const rows = db.prepare(`
+        SELECT id, collection, artifact_key, payload_json, meta_json, labels_json, provenance_json, mx_json, created_at, updated_at
+        FROM ${quote(cfg.table)}
+        WHERE collection = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+      `).all(collection, limit);
+      return rows.map(row => toStoredRecord(row, cfg));
+    }
+
+    throw new Error(`Unsupported action: ${String(action)}`);
+  } finally {
+    db.close();
+  }
+}
+
+exe @init(config) = @sqliteStore("ensure", @config, {})
+exe @ensureSchema(config) = @sqliteStore("ensure", @config, {})
+
+exe @putArtifact(config, collection, key, payload, meta) = [
+  let @details = @meta ? @meta : {}
+  => @sqliteStore("put", @config, {
+    collection: @collection,
+    key: @key,
+    payload: @payload,
+    meta: @details,
+    mx: @mx
+  })
+]
+
+exe @appendArtifact(config, collection, payload, meta) = [
+  let @details = @meta ? @meta : {}
+  => @sqliteStore("append", @config, {
+    collection: @collection,
+    payload: @payload,
+    meta: @details,
+    mx: @mx
+  })
+]
+
+exe @getArtifact(config, collection, key) = @sqliteStore("get", @config, {
+  collection: @collection,
+  key: @key
+})
+
+exe @listArtifacts(config, collection, limit) = [
+  let @take = @limit ? @limit : @defaultLimit
+  => @sqliteStore("list", @config, {
+    collection: @collection,
+    limit: @take
+  })
+]
+
+export { @init, @ensureSchema, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts }
