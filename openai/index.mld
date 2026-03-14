@@ -1,0 +1,138 @@
+needs { network }
+
+>> Credential sealing — resolved via keychain then process.env fallback
+auth @openai = "OPENAI_API_KEY"
+
+>> Stream format adapter for OpenAI NDJSON output
+var @openaiStreamFormat = {
+  name: "openai",
+  format: "ndjson",
+  schemas: [
+    {
+      kind: "message",
+      matchPath: "type",
+      matchValue: "text",
+      extract: { chunk: "content" }
+    },
+    {
+      kind: "error",
+      matchPath: "type",
+      matchValue: "error",
+      extract: { message: "message" }
+    },
+    {
+      kind: "metadata",
+      matchPath: "type",
+      matchValue: "result",
+      extract: {
+        inputTokens: "input_tokens",
+        outputTokens: "output_tokens"
+      }
+    }
+  ]
+}
+
+>> ── Internal call helper ──
+>> Handles both streaming (SSE → NDJSON) and non-streaming modes.
+>> Params arrive as JS locals from the exe signature.
+
+exe @openaiImpl(prompt, opts) = js {
+  const cfg = opts || {};
+  const model = cfg.model || "gpt-4o";
+  const baseUrl = cfg.baseUrl || "https://api.openai.com/v1";
+
+  const messages = [];
+  if (cfg.system) messages.push({ role: "system", content: cfg.system });
+  if (cfg.messages) {
+    for (const m of cfg.messages) messages.push(m);
+  }
+  messages.push({ role: "user", content: prompt });
+
+  const body = { model, messages };
+  if (cfg.temperature != null) body.temperature = cfg.temperature;
+  if (cfg.maxTokens) body.max_tokens = cfg.maxTokens;
+  if (cfg.responseFormat) body.response_format = cfg.responseFormat;
+  if (cfg.stream) {
+    body.stream = true;
+    body.stream_options = { include_usage: true };
+  }
+
+  const resp = await fetch(baseUrl + "/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + process.env.OPENAI_API_KEY
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error("OpenAI API " + resp.status + ": " + errBody);
+  }
+
+  if (!cfg.stream) {
+    const json = await resp.json();
+    return json.choices[0].message.content;
+  }
+
+  // Streaming: parse SSE, emit NDJSON lines via console.log
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let full = "";
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
+        try {
+          const chunk = JSON.parse(trimmed.slice(6));
+          const content = chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content;
+          if (content) {
+            full += content;
+            console.log(JSON.stringify({ type: "text", content: content }));
+          }
+          if (chunk.usage) {
+            console.log(JSON.stringify({
+              type: "result",
+              input_tokens: chunk.usage.prompt_tokens,
+              output_tokens: chunk.usage.completion_tokens
+            }));
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  return full;
+} using auth:openai
+
+>> ── Core invocation ──
+
+>> @openai(prompt, config)
+>> config.model          - model name (default: gpt-4o)
+>> config.system         - system prompt
+>> config.messages       - prior conversation turns (array of {role, content})
+>> config.temperature    - sampling temperature
+>> config.maxTokens      - max output tokens
+>> config.responseFormat - e.g. { type: "json_object" }
+>> config.baseUrl        - API base URL (default: https://api.openai.com/v1)
+>> config.stream         - boolean, enables streaming
+exe llm @openai(prompt, config) = [
+  let @cfg = @config ? @config : {}
+  => @openaiImpl(@prompt, @cfg)
+] with { stream: @cfg.stream, streamFormat: @openaiStreamFormat }
+
+>> ── Model shortcuts ──
+
+exe llm @gpt4o(prompt) = @openai(@prompt, { model: "gpt-4o" })
+exe llm @gpt4oMini(prompt) = @openai(@prompt, { model: "gpt-4o-mini" })
+exe llm @o3Mini(prompt) = @openai(@prompt, { model: "o3-mini" })
+
+export { @openai, @gpt4o, @gpt4oMini, @o3Mini, @openaiStreamFormat }
