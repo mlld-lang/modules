@@ -52,6 +52,8 @@ exe @openaiImpl(prompt, opts) = js {
   if (cfg.temperature != null) body.temperature = cfg.temperature;
   if (cfg.maxTokens) body.max_tokens = cfg.maxTokens;
   if (cfg.responseFormat) body.response_format = cfg.responseFormat;
+  if (cfg.fnTools) body.tools = cfg.fnTools;
+  if (cfg.fnToolChoice) body.tool_choice = cfg.fnToolChoice;
   if (cfg.stream) {
     body.stream = true;
     body.stream_options = { include_usage: true };
@@ -73,7 +75,20 @@ exe @openaiImpl(prompt, opts) = js {
 
   if (!cfg.stream) {
     const json = await resp.json();
-    return json.choices[0].message.content;
+    const msg = json.choices[0].message;
+
+    // Native function calling: return structured tool_calls
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      return JSON.stringify({
+        type: "tool_calls",
+        tool_calls: msg.tool_calls.map(tc => ({
+          function: tc.function.name,
+          args: JSON.parse(tc.function.arguments)
+        }))
+      });
+    }
+
+    return msg.content;
   }
 
   // Streaming: parse SSE, emit NDJSON lines via console.log
@@ -122,6 +137,8 @@ exe @openaiImpl(prompt, opts) = js {
 >> config.temperature    - sampling temperature
 >> config.maxTokens      - max output tokens
 >> config.responseFormat - e.g. { type: "json_object" }
+>> config.fnTools        - array of tool definitions for native function calling
+>> config.fnToolChoice   - "auto", "required", "none", or {type: "function", function: {name: "..."}}
 >> config.baseUrl        - API base URL (default: https://api.openai.com/v1)
 >> config.stream         - boolean, enables streaming
 exe llm @openai(prompt, config) = [
