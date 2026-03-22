@@ -1,5 +1,8 @@
 needs { sh }
 
+>> All Claude Code native tool names (from https://code.claude.com/docs/en/tools-reference)
+var @ccNativeTools = "Agent,AskUserQuestion,Bash,CronCreate,CronDelete,CronList,Edit,EnterPlanMode,EnterWorktree,ExitPlanMode,ExitWorktree,Glob,Grep,LSP,ListMcpResourcesTool,NotebookEdit,Read,ReadMcpResourceTool,Skill,TaskCreate,TaskGet,TaskList,TaskOutput,TaskStop,TaskUpdate,TodoWrite,ToolSearch,WebFetch,WebSearch,Write"
+
 >> Stream format adapter for Claude Code CLI NDJSON output
 var @claudeStreamFormat = {
   name: "claude-code",
@@ -54,17 +57,36 @@ var @claudeStreamFormat = {
   ]
 }
 
+>> Returns the subset of native tools to disallow (all minus the ones the user selected)
+exe @computeDisallowed(native, all) = sh {
+  if [ -z "$native" ]; then
+    printf '%s' "$all"
+  else
+    printf '%s' "$all" | tr ',' '\n' | while IFS= read -r tool; do
+      case ",$native," in
+        *",$tool,"*) ;;
+        *) printf '%s,' "$tool" ;;
+      esac
+    done | sed 's/,$//'
+  fi
+}
+
 >> ── CLI flag builder ──
 >> Reads @mx.llm (set automatically by the runtime for exe llm with config.tools)
 >> and produces Claude CLI flags. --strict-mcp-config is used whenever a bridge
 >> config exists to prevent the child agent from loading its own MCP servers.
+>> --disallowedTools explicitly blocks native tools the user didn't select.
 
-exe @claudeFlags(llm) = when [
-  @llm.config && @llm.native => `--mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed"`
-  @llm.config => `--tools "" --mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed"`
-  @llm.allowed => `--allowedTools "@llm.allowed"`
-  @llm.hasTools => `--tools ""`
-  * => ""
+exe @claudeFlags(llm) = [
+  let @dis = @llm.hasTools ? @computeDisallowed(@llm.native, @ccNativeTools) : ""
+  let @disFlag = @dis ? `--disallowedTools "@dis"` : ""
+  => when [
+    @llm.config && @llm.native => `--mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed" @disFlag`
+    @llm.config => `--tools "" --mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed" @disFlag`
+    @llm.allowed => `--allowedTools "@llm.allowed" @disFlag`
+    @llm.hasTools => `--tools "" @disFlag`
+    * => ""
+  ]
 ]
 
 >> ── Core invocation ──
@@ -79,38 +101,9 @@ exe llm @claude(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
-  => when [
-    @cfg.system && @mx.llm && @mx.llm.config && @mx.llm.native => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
-    }
-    @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
-    }
-    @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --allowedTools "@mx.llm.allowed"
-    }
-    @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --tools ""
-    }
-    @cfg.system => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system"
-    }
-    @mx.llm && @mx.llm.config && @mx.llm.native => @prompt | cmd:@dir {
-      claude -p --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
-    }
-    @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      claude -p --model @model --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
-    }
-    @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      claude -p --model @model --allowedTools "@mx.llm.allowed"
-    }
-    @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      claude -p --model @model --tools ""
-    }
-    * => @prompt | cmd:@dir {
-      claude -p --model @model
-    }
-  ]
+  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
+  let @sysFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
+  => @prompt | cmd:@dir { claude -p --model @model @flags @sysFlag }
 ] with { stream: @cfg.stream, streamFormat: @claudeStreamFormat }
 
 >> ── Model shortcuts ──
