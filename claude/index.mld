@@ -60,8 +60,8 @@ var @claudeStreamFormat = {
 >> config exists to prevent the child agent from loading its own MCP servers.
 
 exe @claudeFlags(llm) = when [
-  @llm.config && @llm.inBox => `--tools "" --mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed"`
-  @llm.config => `--mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed"`
+  @llm.config && @llm.native => `--mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed"`
+  @llm.config => `--tools "" --mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed"`
   @llm.allowed => `--allowedTools "@llm.allowed"`
   @llm.hasTools => `--tools ""`
   * => ""
@@ -80,11 +80,11 @@ exe llm @claude(prompt, config) = [
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
   => when [
-    @cfg.system && @mx.llm && @mx.llm.config && @mx.llm.inBox => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
+    @cfg.system && @mx.llm && @mx.llm.config && @mx.llm.native => @prompt | cmd:@dir {
+      claude -p --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
     }
     @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
+      claude -p --model @model --append-system-prompt "@cfg.system" --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
     }
     @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
       claude -p --model @model --append-system-prompt "@cfg.system" --allowedTools "@mx.llm.allowed"
@@ -95,11 +95,11 @@ exe llm @claude(prompt, config) = [
     @cfg.system => @prompt | cmd:@dir {
       claude -p --model @model --append-system-prompt "@cfg.system"
     }
-    @mx.llm && @mx.llm.config && @mx.llm.inBox => @prompt | cmd:@dir {
-      claude -p --model @model --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
+    @mx.llm && @mx.llm.config && @mx.llm.native => @prompt | cmd:@dir {
+      claude -p --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
     }
     @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      claude -p --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
+      claude -p --model @model --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed"
     }
     @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
       claude -p --model @model --allowedTools "@mx.llm.allowed"

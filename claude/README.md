@@ -1,6 +1,6 @@
 # @mlld/claude
 
-Claude invocation primitives with tool bridging, streaming, and polling.
+Claude invocation primitives with tool use, streaming, and polling.
 
 ## tldr
 
@@ -49,10 +49,9 @@ var @analysis = @claude("Analyze this architecture", {
 })
 ```
 
-Tool handling uses `@toolbridge` internally:
-- In a VFS box with string tools: routes through VFS bridge (`--tools "" --mcp-config`)
-- With exe ref tools: creates per-call MCP server for mlld functions
-- Outside a box with string tools only: passes `--allowedTools`
+Tool handling:
+- String tools (e.g. `"Read"`, `"Grep"`): passed as `--allowedTools`
+- Exe ref tools (e.g. `@summarize`): creates a per-call MCP server exposing the mlld function
 
 ### `@haiku(prompt)`
 
