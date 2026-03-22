@@ -101,9 +101,39 @@ exe llm @claude(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
-  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
-  let @sysFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
-  => @prompt | cmd:@dir { claude -p --model @model @flags @sysFlag }
+  let @dis = @mx.llm && @mx.llm.hasTools ? @computeDisallowed(@mx.llm.native, @ccNativeTools) : ""
+  => when [
+    @cfg.system && @mx.llm && @mx.llm.config && @mx.llm.native => @prompt | cmd:@dir {
+      claude -p --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      claude -p --model @model --append-system-prompt "@cfg.system" --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      claude -p --model @model --append-system-prompt "@cfg.system" --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      claude -p --model @model --append-system-prompt "@cfg.system" --tools "" --disallowedTools "@dis"
+    }
+    @cfg.system => @prompt | cmd:@dir {
+      claude -p --model @model --append-system-prompt "@cfg.system"
+    }
+    @mx.llm && @mx.llm.config && @mx.llm.native => @prompt | cmd:@dir {
+      claude -p --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      claude -p --model @model --tools "" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      claude -p --model @model --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      claude -p --model @model --tools "" --disallowedTools "@dis"
+    }
+    * => @prompt | cmd:@dir {
+      claude -p --model @model
+    }
+  ]
 ] with { stream: @cfg.stream, streamFormat: @claudeStreamFormat }
 
 >> ── Model shortcuts ──

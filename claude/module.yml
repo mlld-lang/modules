@@ -2,7 +2,7 @@ name: claude
 author: mlld
 type: library
 about: "Claude invocation primitives with tool bridging, streaming, and polling"
-version: 3.1.1
+version: 3.1.2
 license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"
