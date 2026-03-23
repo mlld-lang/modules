@@ -20,21 +20,34 @@ var @result = @claude("Review code in src/", {
 
 ## docs
 
+### Isolation
+
+All invocations run with `--bare` and `CLAUDECODE` unset by default. This means child `claude` processes start clean — no CLAUDE.md, no hooks, no plugins, no MCP servers from the parent environment. Only tools you explicitly pass via `config.tools` are available.
+
+This ensures consistent behavior whether your script runs inside Claude Code, from the CLI, or via the SDK. Without `--bare`, child processes would inherit the parent's project context (CLAUDE.md instructions, installed plugins, configured MCP servers), making behavior dependent on where the script is invoked from.
+
+To allow the child process to inherit project context, set `config.inherit: true`. This removes `--bare` so the child loads CLAUDE.md, hooks, and plugins normally. `CLAUDECODE` is always unset regardless of `inherit`.
+
 ### `@claude(prompt, config)`
 
 Core invocation. All other exes delegate to this.
 
-- `config.model` — haiku, sonnet, opus (default: sonnet)
-- `config.dir` — working directory
-- `config.tools` — mixed array: strings for built-in tools, exe refs for mlld functions
-- `config.stream` — boolean, enables streaming
-- `config.system` — appended system prompt
+**Config object:**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `model` | string | `"sonnet"` | Model name: haiku, sonnet, opus, or a full model ID |
+| `dir` | string | `@root` | Working directory for tool operations |
+| `tools` | array | — | Tool access: strings for built-in tools, exe refs for mlld functions |
+| `stream` | boolean | — | Enable token streaming |
+| `system` | string | — | Appended system prompt |
+| `inherit` | boolean | `false` | Inherit project context (CLAUDE.md, hooks, plugins). Removes `--bare`. |
 
 ```mlld
 >> Simple call
 var @answer = @claude("Explain TCP/IP", { model: "haiku" })
 
->> With tools (in VFS box, tools route through VFS bridge)
+>> With tools — exe refs create a per-call MCP server
 var @review = @claude("Review the auth module", {
   model: "opus",
   dir: @base,
@@ -47,11 +60,25 @@ var @analysis = @claude("Analyze this architecture", {
   stream: true,
   system: "Focus on security implications"
 })
+
+>> Inherit project context (loads CLAUDE.md, hooks, plugins)
+var @result = @claude("Check the project", {
+  model: "sonnet",
+  inherit: true,
+  tools: ["Read", "Grep"]
+})
 ```
 
-Tool handling:
-- String tools (e.g. `"Read"`, `"Grep"`): passed as `--allowedTools`
-- Exe ref tools (e.g. `@summarize`): creates a per-call MCP server exposing the mlld function
+**Tool handling:**
+
+| Entry type | Behavior |
+|---|---|
+| String (`"Read"`) | Passed as `--allowedTools`. Native Claude Code tools not in the list are disallowed. |
+| Exe ref (`@summarize`) | Wrapped as an MCP tool via a function bridge. Schema generated from the function signature. |
+| Mixed | Both types can be combined in one array. |
+| Omitted | No `--allowedTools` constraint. With `--bare`, only base tools are available. |
+
+When exe ref tools are provided, all native tools not explicitly listed as strings are disallowed via `--disallowedTools`.
 
 ### `@haiku(prompt)`
 

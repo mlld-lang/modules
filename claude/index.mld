@@ -100,33 +100,12 @@ exe llm @claude(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
-  let @dis = @mx.llm && @mx.llm.hasTools ? @computeDisallowed(@mx.llm.native, @ccNativeTools) : ""
-  => when [
-    @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
-    }
-    @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
-    }
-    @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system" --disallowedTools "@dis"
-    }
-    @cfg.system => @prompt | cmd:@dir {
-      claude -p --model @model --append-system-prompt "@cfg.system"
-    }
-    @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      claude -p --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
-    }
-    @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      claude -p --model @model --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
-    }
-    @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      claude -p --model @model --disallowedTools "@dis"
-    }
-    * => @prompt | cmd:@dir {
-      claude -p --model @model
-    }
-  ]
+  let @bareFlag = @cfg.inherit ? "" : "--bare"
+  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
+  let @systemFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
+  => @prompt | cmd:@dir {
+    env -u CLAUDECODE claude -p @bareFlag --model @model @flags @systemFlag
+  }
 ] with { stream: @cfg.stream, streamFormat: @claudeStreamFormat }
 
 >> ── Model shortcuts ──
@@ -239,7 +218,7 @@ exe llm @claudePoll(prompt, config) = [
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
   let @systemFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
-  let @cmdLine = `claude -p --model @model @flags @systemFlag`
+  let @cmdLine = `env -u CLAUDECODE claude -p --bare --model @model @flags @systemFlag`
   let @timeout = @cfg.timeout ? @cfg.timeout : 3600
   => @pollFileImpl(@prompt, @cmdLine, @cfg.poll, @timeout)
 ]
@@ -255,7 +234,7 @@ exe llm @claudePollJsonl(prompt, config) = [
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
   let @systemFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
-  let @cmdLine = `claude -p --model @model @flags @systemFlag`
+  let @cmdLine = `env -u CLAUDECODE claude -p --bare --model @model @flags @systemFlag`
   let @timeout = @cfg.timeout ? @cfg.timeout : 3600
   => @pollJsonlImpl(@prompt, @cmdLine, @cfg.poll, @cfg.pattern, @timeout)
 ]
@@ -272,7 +251,7 @@ exe llm @claudePollEvent(prompt, config) = [
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
   let @systemFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
-  let @cmdLine = `claude -p --model @model @flags @systemFlag`
+  let @cmdLine = `env -u CLAUDECODE claude -p --bare --model @model @flags @systemFlag`
   let @timeout = @cfg.timeout ? @cfg.timeout : 3600
   => @pollEventImpl(@prompt, @cmdLine, @cfg.poll, @cfg.event, @cfg.itemId, @timeout)
 ]
