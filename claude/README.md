@@ -22,11 +22,11 @@ var @result = @claude("Review code in src/", {
 
 ### Isolation
 
-All invocations run with `--bare` and `CLAUDECODE` unset by default. This means child `claude` processes start clean — no CLAUDE.md, no hooks, no plugins, no MCP servers from the parent environment. Only tools you explicitly pass via `config.tools` are available.
+`CLAUDECODE` is always unset so child processes aren't blocked by the nested-session guard.
 
-This ensures consistent behavior whether your script runs inside Claude Code, from the CLI, or via the SDK. Without `--bare`, child processes would inherit the parent's project context (CLAUDE.md instructions, installed plugins, configured MCP servers), making behavior dependent on where the script is invoked from.
+Tool isolation works via `--disallowedTools` — native tools not in your `config.tools` list are blocked automatically.
 
-To allow the child process to inherit project context, set `config.inherit: true`. This removes `--bare` so the child loads CLAUDE.md, hooks, and plugins normally. `CLAUDECODE` is always unset regardless of `inherit`.
+For full isolation, set `config.bare: true`. This adds `--bare`, which skips CLAUDE.md, hooks, plugins, and MCP servers. Requires `ANTHROPIC_API_KEY` (bare mode disables OAuth/keychain auth).
 
 ### `@claude(prompt, config)`
 
@@ -41,7 +41,7 @@ Core invocation. All other exes delegate to this.
 | `tools` | array | — | Tool access: strings for built-in tools, exe refs for mlld functions |
 | `stream` | boolean | — | Enable token streaming |
 | `system` | string | — | Appended system prompt |
-| `inherit` | boolean | `false` | Inherit project context (CLAUDE.md, hooks, plugins). Removes `--bare`. |
+| `bare` | boolean | `false` | Full isolation: skip CLAUDE.md, hooks, plugins. Requires `ANTHROPIC_API_KEY`. |
 
 ```mlld
 >> Simple call
@@ -61,10 +61,10 @@ var @analysis = @claude("Analyze this architecture", {
   system: "Focus on security implications"
 })
 
->> Inherit project context (loads CLAUDE.md, hooks, plugins)
+>> Full isolation (requires ANTHROPIC_API_KEY)
 var @result = @claude("Check the project", {
   model: "sonnet",
-  inherit: true,
+  bare: true,
   tools: ["Read", "Grep"]
 })
 ```

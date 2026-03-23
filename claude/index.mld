@@ -100,12 +100,34 @@ exe llm @claude(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
-  let @bareFlag = @cfg.inherit ? "" : "--bare"
-  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
-  let @systemFlag = @cfg.system ? `--append-system-prompt "@cfg.system"` : ""
-  => @prompt | cmd:@dir {
-    env -u CLAUDECODE claude -p @bareFlag --model @model @flags @systemFlag
-  }
+  let @bare = @cfg.bare ? "--bare" : ""
+  let @dis = @mx.llm && @mx.llm.hasTools ? @computeDisallowed(@mx.llm.native, @ccNativeTools) : ""
+  => when [
+    @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system" --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system" --disallowedTools "@dis"
+    }
+    @cfg.system => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system"
+    }
+    @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+    }
+    @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model --disallowedTools "@dis"
+    }
+    * => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare --model @model
+    }
+  ]
 ] with { stream: @cfg.stream, streamFormat: @claudeStreamFormat }
 
 >> ── Model shortcuts ──
