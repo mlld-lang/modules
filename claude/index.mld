@@ -1,7 +1,7 @@
 needs { sh }
 
 >> All Claude Code native tool names (from https://code.claude.com/docs/en/tools-reference)
-var @ccNativeTools = "Agent,AskUserQuestion,Bash,CronCreate,CronDelete,CronList,Edit,EnterPlanMode,EnterWorktree,ExitPlanMode,ExitWorktree,Glob,Grep,LSP,ListMcpResourcesTool,NotebookEdit,Read,ReadMcpResourceTool,RemoteTrigger,Skill,TaskCreate,TaskGet,TaskList,TaskOutput,TaskStop,TaskUpdate,TodoWrite,ToolSearch,WebFetch,WebSearch,Write"
+var @ccNativeTools = "Agent,AskUserQuestion,Bash,CronCreate,CronDelete,CronList,Edit,EnterPlanMode,EnterWorktree,ExitPlanMode,ExitWorktree,Glob,Grep,LSP,ListMcpResourcesTool,NotebookEdit,Read,ReadMcpResourceTool,Skill,TaskCreate,TaskGet,TaskList,TaskOutput,TaskStop,TaskUpdate,TodoWrite,ToolSearch,WebFetch,WebSearch,Write"
 
 >> Stream format adapter for Claude Code CLI NDJSON output
 var @claudeStreamFormat = {
@@ -78,12 +78,18 @@ exe @computeDisallowed(native, all) = sh {
 >> --disallowedTools explicitly blocks native tools the user didn't select.
 
 exe @claudeFlags(llm) = [
+  let @nativeFlag = when [
+    @llm.hasTools && @llm.native => `--tools "@llm.native"`
+    @llm.hasTools => '--tools ""'
+    * => ""
+  ]
+  let @allowedFlag = @llm.allowed ? `--allowedTools "@llm.allowed"` : ""
   let @dis = @llm.hasTools ? @computeDisallowed(@llm.native, @ccNativeTools) : ""
   let @disFlag = @dis ? `--disallowedTools "@dis"` : ""
   => when [
-    @llm.config => `--mcp-config "@llm.config" --strict-mcp-config --allowedTools "@llm.allowed" @disFlag`
-    @llm.allowed => `--allowedTools "@llm.allowed" @disFlag`
-    @llm.hasTools => `@disFlag`
+    @llm.config => `@nativeFlag --mcp-config "@llm.config" --strict-mcp-config @allowedFlag @disFlag`
+    @llm.allowed => `@allowedFlag @disFlag`
+    @llm.hasTools => `@nativeFlag @disFlag`
     * => ""
   ]
 ]
@@ -101,28 +107,31 @@ exe llm @claude(prompt, config) = [
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @bare = @cfg.bare ? "--bare" : ""
+  let @nativeTools = @mx.llm && @mx.llm.native ? @mx.llm.native : ""
+  let @allowedTools = @mx.llm && @mx.llm.allowed ? @mx.llm.allowed : ""
+  let @needsEmptyNativeTools = @mx.llm && @mx.llm.hasTools && !@mx.llm.native
   let @dis = @mx.llm && @mx.llm.hasTools ? @computeDisallowed(@mx.llm.native, @ccNativeTools) : ""
   => when [
     @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+      env -u CLAUDECODE claude -p @bare --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system" --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+      env -u CLAUDECODE claude -p @bare --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system" --disallowedTools "@dis"
+      env -u CLAUDECODE claude -p @bare --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
     }
     @cfg.system => @prompt | cmd:@dir {
       env -u CLAUDECODE claude -p @bare --model @model --append-system-prompt "@cfg.system"
     }
     @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --model @model --mcp-config "@mx.llm.config" --strict-mcp-config --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+      env -u CLAUDECODE claude -p @bare --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --model @model --allowedTools "@mx.llm.allowed" --disallowedTools "@dis"
+      env -u CLAUDECODE claude -p @bare --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --model @model --disallowedTools "@dis"
+      env -u CLAUDECODE claude -p @bare --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
     }
     * => @prompt | cmd:@dir {
       env -u CLAUDECODE claude -p @bare --model @model
