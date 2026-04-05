@@ -122,28 +122,28 @@ exe llm @claude(prompt, config) = [
       env -u CLAUDECODE claude -p --bare --model @model --resume "@sessionId"
     }
     @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
     }
     @cfg.system => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model --append-system-prompt "@cfg.system"
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model --append-system-prompt "@cfg.system"
     }
     @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
     }
     * => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session "@sessionId" --model @model
+      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model
     }
   ]
 ] with { stream: @cfg.stream, streamFormat: @claudeStreamFormat }
