@@ -42,6 +42,8 @@ Core invocation. All other exes delegate to this.
 | `stream` | boolean | — | Enable token streaming |
 | `system` | string | — | Appended system prompt |
 | `bare` | boolean | `false` | Full isolation: skip CLAUDE.md, hooks, plugins. Requires `ANTHROPIC_API_KEY`. |
+| `sessionId` | string | auto-generated | Session UUID for conversation tracking. Every call gets a session (generated if omitted). |
+| `resume` | string | — | Session UUID to resume. Uses `--resume`, no tools. The prompt is appended to the existing conversation. |
 
 ```mlld
 >> Simple call
@@ -66,6 +68,16 @@ var @result = @claude("Check the project", {
   model: "sonnet",
   bare: true,
   tools: ["Read", "Grep"]
+})
+
+>> Session tracking — every call gets a session by default
+>> Pass sessionId to control it, resume to continue a prior session
+var @first = @claude("Write the draft", {
+  tools: ["Read", "Write"],
+  sessionId: "my-session-id"
+})
+var @fixed = @claude("Fix the formatting", {
+  resume: "my-session-id"
 })
 ```
 
