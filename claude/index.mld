@@ -1,5 +1,7 @@
 needs { sh }
 
+>> ── Constants ──
+
 >> All Claude Code native tool names (from https://code.claude.com/docs/en/tools-reference)
 var @ccNativeTools = "Agent,AskUserQuestion,Bash,CronCreate,CronDelete,CronList,Edit,EnterPlanMode,EnterWorktree,ExitPlanMode,ExitWorktree,Glob,Grep,LSP,ListMcpResourcesTool,NotebookEdit,Read,ReadMcpResourceTool,Skill,TaskCreate,TaskGet,TaskList,TaskOutput,TaskStop,TaskUpdate,TodoWrite,ToolSearch,WebFetch,WebSearch,Write"
 
@@ -71,6 +73,83 @@ exe @computeDisallowed(native, all) = sh {
   fi
 }
 
+>> ── Session / resume helpers ──
+
+>> Normalizes a session ID while tolerating missing/non-string inputs.
+exe @normalizeSessionId(sessionId) = js {
+  if (typeof sessionId !== "string") return null;
+  const trimmed = sessionId.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+>> Reads the public and runtime-injected resume/session config.
+>>
+>> Public API:
+>>   config.sessionId - explicit conversation tracking ID
+>>   config.resume    - explicit resume session ID
+>>
+>> Runtime API:
+>>   config._mlld.resume = { sessionId, provider, continue }
+>>
+>> The runtime channel exists so guards can request `resume` without mutating the
+>> user-authored config surface. Public fields remain useful for manual calls.
+exe @claudeResume(config) = [
+  let @cfg = @config ? @config : {}
+  let @runtime = @cfg._mlld ? @cfg._mlld : {}
+  let @resume = @runtime.resume ? @runtime.resume : {}
+  let @runtimeSessionId = @normalizeSessionId(@resume.sessionId)
+  let @runtimeProvider = @resume.provider ? @resume.provider : "claude"
+  let @publicSessionId = @normalizeSessionId(@cfg.sessionId)
+  let @publicResumeId = @normalizeSessionId(@cfg.resume)
+  => when [
+    @resume.continue && @runtimeSessionId => {
+      continue: true,
+      sessionId: @runtimeSessionId,
+      provider: @runtimeProvider,
+      source: "runtime_resume"
+    }
+    @publicResumeId => {
+      continue: true,
+      sessionId: @publicResumeId,
+      provider: "claude",
+      source: "public_resume"
+    }
+    @runtimeSessionId => {
+      continue: false,
+      sessionId: @runtimeSessionId,
+      provider: @runtimeProvider,
+      source: "runtime_tracking"
+    }
+    @publicSessionId => {
+      continue: false,
+      sessionId: @publicSessionId,
+      provider: "claude",
+      source: "public_session"
+    }
+    * => {
+      continue: false,
+      sessionId: null,
+      provider: "claude",
+      source: "none"
+    }
+  ]
+]
+
+>> Returns a runtime-visible envelope when a resumable session is active.
+>>
+>> The interpreter strips this before normal callers see the result, but uses the hidden
+>> `_mlld` block to persist the provider session across guard-driven resume.
+exe @claudeResult(inputValue, resume) = when [
+  @resume.sessionId => {
+    value: @inputValue,
+    _mlld: {
+      sessionId: @resume.sessionId,
+      provider: @resume.provider
+    }
+  }
+  * => @inputValue
+]
+
 >> ── CLI flag builder ──
 >> Reads @mx.llm (set automatically by the runtime for exe llm with config.tools)
 >> and produces Claude CLI flags. --strict-mcp-config is used whenever a bridge
@@ -96,16 +175,21 @@ exe @claudeFlags(llm) = [
 
 >> ── Core invocation ──
 
-exe @genSessionId() = sh { uuidgen }
-
 >> @claude(prompt, config)
 >> config.model     - haiku, sonnet, opus (default: sonnet)
 >> config.dir       - working directory
 >> config.tools     - mixed array: strings for built-in tools, exe refs for mlld functions
 >> config.stream    - boolean, enables streaming
 >> config.system    - appended system prompt
->> config.sessionId - session UUID for conversation tracking
+>> config.sessionId - explicit session UUID for conversation tracking
 >> config.resume    - session UUID to resume (no tools, appends prompt to existing conversation)
+>>
+>> Runtime notes:
+>> - Streaming mode keeps Claude's NDJSON output for the stream adapter above.
+>> - Non-stream mode uses `--output-format json` so we can recover Claude's real
+>>   `session_id` and feed it back to the interpreter.
+>> - Runtime-seeded initial tracking ids are placeholders. We only forward
+>>   `--session-id` for explicit public ids and otherwise let Claude allocate one.
 exe llm @claude(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
@@ -115,37 +199,129 @@ exe llm @claude(prompt, config) = [
   let @allowedTools = @mx.llm && @mx.llm.allowed ? @mx.llm.allowed : ""
   let @needsEmptyNativeTools = @mx.llm && @mx.llm.hasTools && !@mx.llm.native
   let @dis = @mx.llm && @mx.llm.hasTools ? @computeDisallowed(@mx.llm.native, @ccNativeTools) : ""
-  let @resumeId = @cfg.resume ? @cfg.resume : @genSessionId()
-  let @sessionId = @cfg.sessionId ? @cfg.sessionId : @resumeId
-  => when [
-    @cfg.resume => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p --bare --model @model --resume "@sessionId"
+  let @resume = @claudeResume(@cfg)
+  >> Only explicit public session ids are forwarded on the first call.
+  >> Runtime tracking ids become real only after Claude returns a session_id.
+  let @sessionFlag = @resume.sessionId && !@resume.continue && @resume.source == "public_session" ? ` --session-id "@resume.sessionId"` : ""
+  let @raw = when [
+    >> Streaming path: keep Claude's native NDJSON output untouched.
+    @cfg.stream && @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId && @cfg.system => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system"
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @resume.continue && @resume.sessionId => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId"
+    }
+    @cfg.stream && @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @cfg.system => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model --append-system-prompt "@cfg.system"
+    }
+    @cfg.stream && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
+    }
+    @cfg.stream => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model
+    }
+    >> Non-stream path: ask Claude for structured JSON so we can capture session_id.
+    @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+    }
+    @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+    }
+    @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
+    }
+    @resume.continue && @resume.sessionId && @cfg.system => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId" --append-system-prompt "@cfg.system"
+    }
+    @resume.continue && @resume.sessionId && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+    }
+    @resume.continue && @resume.sessionId && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+    }
+    @resume.continue && @resume.sessionId && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId"@dis?` --disallowedTools "@dis"`
+    }
+    @resume.continue && @resume.sessionId => @prompt | cmd:@dir {
+      env -u CLAUDECODE claude -p --bare --output-format json --model @model --resume "@resume.sessionId"
     }
     @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
     }
     @cfg.system => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model --append-system-prompt "@cfg.system"
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model --append-system-prompt "@cfg.system"
     }
     @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
     }
     * => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare --session-id "@sessionId" --model @model
+      env -u CLAUDECODE claude -p @bare@sessionFlag --output-format json --model @model
     }
   ]
+  let @parsed = when [
+    @cfg.stream => null
+    * => @raw | @parse.strict
+  ]
+  >> For non-stream calls, prefer Claude's returned session_id over any runtime seed.
+  let @sessionId = when [
+    @cfg.stream => @resume.sessionId
+    * => @normalizeSessionId(@parsed.session_id ?? @resume.sessionId ?? null)
+  ]
+  let @value = when [
+    @cfg.stream => @raw
+    * => @parsed.result ?? @raw
+  ]
+  => @claudeResult(@value, {
+    continue: @resume.continue,
+    sessionId: @sessionId,
+    provider: "claude",
+    source: @resume.source
+  })
 ] with { stream: @cfg.stream, streamFormat: @claudeStreamFormat }
 
 >> ── Model shortcuts ──
