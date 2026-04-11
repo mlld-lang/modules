@@ -1,0 +1,307 @@
+needs { sh }
+
+>> ── Stream format adapter for Codex CLI JSONL output (codex exec --json) ──
+var @codexStreamFormat = {
+  name: "codex",
+  format: "ndjson",
+  schemas: [
+    {
+      kind: "message",
+      matchPath: "type",
+      matchValue: "item.completed",
+      extract: { chunk: "item.text" }
+    },
+    {
+      kind: "metadata",
+      matchPath: "type",
+      matchValue: "thread.started",
+      extract: { sessionId: "thread_id" }
+    },
+    {
+      kind: "metadata",
+      matchPath: "type",
+      matchValue: "turn.completed",
+      extract: {
+        inputTokens: "usage.input_tokens",
+        outputTokens: "usage.output_tokens"
+      }
+    }
+  ]
+}
+
+>> ── Session / resume helpers ──
+
+>> Normalizes a session id while tolerating missing/non-string inputs.
+>> Codex thread ids are UUIDs; we lowercase them to match codex's own output.
+exe @normalizeCodexSessionId(sessionId) = js {
+  if (typeof sessionId !== "string") return null;
+  const trimmed = sessionId.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+}
+
+>> Parses codex exec --json JSONL output for session id, final message text, and usage.
+exe @parseCodexJsonl(raw) = js {
+  const result = { sessionId: null, text: "", inputTokens: null, outputTokens: null };
+  if (typeof raw !== "string" || !raw) return result;
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let obj;
+    try { obj = JSON.parse(trimmed); } catch { continue; }
+    if (!obj || typeof obj !== "object") continue;
+    if (obj.type === "thread.started" && typeof obj.thread_id === "string") {
+      result.sessionId = obj.thread_id;
+    } else if (
+      obj.type === "item.completed" &&
+      obj.item && obj.item.type === "agent_message" &&
+      typeof obj.item.text === "string"
+    ) {
+      result.text = obj.item.text;
+    } else if (obj.type === "turn.completed" && obj.usage && typeof obj.usage === "object") {
+      if (typeof obj.usage.input_tokens === "number") result.inputTokens = obj.usage.input_tokens;
+      if (typeof obj.usage.output_tokens === "number") result.outputTokens = obj.usage.output_tokens;
+    }
+  }
+  return result;
+}
+
+>> Prepends a system prompt to the user prompt.
+>> Codex has no --append-system-prompt; injecting into the prompt is the only
+>> per-invocation hook without clobbering codex's base_instructions.
+exe @prependSystemPrompt(prompt, system) = js {
+  const sys = typeof system === "string" ? system : "";
+  const body = typeof prompt === "string" ? prompt : "";
+  return sys ? sys + "\n\n" + body : body;
+}
+
+>> Reads the public and runtime-injected resume/session config for codex.
+>>
+>> Public API:
+>>   config.sessionId - explicit conversation tracking id (UUID)
+>>   config.resume    - explicit resume session id (UUID)
+>>
+>> Runtime API:
+>>   config._mlld.resume = { sessionId, provider, continue }
+>>
+>> We ignore a runtime resume when it targets a different provider so a claude
+>> session never flows into a codex call.
+exe @codexResume(config) = [
+  let @cfg = @config ? @config : {}
+  let @runtime = @cfg._mlld ? @cfg._mlld : {}
+  let @resume = @runtime.resume ? @runtime.resume : {}
+  let @runtimeProvider = @resume.provider ? @resume.provider : "codex"
+  let @runtimeSessionId = @normalizeCodexSessionId(@resume.sessionId)
+  let @publicSessionId = @normalizeCodexSessionId(@cfg.sessionId)
+  let @publicResumeId = @normalizeCodexSessionId(@cfg.resume)
+  => when [
+    @resume.continue && @runtimeSessionId && @runtimeProvider == "codex" => {
+      continue: true,
+      sessionId: @runtimeSessionId,
+      provider: "codex",
+      source: "runtime_resume"
+    }
+    @publicResumeId => {
+      continue: true,
+      sessionId: @publicResumeId,
+      provider: "codex",
+      source: "public_resume"
+    }
+    @runtimeSessionId && @runtimeProvider == "codex" => {
+      continue: false,
+      sessionId: @runtimeSessionId,
+      provider: "codex",
+      source: "runtime_tracking"
+    }
+    @publicSessionId => {
+      continue: false,
+      sessionId: @publicSessionId,
+      provider: "codex",
+      source: "public_session"
+    }
+    * => {
+      continue: false,
+      sessionId: null,
+      provider: "codex",
+      source: "none"
+    }
+  ]
+]
+
+>> Returns a runtime-visible envelope when a resumable session is active.
+>>
+>> The interpreter strips this before normal callers see the result, but uses the
+>> hidden `_mlld` block to persist the provider session across guard-driven resume.
+exe @codexResult(inputValue, resume) = when [
+  @resume.sessionId => {
+    value: @inputValue,
+    _mlld: {
+      sessionId: @resume.sessionId,
+      provider: @resume.provider
+    }
+  }
+  * => @inputValue
+]
+
+>> ── MCP bridge translation ──
+>>
+>> The runtime-generated MCP config at @mx.llm.config is a JSON file shaped like
+>> `{ mcpServers: { name: { command, args, env, url } } }` (Claude's format).
+>> Codex consumes the same bridges via repeated `-c mcp_servers.<name>.*` TOML
+>> overrides on the command line.
+>>
+>> We write each CLI argument on its own line to a temp file. The sh block below
+>> reads the file into a bash array via `read -r`, so TOML string values (which
+>> must contain literal `"`) survive without any shell-escaping collisions with
+>> mlld's interpolation — see ticket m-8694 for the underlying bug where `cmd`
+>> block interpolation mangles `"` when the command is argv-spawned.
+exe @codexMcpArgsFile(configPath) = node {
+  if (!configPath) return "";
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  if (!fs.existsSync(configPath)) return "";
+  let parsed;
+  try { parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { return ""; }
+  const servers = parsed && parsed.mcpServers;
+  if (!servers || typeof servers !== 'object' || !Object.keys(servers).length) {
+    return "";
+  }
+
+  const tomlString = (s) =>
+    '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  const args = [];
+  for (const [name, spec] of Object.entries(servers)) {
+    if (!spec || typeof spec !== 'object') continue;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) continue;
+    if (typeof spec.command === 'string') {
+      args.push('-c', `mcp_servers.${name}.command=${tomlString(spec.command)}`);
+    }
+    if (Array.isArray(spec.args)) {
+      args.push('-c', `mcp_servers.${name}.args=[${spec.args.map(tomlString).join(', ')}]`);
+    }
+    if (spec.env && typeof spec.env === 'object') {
+      const entries = Object.entries(spec.env)
+        .filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))
+        .map(([k, v]) => `${k} = ${tomlString(v)}`)
+        .join(', ');
+      if (entries) {
+        args.push('-c', `mcp_servers.${name}.env={ ${entries} }`);
+      }
+    }
+    if (typeof spec.url === 'string') {
+      args.push('-c', `mcp_servers.${name}.url=${tomlString(spec.url)}`);
+    }
+  }
+  if (!args.length) return "";
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const file = path.join(
+    os.tmpdir(),
+    'mlld-codex-mcp-' + process.pid + '-' + Date.now() + '-' + suffix + '.args'
+  );
+  fs.writeFileSync(file, args.join('\n') + '\n', 'utf8');
+  return file;
+}
+
+>> ── Shell wrapper for codex exec ──
+>>
+>> Flat positional params so BashExecutor injects each one as a distinct env var.
+>> mlld cmd blocks would double-escape TOML double-quotes in mcpArgsFile entries;
+>> routing through sh with env vars sidesteps that entirely (see ticket m-8694).
+exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResume, resumeId) = sh {
+  set -e
+  cd "$dir"
+
+  extra=()
+  if [ -n "$mcpArgsFile" ] && [ -f "$mcpArgsFile" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      extra+=("$line")
+    done < "$mcpArgsFile"
+  fi
+
+  modelFlag=()
+  if [ -n "$model" ]; then
+    modelFlag=(-m "$model")
+  fi
+
+  sandboxFlag=()
+  if [ -n "$sandbox" ]; then
+    sandboxFlag=(-s "$sandbox")
+  elif [ -n "$bypass" ]; then
+    sandboxFlag=(--dangerously-bypass-approvals-and-sandbox)
+  else
+    sandboxFlag=(--full-auto)
+  fi
+
+  if [ -n "$doResume" ]; then
+    printf '%s' "$prompt" | codex exec resume "$resumeId" --json --skip-git-repo-check "${sandboxFlag[@]}" "${modelFlag[@]}" "${extra[@]}" -
+    exit $?
+  fi
+
+  searchFlag=()
+  if [ -n "$search" ]; then
+    searchFlag=(--search)
+  fi
+
+  printf '%s' "$prompt" | codex exec --json --skip-git-repo-check "${sandboxFlag[@]}" "${modelFlag[@]}" "${searchFlag[@]}" "${extra[@]}" -
+}
+
+>> ── Core invocation ──
+>>
+>> @codex(prompt, config)
+>> config.model     - model name (codex default unless set)
+>> config.dir       - working directory
+>> config.sandbox   - read-only | workspace-write | danger-full-access
+>>                    (defaults to --full-auto convenience alias)
+>> config.bypass    - boolean, opt into --dangerously-bypass-approvals-and-sandbox
+>>                    REQUIRED when `config.tools` is set, because codex's default
+>>                    on-request approval auto-cancels MCP tool calls in
+>>                    non-interactive exec mode (returns "user cancelled MCP tool
+>>                    call" as the tool result). Ignored when `config.sandbox` is
+>>                    explicit.
+>> config.search    - enable live web search
+>> config.system    - prepended to the prompt (no --append-system-prompt in codex)
+>> config.stream    - JSONL streaming via stream adapter
+>> config.sessionId - explicit tracking session id (UUID)
+>> config.resume    - explicit resume session id
+>> config.tools     - mlld convention: runtime populates @mx.llm.config with a
+>>                    generated MCP bridge JSON. We translate it into codex -c
+>>                    overrides so function/VFS bridges work here.
+>>                    Requires `config.bypass: true` to actually execute tool
+>>                    calls (see config.bypass above).
+>>                    Note: codex cannot selectively gate its native tools, so
+>>                    @mx.llm.native filtering is informational only.
+>>
+>> Runtime notes:
+>> - Always runs codex with `--json` so we can parse thread_id + final message
+>>   + usage regardless of streaming mode. In stream mode the stream adapter
+>>   consumes chunks as they arrive; @raw still holds the full JSONL.
+>> - Uses a `sh { }` block instead of `cmd { }` so interpolated values flow as
+>>   bash env vars and TOML `"` literals in MCP overrides survive unescaped.
+exe llm @codex(prompt, config) = [
+  let @cfg = @config ? @config : {}
+  let @dir = @cfg.dir ? @cfg.dir : @root
+  let @model = @cfg.model ? @cfg.model : "gpt-5.4"
+  let @sandbox = @cfg.sandbox ? @cfg.sandbox : ""
+  let @search = @cfg.search ? "1" : ""
+  let @bypass = @cfg.bypass ? "1" : ""
+  let @mcpArgsFile = @mx.llm && @mx.llm.config ? @codexMcpArgsFile(@mx.llm.config) : ""
+  let @finalPrompt = @cfg.system ? @prependSystemPrompt(@prompt, @cfg.system) : @prompt
+  let @resume = @codexResume(@cfg)
+  let @doResume = @resume.continue && @resume.sessionId ? "1" : ""
+  let @resumeId = @resume.sessionId ? @resume.sessionId : ""
+  let @raw = @runCodexSh(@finalPrompt, @dir, @model, @sandbox, @search, @bypass, @mcpArgsFile, @doResume, @resumeId)
+  let @parsed = @parseCodexJsonl(@raw)
+  let @sessionId = @normalizeCodexSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
+  let @value = when [
+    @cfg.stream => @raw
+    @parsed.text => @parsed.text
+    * => @raw
+  ]
+  => @codexResult(@value, {
+    sessionId: @sessionId,
+    provider: "codex",
+    source: @resume.source
+  })
+] with { stream: @cfg.stream, streamFormat: @codexStreamFormat }
+
+export { @codex, @codexStreamFormat }
