@@ -1,6 +1,11 @@
 needs { sh }
 
 >> ── Stream format adapter for Opencode CLI NDJSON events (opencode run --format json) ──
+>>
+>> Aligned with @claudeStreamFormat where possible. Opencode fuses tool-use and
+>> tool-result into a single `tool_use` event at completion time, so the tool-use
+>> kind here carries `result` inline instead of being paired with a separate
+>> tool-result event. See modules/claude/index.mld for the claude-shape reference.
 var @opencodeStreamFormat = {
   name: "opencode",
   format: "ndjson",
@@ -10,6 +15,24 @@ var @opencodeStreamFormat = {
       matchPath: "type",
       matchValue: "text",
       extract: { chunk: "part.text" }
+    },
+    {
+      kind: "thinking",
+      matchPath: "type",
+      matchValue: "reasoning",
+      extract: { text: "part.text" }
+    },
+    {
+      kind: "tool-use",
+      matchPath: "type",
+      matchValue: "tool_use",
+      extract: {
+        name: "part.tool",
+        id: "part.callID",
+        input: "part.state.input",
+        result: "part.state.output",
+        status: "part.state.status"
+      }
     },
     {
       kind: "metadata",
@@ -25,7 +48,9 @@ var @opencodeStreamFormat = {
         inputTokens: "part.tokens.input",
         outputTokens: "part.tokens.output",
         totalTokens: "part.tokens.total",
-        cost: "part.cost"
+        reasoningTokens: "part.tokens.reasoning",
+        cost: "part.cost",
+        reason: "part.reason"
       }
     }
   ]
