@@ -106,13 +106,14 @@ exe @prependOpencodeSystem(prompt, system) = js {
 
 >> When mlld provides an explicit tool surface, target a concrete OpenCode
 >> agent so we can bind permission rules to a real agent config.
->> If the caller did not request an agent explicitly, use the built-in
->> `build` agent.
+>> If the caller did not request an agent explicitly, use a dedicated
+>> invocation-local agent instead of the built-in `build` agent so the
+>> tool surface cannot inherit built-in defaults.
 exe @opencodeToolAgentName(requestedAgent) = js {
   if (typeof requestedAgent === "string" && requestedAgent.trim()) {
     return requestedAgent.trim();
   }
-  return "build";
+  return "mlld";
 }
 
 >> Build the invocation-local OpenCode `permission` config that denies every
@@ -224,25 +225,12 @@ exe @opencodeResult(inputValue, resume) = when [
 >>
 >>   { "mcp": { "name": { "type": "local", "command": ["node", "..."], "environment": {...} } } }
 >>
->> Opencode has no per-call MCP flag and no `--config-file` override, but it honors
->> XDG_CONFIG_HOME for its config directory. We build a shadow config dir:
->>   - symlink every entry from the real $XDG_CONFIG_HOME/opencode into a tmp dir
->>     EXCEPT opencode.json / opencode.jsonc
->>   - merge the generated MCP entries into the user's opencode.json (if any)
->>     and write the result to the shadow dir
->>   - the sh wrapper exports XDG_CONFIG_HOME=<shadow> for that invocation
->>
->> Data (auth, sessions, snapshots) lives under $XDG_DATA_HOME which we don't
->> reroute, so auth and session history remain intact.
->>
->> When mlld supplies `config.tools`, OpenCode needs an invocation-local
->> agent config as well as MCP server translation. The generated agent
->> permission block denies every tool by default and only re-enables the
->> requested mlld/MCP surface.
-exe @opencodeMcpHome(configPath, allowedTools, requestedAgent, hasToolSurface) = node {
+>> OpenCode supports inline runtime overrides through OPENCODE_CONFIG_CONTENT.
+>> We use that as the invocation-local carrier for generated MCP servers plus
+>> the explicit tool surface for this call. This lands after global/project
+>> config merge, so the generated tool surface wins over ambient user defaults.
+exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurface) = node {
   const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
   const explicitToolSurface = hasToolSurface === true || hasToolSurface === 'true' || hasToolSurface === 1;
 
   const allowedNames = typeof allowedTools === 'string'
@@ -288,78 +276,34 @@ exe @opencodeMcpHome(configPath, allowedTools, requestedAgent, hasToolSurface) =
   const translatedNames = Object.keys(translated);
   if (!translatedNames.length && !allowedNames.length && !explicitToolSurface) return "";
 
-  const sourceConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-  const sourceOpencodeDir = path.join(sourceConfigHome, 'opencode');
-
-  const shadowRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mlld-opencode-home-'));
-  const shadowOpencodeDir = path.join(shadowRoot, 'opencode');
-  fs.mkdirSync(shadowOpencodeDir, { recursive: true });
-
-  const skipNames = new Set(['opencode.json', 'opencode.jsonc', 'config.json']);
-  if (fs.existsSync(sourceOpencodeDir)) {
-    for (const entry of fs.readdirSync(sourceOpencodeDir)) {
-      if (skipNames.has(entry)) continue;
-      try {
-        fs.symlinkSync(
-          path.join(sourceOpencodeDir, entry),
-          path.join(shadowOpencodeDir, entry)
-        );
-      } catch { /* best effort */ }
-    }
-  }
-
-  let base = {};
-  for (const candidate of ['config.json', 'opencode.json', 'opencode.jsonc']) {
-    const p = path.join(sourceOpencodeDir, candidate);
-    if (!fs.existsSync(p)) continue;
-    try {
-      const raw = fs.readFileSync(p, 'utf8');
-      const stripped = candidate.endsWith('.jsonc')
-        ? raw.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
-        : raw;
-      const userCfg = JSON.parse(stripped);
-      if (userCfg && typeof userCfg === 'object') {
-        base = { ...base, ...userCfg };
-      }
-    } catch { /* ignore malformed */ }
-  }
+  const base = { $schema: 'https://opencode.ai/config.json' };
   if (translatedNames.length) {
-    base.mcp = { ...(base.mcp && typeof base.mcp === 'object' ? base.mcp : {}), ...translated };
+    base.mcp = translated;
   }
 
   if (allowedNames.length || translatedNames.length || explicitToolSurface) {
     const agentName = typeof requestedAgent === 'string' && requestedAgent.trim()
       ? requestedAgent.trim()
-      : 'build';
-    const baseAgents = base.agent && typeof base.agent === 'object' ? base.agent : {};
-    const existingAgent = baseAgents[agentName] && typeof baseAgents[agentName] === 'object'
-      ? baseAgents[agentName]
-      : {};
-    const existingPermissions = existingAgent.permission && typeof existingAgent.permission === 'object'
-      ? existingAgent.permission
-      : {};
-    const permissionRules = { ...existingPermissions, '*': 'deny' };
+      : 'mlld';
+    const permissionRules = { '*': 'deny' };
+    const toolRules = { '*': false };
     for (const name of translatedNames) {
       permissionRules[`${name}_*`] = 'allow';
+      toolRules[`${name}_*`] = true;
     }
     for (const name of allowedNames) {
       permissionRules[name] = 'allow';
+      toolRules[name] = true;
     }
     base.agent = {
-      ...baseAgents,
       [agentName]: {
-        ...existingAgent,
-        permission: permissionRules
+        permission: permissionRules,
+        tools: toolRules
       }
     };
   }
 
-  fs.writeFileSync(
-    path.join(shadowOpencodeDir, 'opencode.json'),
-    JSON.stringify(base, null, 2),
-    'utf8'
-  );
-  return shadowRoot;
+  return JSON.stringify(base);
 }
 
 >> ── Shell wrapper for opencode run ──
@@ -367,11 +311,11 @@ exe @opencodeMcpHome(configPath, allowedTools, requestedAgent, hasToolSurface) =
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Routing through sh {} with env vars sidesteps the mlld cmd-block double-escape
 >> bug for interpolated values (see ticket m-8694).
-exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, shadowHome, doResume, resumeId) = sh {
+exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId) = sh {
   set -e
 
-  if [ -n "$shadowHome" ]; then
-    export XDG_CONFIG_HOME="$shadowHome"
+  if [ -n "$inlineConfig" ]; then
+    export OPENCODE_CONFIG_CONTENT="$inlineConfig"
   fi
 
   dirFlag=()
@@ -440,18 +384,18 @@ exe llm @opencode(prompt, config) = [
   let @requestedAgent = @cfg.agent ? @cfg.agent : ""
   let @variant = @cfg.variant ? @cfg.variant : ""
   let @bypass = @cfg.bypass ? "1" : ""
-  let @shadowHome = @mx.llm && (@mx.llm.hasTools || @mx.llm.config.isDefined() || @mx.llm.allowed.isDefined())
-    ? @opencodeMcpHome(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, @mx.llm.hasTools)
+  let @inlineConfig = @mx.llm && (@mx.llm.hasTools || @mx.llm.config.isDefined() || @mx.llm.allowed.isDefined())
+    ? @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, @mx.llm.hasTools)
     : ""
   let @agent = when [
-    @shadowHome && @mx.llm && @mx.llm.hasTools => @opencodeToolAgentName(@requestedAgent)
+    @inlineConfig && @mx.llm && @mx.llm.hasTools => @opencodeToolAgentName(@requestedAgent)
     * => @requestedAgent
   ]
   let @finalPrompt = @cfg.system ? @prependOpencodeSystem(@prompt, @cfg.system) : @prompt
   let @resume = @opencodeResume(@cfg)
   let @doResume = @resume.continue && @resume.sessionId ? "1" : ""
   let @resumeId = @resume.sessionId ? @resume.sessionId : ""
-  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @shadowHome, @doResume, @resumeId)
+  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId)
   let @parsed = @parseOpencodeJsonl(@raw)
   let @sessionId = @normalizeOpencodeSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
   let @value = when [
