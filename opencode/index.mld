@@ -239,10 +239,11 @@ exe @opencodeResult(inputValue, resume) = when [
 >> agent config as well as MCP server translation. The generated agent
 >> permission block denies every tool by default and only re-enables the
 >> requested mlld/MCP surface.
-exe @opencodeMcpHome(configPath, allowedTools, requestedAgent) = node {
+exe @opencodeMcpHome(configPath, allowedTools, requestedAgent, hasToolSurface) = node {
   const fs = require('fs');
   const path = require('path');
   const os = require('os');
+  const explicitToolSurface = hasToolSurface === true || hasToolSurface === 'true' || hasToolSurface === 1;
 
   const allowedNames = typeof allowedTools === 'string'
     ? allowedTools.split(',').map((item) => item.trim()).filter(Boolean)
@@ -285,7 +286,7 @@ exe @opencodeMcpHome(configPath, allowedTools, requestedAgent) = node {
   }
 
   const translatedNames = Object.keys(translated);
-  if (!translatedNames.length && !allowedNames.length) return "";
+  if (!translatedNames.length && !allowedNames.length && !explicitToolSurface) return "";
 
   const sourceConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
   const sourceOpencodeDir = path.join(sourceConfigHome, 'opencode');
@@ -326,7 +327,7 @@ exe @opencodeMcpHome(configPath, allowedTools, requestedAgent) = node {
     base.mcp = { ...(base.mcp && typeof base.mcp === 'object' ? base.mcp : {}), ...translated };
   }
 
-  if (allowedNames.length || translatedNames.length) {
+  if (allowedNames.length || translatedNames.length || explicitToolSurface) {
     const agentName = typeof requestedAgent === 'string' && requestedAgent.trim()
       ? requestedAgent.trim()
       : 'build';
@@ -439,8 +440,8 @@ exe llm @opencode(prompt, config) = [
   let @requestedAgent = @cfg.agent ? @cfg.agent : ""
   let @variant = @cfg.variant ? @cfg.variant : ""
   let @bypass = @cfg.bypass ? "1" : ""
-  let @shadowHome = @mx.llm && (@mx.llm.config.isDefined() || @mx.llm.allowed.isDefined())
-    ? @opencodeMcpHome(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent)
+  let @shadowHome = @mx.llm && (@mx.llm.hasTools || @mx.llm.config.isDefined() || @mx.llm.allowed.isDefined())
+    ? @opencodeMcpHome(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, @mx.llm.hasTools)
     : ""
   let @agent = when [
     @shadowHome && @mx.llm && @mx.llm.hasTools => @opencodeToolAgentName(@requestedAgent)
