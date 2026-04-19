@@ -104,6 +104,52 @@ exe @prependOpencodeSystem(prompt, system) = js {
   return sys ? sys + "\n\n" + body : body;
 }
 
+>> When mlld provides an explicit tool surface, target a concrete OpenCode
+>> agent so we can bind permission rules to a real agent config.
+>> If the caller did not request an agent explicitly, use the built-in
+>> `build` agent.
+exe @opencodeToolAgentName(requestedAgent) = js {
+  if (typeof requestedAgent === "string" && requestedAgent.trim()) {
+    return requestedAgent.trim();
+  }
+  return "build";
+}
+
+>> Build the invocation-local OpenCode `permission` config that denies every
+>> tool by default and then re-enables only the mlld-provided surface.
+>>
+>> - `allowedTools` is the runtime CSV from `@mx.llm.allowed`
+>> - `mcpServers` may be an array or CSV of generated MCP server names; each
+>>   server name enables `mcp__<server>__*`
+exe @opencodePermissionRules(allowedTools, mcpServers) = js {
+  const rules = { "*": "deny" };
+
+  const add = (name, value = "allow") => {
+    if (typeof name !== "string") return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    rules[trimmed] = value;
+  };
+
+  const serverNames = Array.isArray(mcpServers)
+    ? mcpServers
+    : typeof mcpServers === "string"
+      ? mcpServers.split(",")
+      : [];
+
+  for (const serverName of serverNames) {
+    add(`mcp__${serverName}__*`);
+  }
+
+  if (typeof allowedTools === "string") {
+    for (const toolName of allowedTools.split(",")) {
+      add(toolName);
+    }
+  }
+
+  return rules;
+}
+
 >> Reads the public and runtime-injected resume/session config for opencode.
 >>
 >> Public API:
@@ -188,48 +234,58 @@ exe @opencodeResult(inputValue, resume) = when [
 >>
 >> Data (auth, sessions, snapshots) lives under $XDG_DATA_HOME which we don't
 >> reroute, so auth and session history remain intact.
-exe @opencodeMcpHome(configPath) = node {
-  if (!configPath) return "";
+>>
+>> When mlld supplies `config.tools`, OpenCode needs an invocation-local
+>> agent config as well as MCP server translation. The generated agent
+>> permission block denies every tool by default and only re-enables the
+>> requested mlld/MCP surface.
+exe @opencodeMcpHome(configPath, allowedTools, requestedAgent) = node {
   const fs = require('fs');
   const path = require('path');
   const os = require('os');
-  if (!fs.existsSync(configPath)) return "";
 
-  let parsed;
-  try { parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { return ""; }
-  const servers = parsed && parsed.mcpServers;
-  if (!servers || typeof servers !== 'object' || !Object.keys(servers).length) {
-    return "";
+  const allowedNames = typeof allowedTools === 'string'
+    ? allowedTools.split(',').map((item) => item.trim()).filter(Boolean)
+    : [];
+
+  let parsed = null;
+  if (configPath && fs.existsSync(configPath)) {
+    try { parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { parsed = null; }
   }
 
   const translated = {};
-  for (const [name, spec] of Object.entries(servers)) {
-    if (!spec || typeof spec !== 'object') continue;
-    if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) continue;
-    if (typeof spec.url === 'string') {
-      const headers = {};
-      if (spec.headers && typeof spec.headers === 'object') {
-        for (const [k, v] of Object.entries(spec.headers)) {
-          if (typeof v === 'string') headers[k] = v;
+  const servers = parsed && parsed.mcpServers;
+  if (servers && typeof servers === 'object') {
+    for (const [name, spec] of Object.entries(servers)) {
+      if (!spec || typeof spec !== 'object') continue;
+      if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) continue;
+      if (typeof spec.url === 'string') {
+        const headers = {};
+        if (spec.headers && typeof spec.headers === 'object') {
+          for (const [k, v] of Object.entries(spec.headers)) {
+            if (typeof v === 'string') headers[k] = v;
+          }
+        }
+        translated[name] = { type: 'remote', url: spec.url, headers };
+        continue;
+      }
+      if (typeof spec.command !== 'string') continue;
+      const argv = [spec.command];
+      if (Array.isArray(spec.args)) {
+        for (const a of spec.args) argv.push(String(a));
+      }
+      const environment = {};
+      if (spec.env && typeof spec.env === 'object') {
+        for (const [k, v] of Object.entries(spec.env)) {
+          if (typeof v === 'string') environment[k] = v;
         }
       }
-      translated[name] = { type: 'remote', url: spec.url, headers };
-      continue;
+      translated[name] = { type: 'local', command: argv, environment, enabled: true };
     }
-    if (typeof spec.command !== 'string') continue;
-    const argv = [spec.command];
-    if (Array.isArray(spec.args)) {
-      for (const a of spec.args) argv.push(String(a));
-    }
-    const environment = {};
-    if (spec.env && typeof spec.env === 'object') {
-      for (const [k, v] of Object.entries(spec.env)) {
-        if (typeof v === 'string') environment[k] = v;
-      }
-    }
-    translated[name] = { type: 'local', command: argv, environment, enabled: true };
   }
-  if (!Object.keys(translated).length) return "";
+
+  const translatedNames = Object.keys(translated);
+  if (!translatedNames.length && !allowedNames.length) return "";
 
   const sourceConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
   const sourceOpencodeDir = path.join(sourceConfigHome, 'opencode');
@@ -266,7 +322,36 @@ exe @opencodeMcpHome(configPath) = node {
       }
     } catch { /* ignore malformed */ }
   }
-  base.mcp = { ...(base.mcp && typeof base.mcp === 'object' ? base.mcp : {}), ...translated };
+  if (translatedNames.length) {
+    base.mcp = { ...(base.mcp && typeof base.mcp === 'object' ? base.mcp : {}), ...translated };
+  }
+
+  if (allowedNames.length || translatedNames.length) {
+    const agentName = typeof requestedAgent === 'string' && requestedAgent.trim()
+      ? requestedAgent.trim()
+      : 'build';
+    const baseAgents = base.agent && typeof base.agent === 'object' ? base.agent : {};
+    const existingAgent = baseAgents[agentName] && typeof baseAgents[agentName] === 'object'
+      ? baseAgents[agentName]
+      : {};
+    const existingPermissions = existingAgent.permission && typeof existingAgent.permission === 'object'
+      ? existingAgent.permission
+      : {};
+    const permissionRules = { ...existingPermissions, '*': 'deny' };
+    for (const name of translatedNames) {
+      permissionRules[`${name}_*`] = 'allow';
+    }
+    for (const name of allowedNames) {
+      permissionRules[name] = 'allow';
+    }
+    base.agent = {
+      ...baseAgents,
+      [agentName]: {
+        ...existingAgent,
+        permission: permissionRules
+      }
+    };
+  }
 
   fs.writeFileSync(
     path.join(shadowOpencodeDir, 'opencode.json'),
@@ -336,8 +421,10 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, shadowHome, doRes
 >> config.tools     - mlld convention: runtime populates @mx.llm.config with a
 >>                    generated MCP bridge JSON. We translate it into an
 >>                    opencode.json mcp block and expose via XDG_CONFIG_HOME.
->>                    Note: opencode has no per-tool gating, so @mx.llm.native
->>                    filtering is informational only.
+>>                    When tools are present, the module also applies an
+>>                    invocation-local OpenCode agent permission block that
+>>                    denies every tool by default and re-enables only the
+>>                    requested mlld/MCP surface.
 >>
 >> Runtime notes:
 >> - Always runs `opencode run --format json` so we can parse sessionID + text
@@ -349,10 +436,16 @@ exe llm @opencode(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"
-  let @agent = @cfg.agent ? @cfg.agent : ""
+  let @requestedAgent = @cfg.agent ? @cfg.agent : ""
   let @variant = @cfg.variant ? @cfg.variant : ""
   let @bypass = @cfg.bypass ? "1" : ""
-  let @shadowHome = @mx.llm && @mx.llm.config ? @opencodeMcpHome(@mx.llm.config) : ""
+  let @shadowHome = @mx.llm && (@mx.llm.config.isDefined() || @mx.llm.allowed.isDefined())
+    ? @opencodeMcpHome(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent)
+    : ""
+  let @agent = when [
+    @shadowHome && @mx.llm && @mx.llm.hasTools => @opencodeToolAgentName(@requestedAgent)
+    * => @requestedAgent
+  ]
   let @finalPrompt = @cfg.system ? @prependOpencodeSystem(@prompt, @cfg.system) : @prompt
   let @resume = @opencodeResume(@cfg)
   let @doResume = @resume.continue && @resume.sessionId ? "1" : ""
@@ -372,4 +465,4 @@ exe llm @opencode(prompt, config) = [
   })
 ] with { stream: @cfg.stream, streamFormat: @opencodeStreamFormat }
 
-export { @opencode, @opencodeStreamFormat }
+export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules }
