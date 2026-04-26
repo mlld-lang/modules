@@ -229,9 +229,22 @@ exe @opencodeResult(inputValue, resume) = when [
 >> We use that as the invocation-local carrier for generated MCP servers plus
 >> the explicit tool surface for this call. This lands after global/project
 >> config merge, so the generated tool surface wins over ambient user defaults.
-exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurface) = node {
+exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurface, mcpTimeoutMs) = node {
   const fs = require('fs');
   const explicitToolSurface = hasToolSurface === true || hasToolSurface === 'true' || hasToolSurface === 1;
+
+  // mcpTimeoutMs is optional. If a positive integer is provided, emit
+  // experimental.mcp_timeout. Otherwise omit entirely and let opencode
+  // use its built-in default — that way we never silently override
+  // opencode's default with an arbitrary number.
+  const timeoutMs = (() => {
+    if (typeof mcpTimeoutMs === 'number' && mcpTimeoutMs > 0 && Number.isFinite(mcpTimeoutMs)) return Math.floor(mcpTimeoutMs);
+    if (typeof mcpTimeoutMs === 'string' && /^\d+$/.test(mcpTimeoutMs.trim())) {
+      const n = parseInt(mcpTimeoutMs.trim(), 10);
+      if (n > 0) return n;
+    }
+    return null;
+  })();
 
   const allowedNames = typeof allowedTools === 'string'
     ? allowedTools.split(',').map((item) => item.trim()).filter(Boolean)
@@ -276,7 +289,10 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
   const translatedNames = Object.keys(translated);
   if (!translatedNames.length && !allowedNames.length && !explicitToolSurface) return "";
 
-  const base = { $schema: 'https://opencode.ai/config.json', experimental: { mcp_timeout: 300000 } };
+  const base = { $schema: 'https://opencode.ai/config.json' };
+  if (timeoutMs !== null) {
+    base.experimental = { mcp_timeout: timeoutMs };
+  }
   if (translatedNames.length) {
     base.mcp = translated;
   }
@@ -409,8 +425,9 @@ exe llm @opencode(prompt, config) = [
   let @bypass = @cfg.bypass ? "1" : ""
   let @explicitNoTools = @cfg.tools.isDefined() && @cfg.tools.length == 0
   let @hasToolBridge = @mx.llm && !@explicitNoTools && @mx.llm.hasTools && (@mx.llm.allowed ?? "") != ""
+  let @mcpTimeoutMs = @cfg.mcpTimeoutMs.isDefined() ? @cfg.mcpTimeoutMs : null
   let @inlineConfig = when [
-    @hasToolBridge => @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, true)
+    @hasToolBridge => @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, true, @mcpTimeoutMs)
     * => ""
   ]
   let @agent = when [
