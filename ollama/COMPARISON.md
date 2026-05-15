@@ -32,8 +32,9 @@
 ## Use Case Guide
 
 ### Code Review
-- **Simple linting/style**: Ollama (qwen2.5-coder, deepseek-coder)
-- **Code generation**: Ollama (qwen2.5-coder:32b, best quality)
+- **Simple linting/style**: Ollama (qwen3-coder, deepseek-coder)
+- **Code generation**: Ollama (qwen3-coder:32b, best quality)
+- **Code refactoring**: Ollama (qwen3-coder:14b, balanced)
 - **Architecture review**: Claude or GPT-4
 - **Security audit**: Claude or GPT-4
 
@@ -101,13 +102,14 @@ var @r = @claude("prompt", {
 - Claude (sonnet): ~3s (network)
 
 **Code generation: "Write a sorting function"**
+- Ollama (qwen3-coder): ~4s, excellent quality (latest!)
 - Ollama (qwen2.5-coder): ~4s, excellent quality
 - Ollama (deepseek-coder): ~3s, very good quality  
-- Ollama (qwen2.5-coder:32b): ~8s, exceptional quality
+- Ollama (qwen3-coder:32b): ~8s, exceptional quality
 - OpenAI (gpt-4o): ~4s, excellent quality
 - Claude (sonnet): ~4s, excellent quality
 
-**Note**: Qwen 2.5 Coder rivals GPT-4o for code generation tasks
+**Note**: Qwen 3 Coder matches or exceeds GPT-4o for code generation tasks
 
 **Results vary by hardware and network conditions*
 
@@ -121,7 +123,7 @@ import { @openai } from @mlld/openai
 
 >> Development: Use Ollama (fast, free)
 when @env.get("NODE_ENV") == "development" => {
-  var @result = @ollama("prompt", { model: "qwen2.5-coder" })
+  var @result = @ollama("prompt", { model: "qwen3-coder" })
 }
 
 >> Production: Use OpenAI/Claude (reliable)
@@ -132,18 +134,19 @@ when @env.get("NODE_ENV") == "production" => {
 
 ## Model Capability Tiers
 
-**Tier 1 (Best)**: GPT-4, Claude Opus
+**Tier 1 (Best)**: GPT-4, Claude Opus, Qwen 3 Coder 32B (Ollama)
 - Complex reasoning
 - Large context
 - Cutting-edge features
+- Qwen 3 Coder matches GPT-4 for code
 
-**Tier 2 (Strong)**: GPT-4o-mini, Claude Sonnet, Qwen 2.5 Coder 32B (Ollama), Mixtral (Ollama)
+**Tier 2 (Strong)**: GPT-4o-mini, Claude Sonnet, Qwen 3 Coder 14B (Ollama), Qwen 2.5 Coder 32B (Ollama), Mixtral (Ollama)
 - Good reasoning
 - Cost-effective
 - Balanced performance
-- Qwen 2.5 Coder rivals GPT-4 for code
+- Excellent code generation
 
-**Tier 3 (Fast)**: Qwen 2.5 Coder 7B, DeepSeek Coder, Llama 3.2, Phi-3, Mistral (Ollama)
+**Tier 3 (Fast)**: Qwen 3 Coder 7B, Qwen 2.5 Coder 7B, DeepSeek Coder, Llama 3.2, Phi-3, Mistral (Ollama)
 - Quick responses
 - Good for most code tasks
 - Low resource usage

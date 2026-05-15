@@ -61,8 +61,11 @@ show @ollama("Hello!")
 ollama pull llama3.2          # Latest Llama (4GB)
 
 # Code-specialized models (pick one or more)
-ollama pull qwen2.5-coder     # Qwen Coder 7B (4.7GB) - Excellent
-ollama pull qwen2.5-coder:32b # Qwen Coder 32B (19GB) - Best quality
+ollama pull qwen3-coder       # Qwen 3 Coder 7B (4.7GB) - Latest & Best!
+ollama pull qwen3-coder:14b   # Qwen 3 Coder 14B (8.5GB) - Balanced
+ollama pull qwen3-coder:32b   # Qwen 3 Coder 32B (19GB) - Highest quality
+ollama pull qwen2.5-coder     # Qwen 2.5 Coder 7B (4.7GB) - Still excellent
+ollama pull qwen2.5-coder:32b # Qwen 2.5 Coder 32B (19GB) - Great quality
 ollama pull deepseek-coder    # DeepSeek 6.7B (3.8GB) - Fast
 ollama pull deepseek-coder:33b # DeepSeek 33B (19GB) - High quality
 ollama pull codellama         # CodeLlama 7B (3.8GB) - Alternative
@@ -92,10 +95,10 @@ ollama rm <model-name>
 
 ```bash
 cat > test-ollama.mld << 'EOF'
-import { @qwenCoder } from @mlld/ollama
+import { @qwen3Coder } from @mlld/ollama
 
-show "Testing Ollama module..."
-var @result = @qwenCoder("Write a Python function that adds two numbers")
+show "Testing Ollama module with Qwen 3..."
+var @result = @qwen3Coder("Write a Python function that adds two numbers")
 show @result
 EOF
 ```
@@ -198,8 +201,11 @@ show @mx.config
 | codellama | 3.8GB | 8GB |
 | llama3.1 | 4.7GB | 8GB |
 | qwen2.5-coder | 4.7GB | 8GB |
+| qwen3-coder | 4.7GB | 8GB |
+| qwen3-coder:14b | 8.5GB | 12GB |
 | deepseek-coder:33b | 19GB | 24GB |
 | qwen2.5-coder:32b | 19GB | 24GB |
+| qwen3-coder:32b | 19GB | 24GB |
 | mixtral | 26GB | 32GB |
 
 ## GPU Support

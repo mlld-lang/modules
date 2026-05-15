@@ -5,13 +5,13 @@ Ollama chat completions with streaming support for local models.
 ## tldr
 
 ```mlld
-import { @ollama, @llama3_2, @qwenCoder, @deepseekCoder } from @mlld/ollama
+import { @ollama, @llama3_2, @qwen3Coder, @qwenCoder } from @mlld/ollama
 
 show @llama3_2("What is REST?")
-show @qwenCoder("Write a Python function to sort a list")
+show @qwen3Coder("Write a Python function to sort a list")
 
 var @result = @ollama("Review this code", {
-  model: "qwen2.5-coder:32b",
+  model: "qwen3-coder:32b",
   system: "You are a code reviewer",
   temperature: 0.3,
   stream: true
@@ -118,6 +118,18 @@ Qwen2.5-Coder 32B — larger variant, superior code understanding and generation
 
 Qwen2.5-Coder 7B — explicit 7B variant, fast and capable.
 
+### `@qwen3Coder(prompt)`
+
+Qwen3-Coder — latest Qwen 3 series coding model, cutting-edge performance (default: 7B).
+
+### `@qwen3Coder14b(prompt)`
+
+Qwen3-Coder 14B — mid-size variant, excellent balance of speed and quality.
+
+### `@qwen3Coder32b(prompt)`
+
+Qwen3-Coder 32B — largest variant, state-of-the-art code generation.
+
 ### `@deepseekCoder(prompt)`
 
 DeepSeek-Coder — specialized for code completion and generation (default: 6.7B).
@@ -152,10 +164,13 @@ ollama pull mistral
 
 # Code-specialized models
 ollama pull codellama
-ollama pull qwen2.5-coder          # 7B default
-ollama pull qwen2.5-coder:32b      # Larger variant
-ollama pull deepseek-coder         # 6.7B default
-ollama pull deepseek-coder:33b     # Larger variant
+ollama pull qwen2.5-coder          # Qwen 2.5 - 7B default
+ollama pull qwen2.5-coder:32b      # Qwen 2.5 - 32B variant
+ollama pull qwen3-coder            # Qwen 3 - Latest (7B)
+ollama pull qwen3-coder:14b        # Qwen 3 - 14B variant
+ollama pull qwen3-coder:32b        # Qwen 3 - 32B variant
+ollama pull deepseek-coder         # DeepSeek - 6.7B default
+ollama pull deepseek-coder:33b     # DeepSeek - 33B variant
 ```
 
 ### Start Ollama
@@ -180,7 +195,8 @@ Popular models you can use with Ollama:
 
 **Code-Specialized:**
 - `codellama` — Meta's CodeLlama (7B)
-- `qwen2.5-coder` — Qwen 2.5 Coder (7B, 14B, 32B variants)
+- `qwen3-coder` — Qwen 3 Coder (7B, 14B, 32B variants) - Latest!
+- `qwen2.5-coder` — Qwen 2.5 Coder (7B, 32B variants)
 - `deepseek-coder` — DeepSeek Coder (1.3B, 6.7B, 33B variants)
 - `codegemma` — Google's code-tuned Gemma
 

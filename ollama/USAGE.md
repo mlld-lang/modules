@@ -10,7 +10,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 2. Pull your desired models:
 ```bash
 ollama pull llama3.2
-ollama pull qwen2.5-coder      # Excellent for coding
+ollama pull qwen3-coder        # Latest Qwen 3 - Best for coding
+ollama pull qwen2.5-coder      # Qwen 2.5 - Still excellent
 ollama pull deepseek-coder     # Alternative coding model
 ```
 
@@ -22,15 +23,19 @@ curl http://localhost:11434/api/tags
 ## Basic Usage
 
 ```mlld
-import { @llama3_2, @qwenCoder, @deepseekCoder } from @mlld/ollama
+import { @llama3_2, @qwen3Coder, @qwenCoder, @deepseekCoder } from @mlld/ollama
 
 >> Simple query
 var @answer = @llama3_2("Explain Docker in one sentence")
 show @answer
 
->> Code generation with Qwen
-var @code = @qwenCoder("Write a binary search function in Python")
+>> Code generation with Qwen 3 (latest)
+var @code = @qwen3Coder("Write a binary search function in Python")
 show @code
+
+>> Code generation with Qwen 2.5 (also excellent)
+var @code2 = @qwenCoder("Write a quicksort in JavaScript")
+show @code2
 
 >> Code review with DeepSeek
 var @review = @deepseekCoder("Review this: const x = 5;")
@@ -89,9 +94,10 @@ var @data = @ollama("List 3 programming languages", {
 ## Model Recommendations
 
 - **General queries**: llama3.2
-- **Code generation**: qwen2.5-coder, deepseek-coder
-- **Code review**: qwen2.5-coder:32b, codellama
-- **Code completion**: deepseek-coder (fast)
+- **Code generation** (best): qwen3-coder, qwen3-coder:32b
+- **Code generation** (fast): qwen2.5-coder, deepseek-coder
+- **Code review**: qwen3-coder:32b, qwen2.5-coder:32b
+- **Code completion**: deepseek-coder (fastest)
 - **Creative writing**: mixtral
 - **Fast/efficient**: phi3, mistral
 - **Reasoning**: mixtral, llama3.1

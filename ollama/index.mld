@@ -140,7 +140,10 @@ exe llm @codellama(prompt) = @ollama(@prompt, { model: "codellama" })
 exe llm @qwenCoder(prompt) = @ollama(@prompt, { model: "qwen2.5-coder" })
 exe llm @qwenCoder32b(prompt) = @ollama(@prompt, { model: "qwen2.5-coder:32b" })
 exe llm @qwenCoder7b(prompt) = @ollama(@prompt, { model: "qwen2.5-coder:7b" })
+exe llm @qwen3Coder(prompt) = @ollama(@prompt, { model: "qwen3-coder" })
+exe llm @qwen3Coder14b(prompt) = @ollama(@prompt, { model: "qwen3-coder:14b" })
+exe llm @qwen3Coder32b(prompt) = @ollama(@prompt, { model: "qwen3-coder:32b" })
 exe llm @deepseekCoder(prompt) = @ollama(@prompt, { model: "deepseek-coder" })
 exe llm @deepseekCoder33b(prompt) = @ollama(@prompt, { model: "deepseek-coder:33b" })
 
-export { @ollama, @llama3_2, @llama3_1, @mixtral, @phi3, @mistral, @codellama, @qwenCoder, @qwenCoder32b, @qwenCoder7b, @deepseekCoder, @deepseekCoder33b, @ollamaStreamFormat }
+export { @ollama, @llama3_2, @llama3_1, @mixtral, @phi3, @mistral, @codellama, @qwenCoder, @qwenCoder32b, @qwenCoder7b, @qwen3Coder, @qwen3Coder14b, @qwen3Coder32b, @deepseekCoder, @deepseekCoder33b, @ollamaStreamFormat }
