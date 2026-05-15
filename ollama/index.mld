@@ -128,11 +128,19 @@ exe llm @ollama(prompt, config) = [
 
 >> ── Model shortcuts ──
 
+>> General purpose models
 exe llm @llama3_2(prompt) = @ollama(@prompt, { model: "llama3.2" })
 exe llm @llama3_1(prompt) = @ollama(@prompt, { model: "llama3.1" })
 exe llm @mixtral(prompt) = @ollama(@prompt, { model: "mixtral" })
-exe llm @codellama(prompt) = @ollama(@prompt, { model: "codellama" })
 exe llm @phi3(prompt) = @ollama(@prompt, { model: "phi3" })
 exe llm @mistral(prompt) = @ollama(@prompt, { model: "mistral" })
 
-export { @ollama, @llama3_2, @llama3_1, @mixtral, @codellama, @phi3, @mistral, @ollamaStreamFormat }
+>> Code-specialized models
+exe llm @codellama(prompt) = @ollama(@prompt, { model: "codellama" })
+exe llm @qwenCoder(prompt) = @ollama(@prompt, { model: "qwen2.5-coder" })
+exe llm @qwenCoder32b(prompt) = @ollama(@prompt, { model: "qwen2.5-coder:32b" })
+exe llm @qwenCoder7b(prompt) = @ollama(@prompt, { model: "qwen2.5-coder:7b" })
+exe llm @deepseekCoder(prompt) = @ollama(@prompt, { model: "deepseek-coder" })
+exe llm @deepseekCoder33b(prompt) = @ollama(@prompt, { model: "deepseek-coder:33b" })
+
+export { @ollama, @llama3_2, @llama3_1, @mixtral, @phi3, @mistral, @codellama, @qwenCoder, @qwenCoder32b, @qwenCoder7b, @deepseekCoder, @deepseekCoder33b, @ollamaStreamFormat }

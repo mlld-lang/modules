@@ -5,13 +5,13 @@ Ollama chat completions with streaming support for local models.
 ## tldr
 
 ```mlld
-import { @ollama, @llama3_2, @mixtral, @codellama } from @mlld/ollama
+import { @ollama, @llama3_2, @qwenCoder, @deepseekCoder } from @mlld/ollama
 
 show @llama3_2("What is REST?")
-show @mixtral("Summarize this document")
+show @qwenCoder("Write a Python function to sort a list")
 
 var @result = @ollama("Review this code", {
-  model: "codellama",
+  model: "qwen2.5-coder:32b",
   system: "You are a code reviewer",
   temperature: 0.3,
   stream: true
@@ -78,6 +78,8 @@ var @creative = @ollama("Write a creative story", {
 })
 ```
 
+### General Purpose Models
+
 ### `@llama3_2(prompt)`
 
 Llama 3.2 — latest model, good general capability.
@@ -90,10 +92,6 @@ Llama 3.1 — previous generation, still capable.
 
 Mixtral — Mixtral MoE model, good for reasoning.
 
-### `@codellama(prompt)`
-
-CodeLlama — specialized for code generation and review.
-
 ### `@phi3(prompt)`
 
 Phi-3 — Microsoft's small but capable model.
@@ -101,6 +99,32 @@ Phi-3 — Microsoft's small but capable model.
 ### `@mistral(prompt)`
 
 Mistral — fast and efficient model.
+
+### Code-Specialized Models
+
+### `@codellama(prompt)`
+
+CodeLlama — specialized for code generation and review.
+
+### `@qwenCoder(prompt)`
+
+Qwen2.5-Coder — Alibaba's latest coding model, excellent for code generation (default: 7B).
+
+### `@qwenCoder32b(prompt)`
+
+Qwen2.5-Coder 32B — larger variant, superior code understanding and generation.
+
+### `@qwenCoder7b(prompt)`
+
+Qwen2.5-Coder 7B — explicit 7B variant, fast and capable.
+
+### `@deepseekCoder(prompt)`
+
+DeepSeek-Coder — specialized for code completion and generation (default: 6.7B).
+
+### `@deepseekCoder33b(prompt)`
+
+DeepSeek-Coder 33B — larger variant, excellent for complex coding tasks.
 
 ### `@ollamaStreamFormat`
 
@@ -120,11 +144,18 @@ curl -fsSL https://ollama.com/install.sh | sh
 ### Pull Models
 
 ```bash
+# General purpose models
 ollama pull llama3.2
-ollama pull codellama
 ollama pull mixtral
 ollama pull phi3
 ollama pull mistral
+
+# Code-specialized models
+ollama pull codellama
+ollama pull qwen2.5-coder          # 7B default
+ollama pull qwen2.5-coder:32b      # Larger variant
+ollama pull deepseek-coder         # 6.7B default
+ollama pull deepseek-coder:33b     # Larger variant
 ```
 
 ### Start Ollama
@@ -139,15 +170,19 @@ curl http://localhost:11434/api/tags
 
 Popular models you can use with Ollama:
 
-- `llama3.2` — Latest Llama model
-- `llama3.1` — Previous Llama generation
-- `codellama` — Specialized for code
+**General Purpose:**
+- `llama3.2` — Latest Llama model (3B)
+- `llama3.1` — Previous Llama generation (8B)
 - `mixtral` — Mixtral 8x7B MoE
-- `phi3` — Microsoft Phi-3
+- `phi3` — Microsoft Phi-3 (3.8B)
 - `mistral` — Mistral 7B
 - `gemma2` — Google Gemma 2
-- `qwen2` — Alibaba Qwen 2
-- `deepseek-coder` — DeepSeek code model
+
+**Code-Specialized:**
+- `codellama` — Meta's CodeLlama (7B)
+- `qwen2.5-coder` — Qwen 2.5 Coder (7B, 14B, 32B variants)
+- `deepseek-coder` — DeepSeek Coder (1.3B, 6.7B, 33B variants)
+- `codegemma` — Google's code-tuned Gemma
 
 See full list at https://ollama.com/library
 

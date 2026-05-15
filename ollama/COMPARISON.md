@@ -32,7 +32,8 @@
 ## Use Case Guide
 
 ### Code Review
-- **Simple linting/style**: Ollama (codellama)
+- **Simple linting/style**: Ollama (qwen2.5-coder, deepseek-coder)
+- **Code generation**: Ollama (qwen2.5-coder:32b, best quality)
 - **Architecture review**: Claude or GPT-4
 - **Security audit**: Claude or GPT-4
 
@@ -100,9 +101,13 @@ var @r = @claude("prompt", {
 - Claude (sonnet): ~3s (network)
 
 **Code generation: "Write a sorting function"**
-- Ollama (codellama): ~5s, decent quality
+- Ollama (qwen2.5-coder): ~4s, excellent quality
+- Ollama (deepseek-coder): ~3s, very good quality  
+- Ollama (qwen2.5-coder:32b): ~8s, exceptional quality
 - OpenAI (gpt-4o): ~4s, excellent quality
 - Claude (sonnet): ~4s, excellent quality
+
+**Note**: Qwen 2.5 Coder rivals GPT-4o for code generation tasks
 
 **Results vary by hardware and network conditions*
 
@@ -116,7 +121,7 @@ import { @openai } from @mlld/openai
 
 >> Development: Use Ollama (fast, free)
 when @env.get("NODE_ENV") == "development" => {
-  var @result = @ollama("prompt", { model: "codellama" })
+  var @result = @ollama("prompt", { model: "qwen2.5-coder" })
 }
 
 >> Production: Use OpenAI/Claude (reliable)
@@ -132,14 +137,15 @@ when @env.get("NODE_ENV") == "production" => {
 - Large context
 - Cutting-edge features
 
-**Tier 2 (Strong)**: GPT-4o-mini, Claude Sonnet, Mixtral (Ollama)
+**Tier 2 (Strong)**: GPT-4o-mini, Claude Sonnet, Qwen 2.5 Coder 32B (Ollama), Mixtral (Ollama)
 - Good reasoning
 - Cost-effective
 - Balanced performance
+- Qwen 2.5 Coder rivals GPT-4 for code
 
-**Tier 3 (Fast)**: Llama 3.2, Phi-3, Mistral (Ollama)
+**Tier 3 (Fast)**: Qwen 2.5 Coder 7B, DeepSeek Coder, Llama 3.2, Phi-3, Mistral (Ollama)
 - Quick responses
-- Simple tasks
+- Good for most code tasks
 - Low resource usage
 
 ## Recommendations

@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of @mlld/ollama module
 - Core `@ollama` function with full configuration support
 - Streaming support with NDJSON format adapter
-- Model shortcuts: `@llama3_2`, `@llama3_1`, `@mixtral`, `@codellama`, `@phi3`, `@mistral`
+- General model shortcuts: `@llama3_2`, `@llama3_1`, `@mixtral`, `@phi3`, `@mistral`
+- Code-specialized model shortcuts: `@codellama`, `@qwenCoder`, `@qwenCoder32b`, `@qwenCoder7b`, `@deepseekCoder`, `@deepseekCoder33b`
 - Support for custom Ollama endpoints via `baseUrl`
 - JSON output mode via `format: "json"`
 - Multi-turn conversation support via `messages` array

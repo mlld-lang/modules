@@ -2,28 +2,39 @@
 
 >> Example usage of the Ollama module
 >> Make sure Ollama is running: ollama serve
+>> And models are pulled: ollama pull qwen2.5-coder
 
-import { @ollama, @llama3_2, @codellama } from @mlld/ollama
+import { @ollama, @llama3_2, @qwenCoder, @deepseekCoder } from @mlld/ollama
 
->> Simple call with default model
+>> Simple call with general model
 show "=== Basic Query ==="
 var @answer = @llama3_2("What is REST in one sentence?")
 show @answer
 
->> With system prompt
-show "\n=== Code Review ==="
-var @review = @ollama("Review this function: function add(a, b) { return a + b; }", {
-  model: "codellama",
-  system: "You are a code reviewer. Be concise.",
-  temperature: 0.3
-})
+>> Code generation with Qwen Coder
+show "\n=== Code Generation (Qwen) ==="
+var @code = @qwenCoder("Write a Python function to calculate factorial")
+show @code
+
+>> Code review with DeepSeek
+show "\n=== Code Review (DeepSeek) ==="
+var @review = @deepseekCoder("Review this: def add(a, b): return a + b")
 show @review
+
+>> Advanced usage with 32B model
+show "\n=== Advanced Code (Qwen 32B) ==="
+var @advanced = @ollama("Implement a binary search tree with insert and search", {
+  model: "qwen2.5-coder:32b",
+  system: "Write clean, documented Python code",
+  temperature: 0.2
+})
+show @advanced
 
 >> Streaming example
 show "\n=== Streaming Response ==="
-var @story = @ollama("Write a haiku about programming", {
-  model: "llama3.2",
+var @story = @ollama("Explain recursion with a simple example", {
+  model: "qwen2.5-coder",
   stream: true,
-  temperature: 0.8
+  temperature: 0.7
 })
 show @story

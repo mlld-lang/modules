@@ -10,8 +10,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 2. Pull your desired models:
 ```bash
 ollama pull llama3.2
-ollama pull codellama
-ollama pull mixtral
+ollama pull qwen2.5-coder      # Excellent for coding
+ollama pull deepseek-coder     # Alternative coding model
 ```
 
 3. Verify Ollama is running:
@@ -22,14 +22,18 @@ curl http://localhost:11434/api/tags
 ## Basic Usage
 
 ```mlld
-import { @llama3_2, @codellama } from @mlld/ollama
+import { @llama3_2, @qwenCoder, @deepseekCoder } from @mlld/ollama
 
 >> Simple query
 var @answer = @llama3_2("Explain Docker in one sentence")
 show @answer
 
->> Code-specific queries
-var @review = @codellama("Review this: const x = 5;")
+>> Code generation with Qwen
+var @code = @qwenCoder("Write a binary search function in Python")
+show @code
+
+>> Code review with DeepSeek
+var @review = @deepseekCoder("Review this: const x = 5;")
 show @review
 ```
 
@@ -85,7 +89,9 @@ var @data = @ollama("List 3 programming languages", {
 ## Model Recommendations
 
 - **General queries**: llama3.2
-- **Code tasks**: codellama, deepseek-coder
+- **Code generation**: qwen2.5-coder, deepseek-coder
+- **Code review**: qwen2.5-coder:32b, codellama
+- **Code completion**: deepseek-coder (fast)
 - **Creative writing**: mixtral
 - **Fast/efficient**: phi3, mistral
 - **Reasoning**: mixtral, llama3.1

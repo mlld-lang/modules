@@ -59,9 +59,15 @@ show @ollama("Hello!")
 ```bash
 # Essential models
 ollama pull llama3.2          # Latest Llama (4GB)
-ollama pull codellama         # Code-specialized (3.8GB)
 
-# Optional models
+# Code-specialized models (pick one or more)
+ollama pull qwen2.5-coder     # Qwen Coder 7B (4.7GB) - Excellent
+ollama pull qwen2.5-coder:32b # Qwen Coder 32B (19GB) - Best quality
+ollama pull deepseek-coder    # DeepSeek 6.7B (3.8GB) - Fast
+ollama pull deepseek-coder:33b # DeepSeek 33B (19GB) - High quality
+ollama pull codellama         # CodeLlama 7B (3.8GB) - Alternative
+
+# Optional general models
 ollama pull mixtral           # Reasoning (26GB)
 ollama pull phi3              # Small but capable (2.3GB)
 ollama pull mistral           # Fast (4.1GB)
@@ -86,10 +92,10 @@ ollama rm <model-name>
 
 ```bash
 cat > test-ollama.mld << 'EOF'
-import { @llama3_2 } from @mlld/ollama
+import { @qwenCoder } from @mlld/ollama
 
 show "Testing Ollama module..."
-var @result = @llama3_2("Say 'Hello from Ollama!' in exactly 5 words")
+var @result = @qwenCoder("Write a Python function that adds two numbers")
 show @result
 EOF
 ```
@@ -103,7 +109,8 @@ mlld test-ollama.mld
 Expected output:
 ```
 Testing Ollama module...
-Hello from Ollama today!
+def add(a, b):
+    return a + b
 ```
 
 ## Configuration
@@ -187,8 +194,12 @@ show @mx.config
 | phi3 | 2.3GB | 4GB |
 | mistral | 4.1GB | 8GB |
 | llama3.2 | 4GB | 8GB |
+| deepseek-coder | 3.8GB | 8GB |
 | codellama | 3.8GB | 8GB |
 | llama3.1 | 4.7GB | 8GB |
+| qwen2.5-coder | 4.7GB | 8GB |
+| deepseek-coder:33b | 19GB | 24GB |
+| qwen2.5-coder:32b | 19GB | 24GB |
 | mixtral | 26GB | 32GB |
 
 ## GPU Support
