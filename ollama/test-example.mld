@@ -1,0 +1,29 @@
+#!/usr/bin/env mlld
+
+>> Example usage of the Ollama module
+>> Make sure Ollama is running: ollama serve
+
+import { @ollama, @llama3_2, @codellama } from @mlld/ollama
+
+>> Simple call with default model
+show "=== Basic Query ==="
+var @answer = @llama3_2("What is REST in one sentence?")
+show @answer
+
+>> With system prompt
+show "\n=== Code Review ==="
+var @review = @ollama("Review this function: function add(a, b) { return a + b; }", {
+  model: "codellama",
+  system: "You are a code reviewer. Be concise.",
+  temperature: 0.3
+})
+show @review
+
+>> Streaming example
+show "\n=== Streaming Response ==="
+var @story = @ollama("Write a haiku about programming", {
+  model: "llama3.2",
+  stream: true,
+  temperature: 0.8
+})
+show @story
