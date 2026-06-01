@@ -117,9 +117,11 @@ exe @opencodeToolAgentName(requestedAgent) = js {
 }
 
 >> Build the invocation-local OpenCode `permission` config that denies every
->> tool by default and then re-enables only the mlld-provided surface.
+>> tool by default and then re-enables only the mlld-provided surface: the
+>> generated MCP servers plus any OpenCode native tools the caller listed.
 >>
->> - `allowedTools` is the runtime CSV from `@mx.llm.allowed`
+>> - `allowedTools` is the runtime CSV from `@mx.llm.native` — the native tool
+>>   names the caller listed; when empty, native tools stay denied
 >> - `mcpServers` may be an array or CSV of generated MCP server names; each
 >>   server name enables `mcp__<server>__*`
 exe @opencodePermissionRules(allowedTools, mcpServers) = js {
@@ -229,9 +231,33 @@ exe @opencodeResult(inputValue, resume) = when [
 >> We use that as the invocation-local carrier for generated MCP servers plus
 >> the explicit tool surface for this call. This lands after global/project
 >> config merge, so the generated tool surface wins over ambient user defaults.
-exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurface, mcpTimeoutMs) = node {
+exe @opencodeInlineConfig(configPath, nativeTools, requestedAgent, hasToolSurface, mcpTimeoutMs) = node {
   const fs = require('fs');
   const explicitToolSurface = hasToolSurface === true || hasToolSurface === 'true' || hasToolSurface === 1;
+
+  // `nativeTools` is the CSV from @mx.llm.native — the OpenCode native tools the
+  // caller explicitly listed in their tool surface. The deny-by-default base
+  // below stays in place; these names are the only native tools re-enabled on
+  // top of it. When the caller lists no native tools (e.g. an MCP-only surface),
+  // every native tool stays denied and only the MCP servers are reachable.
+  //
+  // mlld's capitalized VFS builtin names (Read/Write/Bash/Glob/Grep) are mapped
+  // to their OpenCode equivalents so a tool surface authored in the mlld
+  // convention re-enables the right native tools; Write maps to the whole file
+  // mutation family (write/edit/patch/apply_patch). Any other name is passed
+  // through verbatim, so callers can also list OpenCode native names directly
+  // (e.g. "edit", "bash", "webfetch").
+  const NATIVE_ALIASES = {
+    Read: ['read'],
+    Write: ['write', 'edit', 'patch', 'apply_patch'],
+    Bash: ['bash'],
+    Glob: ['glob', 'list'],
+    Grep: ['grep']
+  };
+  const nativeNames = (typeof nativeTools === 'string' ? nativeTools.split(',') : [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .flatMap((name) => NATIVE_ALIASES[name] || [name]);
 
   // mcpTimeoutMs is optional. If a positive integer is provided, emit
   // experimental.mcp_timeout. Otherwise omit entirely and let opencode
@@ -245,10 +271,6 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
     }
     return null;
   })();
-
-  const allowedNames = typeof allowedTools === 'string'
-    ? allowedTools.split(',').map((item) => item.trim()).filter(Boolean)
-    : [];
 
   let parsed = null;
   if (configPath && fs.existsSync(configPath)) {
@@ -287,7 +309,7 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
   }
 
   const translatedNames = Object.keys(translated);
-  if (!translatedNames.length && !allowedNames.length && !explicitToolSurface) return "";
+  if (!translatedNames.length && !nativeNames.length && !explicitToolSurface) return "";
 
   const base = { $schema: 'https://opencode.ai/config.json' };
   if (timeoutMs !== null) {
@@ -297,7 +319,7 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
     base.mcp = translated;
   }
 
-  if (allowedNames.length || translatedNames.length || explicitToolSurface) {
+  if (nativeNames.length || translatedNames.length || explicitToolSurface) {
     const agentName = typeof requestedAgent === 'string' && requestedAgent.trim()
       ? requestedAgent.trim()
       : 'mlld';
@@ -307,7 +329,7 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
       permissionRules[`${name}_*`] = 'allow';
       toolRules[`${name}_*`] = true;
     }
-    for (const name of allowedNames) {
+    for (const name of nativeNames) {
       permissionRules[name] = 'allow';
       toolRules[name] = true;
     }
@@ -408,7 +430,11 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >>                    When tools are present, the module also applies an
 >>                    invocation-local OpenCode agent permission block that
 >>                    denies every tool by default and re-enables only the
->>                    requested mlld/MCP surface.
+>>                    requested surface: the generated MCP servers plus any
+>>                    OpenCode native tools the caller listed as plain strings
+>>                    (e.g. "edit", "bash", or the mlld VFS names Read/Write/
+>>                    Bash/Glob/Grep). List no native tools to keep the surface
+>>                    MCP-only.
 >>
 >> Runtime notes:
 >> - Always runs `opencode run --format json` so we can parse sessionID + text
@@ -427,7 +453,7 @@ exe llm @opencode(prompt, config) = [
   let @hasToolBridge = @mx.llm && !@explicitNoTools && @mx.llm.hasTools && (@mx.llm.allowed ?? "") != ""
   let @mcpTimeoutMs = @cfg.mcpTimeoutMs.isDefined() ? @cfg.mcpTimeoutMs : null
   let @inlineConfig = when [
-    @hasToolBridge => @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, true, @mcpTimeoutMs)
+    @hasToolBridge => @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.native ?? "", @requestedAgent, true, @mcpTimeoutMs)
     * => ""
   ]
   let @agent = when [
