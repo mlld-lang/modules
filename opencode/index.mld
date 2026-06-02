@@ -449,8 +449,14 @@ exe llm @opencode(prompt, config) = [
   let @requestedAgent = @cfg.agent ? @cfg.agent : ""
   let @variant = @cfg.variant ? @cfg.variant : ""
   let @bypass = @cfg.bypass ? "1" : ""
-  let @explicitNoTools = @cfg.tools.isDefined() && @cfg.tools.length == 0
-  let @hasToolBridge = @mx.llm && !@explicitNoTools && @mx.llm.hasTools && (@mx.llm.allowed ?? "") != ""
+  >> Any engagement with the tool system locks the surface down: when the runtime
+  >> set @mx.llm.hasTools (a `tools` key was passed, including an empty `tools: []`)
+  >> we always emit the deny-by-default permission block, so OpenCode's native
+  >> tools are disabled unless explicitly re-enabled via the allow list. An omitted
+  >> `tools` leaves hasTools false and OpenCode keeps its native defaults. The block
+  >> is emitted even when the allow list is empty — @opencodeInlineConfig returns a
+  >> pure `{ '*': 'deny' }` surface in that case.
+  let @hasToolBridge = @mx.llm && @mx.llm.hasTools
   let @mcpTimeoutMs = @cfg.mcpTimeoutMs.isDefined() ? @cfg.mcpTimeoutMs : null
   let @inlineConfig = when [
     @hasToolBridge => @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, true, @mcpTimeoutMs)
