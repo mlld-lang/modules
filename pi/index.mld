@@ -1,0 +1,168 @@
+needs { sh }
+
+>> Stream format adapter for Pi CLI JSONL output (pi --mode json)
+>> Maps pi's AgentEvent types to mlld's stream format conventions
+var @piStreamFormat = {
+  name: "pi",
+  format: "ndjson",
+  schemas: [
+    {
+      kind: "message",
+      matchPath: "type",
+      matchValue: "message_update",
+      extract: { chunk: "assistantMessageEvent.delta" }
+    },
+    {
+      kind: "tool-use",
+      matchPath: "type",
+      matchValue: "tool_execution_start",
+      extract: {
+        name: "toolName",
+        input: "args",
+        id: "toolCallId"
+      }
+    },
+    {
+      kind: "tool-result",
+      matchPath: "type",
+      matchValue: "tool_execution_end",
+      extract: {
+        result: "result",
+        toolUseId: "toolCallId",
+        isError: "isError"
+      }
+    },
+    {
+      kind: "metadata",
+      matchPath: "type",
+      matchValue: "turn_end",
+      extract: {
+        inputTokens: "message.usage.input",
+        outputTokens: "message.usage.output"
+      }
+    }
+  ]
+}
+
+>> Pi's built-in tool names (lowercase)
+var @piBuiltInTools = "read,bash,edit,write,grep,find,ls"
+
+>> Check if tool name is a pi built-in
+exe @isPiBuiltin(name) = js {
+  const piTools = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
+  return piTools.has(String(name));
+}
+
+>> ── Shell wrapper for pi ──
+>>
+>> Flat positional params so BashExecutor injects each one as a distinct env var.
+>> Parameters are passed positionally, not by name, so order matters.
+exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) = sh {
+  set -e
+  export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
+
+  >> Build flags
+  dirFlag=()
+  if [ -n "$dir" ]; then dirFlag=(--dir "$dir"); fi
+
+  providerFlag=()
+  if [ -n "$provider" ]; then providerFlag=(--provider "$provider"); fi
+
+  modelFlag=()
+  if [ -n "$model" ]; then modelFlag=(--model "$model"); fi
+
+  systemFlag=()
+  if [ -n "$systemArg" ]; then systemFlag=(--append-system-prompt "$systemArg"); fi
+
+  >> Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
+  >> Pass through as-is since bash will word-split correctly
+  toolFlag=()
+  if [ -n "$toolArg" ]; then toolFlag=($toolArg); fi
+
+  thinkingFlag=()
+  if [ -n "$thinking" ]; then thinkingFlag=(--thinking "$thinking"); fi
+
+  modeFlag=()
+  if [ -n "$mode" ]; then modeFlag=(--mode json); fi
+
+  >> Run pi
+  printf '%s' "$prompt" | pi -p --no-session "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
+}
+
+>> @pi(prompt, config)
+>>
+>> config.model    - model pattern or provider/id
+>> config.provider - provider name (default: google)
+>> config.dir      - working directory
+>> config.system   - system prompt
+>> config.tools    - tool collection (triggers @mx.llm context)
+>> config.noTools  - boolean, disable all tools
+>> config.thinking - thinking level: off, minimal, low, medium, high, xhigh
+>> config.stream   - boolean, enables JSONL streaming
+>>
+>> Tool behavior:
+>>   - When config.tools is provided, mlld runtime creates MCP bridge
+>>   - @mx.llm.config points to MCP config file (same format as Claude module)
+>>   - pi-mcp-adapter extension loads MCP servers from config
+>>   - Built-in pi tools can be selectively enabled via @mx.llm.native
+>>   - Use config.noTools: true to disable all tools
+exe llm @pi(prompt, config) = [
+  let @cfg = @config ? @config : {}
+  let @dir = @cfg.dir ? @cfg.dir : ""
+  let @provider = @cfg.provider ? @cfg.provider : ""
+  let @model = @cfg.model ? @cfg.model : ""
+  let @thinking = @cfg.thinking ? @cfg.thinking : ""
+  let @mode = @cfg.stream ? "json" : ""
+
+  >> Tool flags from @mx.llm (set by runtime when config.tools provided)
+  let @llmConfig = @mx.llm && @mx.llm.config ? @mx.llm.config : ""
+  let @llmNative = @mx.llm && @mx.llm.native ? @mx.llm.native : ""
+  let @llmHasTools = @mx.llm && @mx.llm.hasTools ? true : false
+
+  >> Build tool argument string
+  let @toolArg = when [
+    @cfg.noTools => "--no-tools"
+    @llmHasTools && @llmConfig && @llmNative => `--tools "@llmNative" --mcp-config "@llmConfig"`
+    @llmHasTools && @llmConfig => `--no-tools --mcp-config "@llmConfig"`
+    @llmHasTools && @llmNative => `--tools "@llmNative"`
+    @llmHasTools => "--no-tools"
+    * => ""
+  ]
+
+  >> System prompt via temp file
+  let @systemArg = when [
+    @cfg.system => [
+      let @ts = js { return Date.now() }
+      let @systemFile = `/tmp/pi-system-@ts.txt`
+      let @b64 = node {
+        const content = `@cfg.system`;
+        return Buffer.from(content).toString('base64');
+      }
+      run sh { echo @b64 | base64 -d > @systemFile }
+      => @systemFile
+    ]
+    * => ""
+  ]
+
+  >> Invoke pi CLI via shell wrapper
+  >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
+  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode)
+
+  => @raw
+] with { stream: @cfg.stream, streamFormat: @piStreamFormat }
+
+>> Model shortcuts (all follow standard @fn(prompt, config) pattern)
+exe llm @haiku(prompt, config) = @pi(@prompt, { ...@config, model: "claude-haiku" })
+exe llm @sonnet(prompt, config) = @pi(@prompt, { ...@config, model: "claude-sonnet" })
+exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
+
+export {
+  @pi,
+  @haiku,
+  @sonnet,
+  @opus,
+  @piStreamFormat,
+  @piBuiltInTools,
+  @isPiBuiltin,
+  @runPiSh
+}

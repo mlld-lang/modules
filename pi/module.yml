@@ -1,0 +1,13 @@
+name: pi
+author: mlld
+type: library
+about: "Pi CLI invocation with multi-provider model selection and tool control"
+version: 1.1.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: ">=2.0.5"
+
+>> Requires pi-mcp-adapter for MCP tool support
+>> Install with: pi install npm:pi-mcp-adapter
+>> (One-time setup, persists in ~/.pi/settings.json)

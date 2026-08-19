@@ -1,0 +1,20 @@
+needs { pi }
+
+>> Simple test: invoke pi without tools
+exe @test1 = @pi("Say hello")
+
+>> Test with mlld tools
+exe @echoTool(message) = js {
+  return `Echo: ${message}`;
+}
+
+exe @test2 = @pi("Use the echo tool to say 'testing'", {
+  tools: {
+    echo: {
+      mlld: 'echoTool',
+      description: "Echo a message back"
+    }
+  }
+})
+
+export { @test1, @test2 }

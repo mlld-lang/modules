@@ -1,0 +1,83 @@
+needs { network }
+
+>> ── Internal call helper ──
+>> Calls LM Studio's OpenAI-compatible /v1/chat/completions endpoint.
+>> The endpoint returns the model's final answer in choices[0].message.content
+>> with reasoning split out separately, so no <think> stripping is needed.
+exe @lmsImpl(prompt, opts) = js {
+  const cfg = opts || {};
+  const baseUrl = (cfg.baseUrl || "http://localhost:1234/v1").replace(/\/$/, "");
+
+  const messages = [];
+  if (cfg.system) messages.push({ role: "system", content: cfg.system });
+  if (Array.isArray(cfg.messages)) {
+    for (const m of cfg.messages) messages.push(m);
+  }
+  messages.push({ role: "user", content: prompt });
+
+  // Normalize to plain JS — values arriving from mlld vars can carry wrappers
+  // that serialize into an invalid request body.
+  const plain = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
+
+  const body = { model: cfg.model || "", messages: plain(messages) };
+  if (cfg.temperature != null) body.temperature = cfg.temperature;
+  if (cfg.maxTokens != null) body.max_tokens = cfg.maxTokens;
+  if (cfg.ttl != null) body.ttl = cfg.ttl;
+  if (cfg.responseFormat) {
+    body.response_format = plain(cfg.responseFormat);
+  } else if (cfg.schema) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: { name: cfg.schemaName || "response", strict: true, schema: plain(cfg.schema) }
+    };
+  }
+
+  const headers = { "Content-Type": "application/json" };
+  if (cfg.apiKey) headers["Authorization"] = "Bearer " + cfg.apiKey;
+
+  const resp = await fetch(baseUrl + "/chat/completions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error("LM Studio REST " + resp.status + ": " + errBody);
+  }
+
+  const json = await resp.json();
+  const choice = json.choices && json.choices[0];
+  const content = choice && choice.message ? (choice.message.content || "") : "";
+
+  if (cfg.full) {
+    return JSON.stringify({
+      content,
+      model: json.model || cfg.model || "",
+      usage: json.usage || null,
+      finishReason: choice ? choice.finish_reason : null
+    });
+  }
+  return content;
+}
+
+>> ── Public API ──
+>> @lms(prompt, config) — call a local LM Studio model over its REST API.
+>> config.model          - model id (default: server's loaded model)
+>> config.system         - system prompt
+>> config.messages       - prior conversation turns (array of {role, content})
+>> config.temperature    - sampling temperature
+>> config.maxTokens      - max output tokens
+>> config.schema         - JSON Schema object → guaranteed structured output
+>> config.schemaName     - name for the schema (default: "response")
+>> config.responseFormat - raw response_format passthrough (overrides schema)
+>> config.ttl            - seconds to keep the model loaded after the call
+>> config.baseUrl        - API base URL (default: http://localhost:1234/v1)
+>> config.apiKey         - bearer token, if the server requires auth
+>> config.full           - return JSON { content, model, usage, finishReason }
+exe llm @lms(prompt, config) = [
+  let @cfg = @config ? @config : {}
+  => @lmsImpl(@prompt, @cfg)
+]
+
+export { @lms }

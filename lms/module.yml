@@ -1,0 +1,9 @@
+name: lms
+author: mlld
+type: library
+about: "LM Studio REST API (OpenAI-compatible) for local LLM calls with structured output"
+version: 1.0.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: ">=2.0.5"

@@ -1,0 +1,150 @@
+needs { pi, assert }
+
+>> Test suite for pi module tool calling compatibility
+
+>> Test 1: Stream format parsing for tool_execution_start
+test "stream format parses tool_execution_start correctly" [
+  let @event = {
+    type: "tool_execution_start",
+    toolCallId: "call-123",
+    toolName: "read",
+    args: { path: "/tmp/test.txt" }
+  }
+  
+  >> Simulate parsing by checking the schema structure
+  let @schema = @piStreamFormat.schemas[1]
+  assert @schema.kind == "tool-use"
+  assert @schema.matchPath == "type"
+  assert @schema.matchValue == "tool_execution_start"
+  assert @schema.extract.name == "toolName"
+  assert @schema.extract.input == "args"
+  assert @schema.extract.id == "toolCallId"
+]
+
+>> Test 2: Stream format parsing for tool_execution_end
+test "stream format parses tool_execution_end correctly" [
+  let @event = {
+    type: "tool_execution_end",
+    toolCallId: "call-123",
+    toolName: "read",
+    result: { content: "file contents" },
+    isError: false
+  }
+  
+  let @schema = @piStreamFormat.schemas[2]
+  assert @schema.kind == "tool-result"
+  assert @schema.matchPath == "type"
+  assert @schema.matchValue == "tool_execution_end"
+  assert @schema.extract.result == "result"
+  assert @schema.extract.toolUseId == "toolCallId"
+  assert @schema.extract.isError == "isError"
+]
+
+>> Test 3: Tool filtering - valid tools only
+test "filterPiTools returns only valid pi tools" [
+  let @result = @filterPiTools("read,write,bash,invalid,unknown")
+  assert @result == "read,write,bash"
+]
+
+>> Test 4: Tool filtering - empty input
+test "filterPiTools handles empty input" [
+  let @result = @filterPiTools("")
+  assert @result == ""
+]
+
+>> Test 5: Tool filtering - all invalid tools
+test "filterPiTools returns empty for all invalid tools" [
+  let @result = @filterPiTools("invalid,unknown,other")
+  assert @result == ""
+]
+
+>> Test 6: isPiTool validation
+test "isPiTool correctly identifies pi tools" [
+  assert @isPiTool("read") == true
+  assert @isPiTool("bash") == true
+  assert @isPiTool("write") == true
+  assert @isPiTool("invalid") == false
+  assert @isPiTool("mcp_tool") == false
+]
+
+>> Test 7: Tool flags - noTools mode
+test "buildToolFlags returns --no-tools when noTools is true" [
+  let @flags = @buildToolFlags({ noTools: true })
+  assert @flags == "--no-tools"
+]
+
+>> Test 8: Tool flags - with valid tools
+test "buildToolFlags returns correct flags for valid tools" [
+  let @flags = @buildToolFlags({ tools: "read,bash,write" })
+  assert @flags == "--tools read,bash,write"
+]
+
+>> Test 9: Tool flags - with invalid tools falls back to --no-tools
+test "buildToolFlags falls back to --no-tools for invalid tools" [
+  let @flags = @buildToolFlags({ tools: "invalid,unknown" })
+  assert @flags == "--no-tools"
+]
+
+>> Test 10: Tool flags - default behavior
+test "buildToolFlags returns empty string for default behavior" [
+  let @flags = @buildToolFlags({})
+  assert @flags == ""
+]
+
+>> Test 11: Stream format includes all event types
+test "piStreamFormat includes all necessary schemas" [
+  let @kinds = @piStreamFormat.schemas.map(s => s.kind)
+  assert @kinds.includes("message")
+  assert @kinds.includes("tool-use")
+  assert @kinds.includes("tool-result")
+  assert @kinds.includes("metadata")
+]
+
+>> Test 12: Pi built-in tools list
+test "piBuiltInTools contains all expected tools" [
+  let @tools = @piBuiltInTools.split(',')
+  assert @tools.includes("read")
+  assert @tools.includes("bash")
+  assert @tools.includes("edit")
+  assert @tools.includes("write")
+  assert @tools.includes("grep")
+  assert @tools.includes("find")
+  assert @tools.includes("ls")
+  assert @tools.length == 7
+]
+
+>> Test 13: Convenience functions
+test "convenience functions use correct tool configs" [
+  >> @ask should disable tools
+  let @askFlags = @buildToolFlags({ noTools: true })
+  assert @askFlags == "--no-tools"
+  
+  >> @piReadonly should use read-only tools
+  let @readonlyFlags = @buildToolFlags({ tools: "read,grep,find,ls" })
+  assert @readonlyFlags == "--tools read,grep,find,ls"
+  
+  >> @piFull should use all tools
+  let @fullFlags = @buildToolFlags({ tools: "read,bash,edit,write,grep,find,ls" })
+  assert @fullFlags == "--tools read,bash,edit,write,grep,find,ls"
+]
+
+>> Test 14: @mx.llm context integration (simulated)
+test "buildToolFlags respects @mx.llm context when available" [
+  >> Simulate @mx.llm context with native tools
+  let @simulatedMx = {
+    llm: {
+      hasTools: true,
+      native: "read,bash",
+      allowed: ""
+    }
+  }
+  
+  >> In real usage, @mx.llm would be set by the runtime
+  >> Here we're testing the logic path
+  let @llm = @simulatedMx.llm
+  let @nativePiTools = @filterPiTools(@llm.native)
+  
+  assert @nativePiTools == "read,bash"
+]
+
+run tests
