@@ -113,11 +113,11 @@ The session id is the one `@opencode` returns (`ses_…`).
 
 **`@conversation.locate(sessionId, cwd, root?, bin?)`** returns the absolute path of a JSON file holding the session, or `null`.
 
-- opencode keeps sessions in a database, not in files. So `locate` runs `opencode export <sessionId>`, opencode's public way to get a session out, and writes what it prints to a new temp directory (`$TMPDIR/mlld-opencode-…/<sessionId>.json`). That file is a snapshot taken when `locate` ran. Nothing deletes it; the caller owns it.
+- opencode keeps sessions in a database, not in files. So `locate` runs `opencode export <sessionId>`, opencode's public way to get a session out, and writes what it prints to a new temp directory (`$TMPDIR/mlld-opencode-…/<sessionId>.json`). That file is a snapshot taken when `locate` ran. Outside mlld's fence it stays until something deletes it. Under the fence the temp directory is inside the run's own temp area, which mlld removes when the run ends, so ingest the file in the same run or copy it somewhere kept.
 - `root` is the data directory the session ran under: pass the same value you gave `@opencode` as `config.dataHome`. It is set as `XDG_DATA_HOME` for the export only. Without it, opencode's default store is read.
 - `cwd` is ignored. It is there so every harness's `locate` takes the same arguments. `bin` replaces the `opencode` binary; the tests use it.
 - The id must match `ses_` followed by letters and digits, and it is case-sensitive. It returns `null`, never an error, for any other id, and when the export fails, times out (30 seconds), or prints something that is not this session.
-- **mlld 2.2.0 fences the processes it starts**: they may write only inside the project and the temp directory. `opencode export` writes to opencode's own database, so under the default fence it fails and `locate` returns `null`. It works where the fence is off (`"fence": { "generic": "off" }` in `mlld-config.json`).
+- **mlld 2.2.0 fences the processes it starts**: they may write only inside the project and the temp directory. `opencode export` writes to opencode's database, so under the default fence `locate` works only for sessions whose data directory is inside the project or the temp directory: run `@opencode` with `config.dataHome` there and pass the same value as `root`. Sessions in opencode's default store return `null` unless the fence is off (`"fence": { "generic": "off" }` in `mlld-config.json`). opencode keeps its provider login (`auth.json`) in the data directory, so a fresh one has none, and `@opencode` runs there need a provider API key in the environment.
 
 **`@conversation.ingest(path)`** returns `{ header, events }`.
 
