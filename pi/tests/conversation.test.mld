@@ -1,0 +1,60 @@
+>> Tests for @conversation (locate + ingest).
+>> Run: mlld test pi/tests/conversation.test.mld
+
+import { @conversation } from "../index.mld"
+
+var @fixtures = "@root/pi/tests/fixtures/conversation"
+var @agentDir = "@fixtures/home"
+var @sessions = "@fixtures/home/sessions"
+var @sid = "7e5e5e5e-1234-4321-8abc-def012345678"
+
+>> locate returns the path with symlinks resolved, so the expected value is too.
+exe @realpath(p) = node { return require("fs").realpathSync(p); }
+var @sessionFile = @realpath("@sessions/--tmp-proj--/2026-09-10T00-22-39-649Z_7e5e5e5e-1234-4321-8abc-def012345678.jsonl")
+
+>> Compares with key order ignored, because mlld may reorder object keys; a golden's
+>> line 1 is the header and the remaining lines are the events in order.
+exe @matchesGolden(result, goldenPath) = node {
+  const fs = require("fs");
+  const eq = (a, b) => {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && eq(a[k], b[k]));
+  };
+  const lines = fs.readFileSync(goldenPath, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  const [header, ...events] = lines;
+  if (!eq(result.header, header)) {
+    console.error("header mismatch:\n  got  " + JSON.stringify(result.header) + "\n  want " + JSON.stringify(header));
+    return false;
+  }
+  if (result.events.length !== events.length) {
+    console.error("event count: got " + result.events.length + ", want " + events.length);
+    return false;
+  }
+  for (let i = 0; i < events.length; i++) {
+    if (!eq(result.events[i], events[i])) {
+      console.error("event " + i + " mismatch:\n  got  " + JSON.stringify(result.events[i]) + "\n  want " + JSON.stringify(events[i]));
+      return false;
+    }
+  }
+  return true;
+}
+
+>> ── ingest: fray's output over fray's native fixtures ──
+
+var @test_ingest_basic = @matchesGolden(@conversation.ingest("@fixtures/pi-basic.jsonl"), "@fixtures/pi-basic.fray.jsonl")
+var @test_ingest_branched = @matchesGolden(@conversation.ingest("@fixtures/pi-branched.jsonl"), "@fixtures/pi-branched.fray.jsonl")
+var @test_ingest_compacted = @matchesGolden(@conversation.ingest("@fixtures/pi-compacted.jsonl"), "@fixtures/pi-compacted.fray.jsonl")
+var @test_ingest_openrouter = @matchesGolden(@conversation.ingest("@fixtures/pi-openrouter.jsonl"), "@fixtures/pi-openrouter.fray.jsonl")
+
+>> ── locate ──
+
+var @test_locate_sessions_root = @conversation.locate(@sid, "/anywhere", @sessions) == @sessionFile
+var @test_locate_uppercase = @conversation.locate("7E5E5E5E-1234-4321-8ABC-DEF012345678", "/anywhere", @sessions) == @sessionFile
+var @test_locate_agent_dir_root = @conversation.locate(@sid, "/anywhere", @agentDir) == @sessionFile
+var @test_locate_unknown_uuid = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345679", "/anywhere", @sessions) == null
+var @test_locate_traversal = @conversation.locate("../../etc/passwd", "/anywhere", @sessions) == null
+var @test_locate_non_uuid = @conversation.locate("not-a-session", "/anywhere", @sessions) == null
