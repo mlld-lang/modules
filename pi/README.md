@@ -81,6 +81,29 @@ This is the same pattern as the Claude and Opencode modules.
 | `noTools` | Boolean, disable all tools |
 | `thinking` | Thinking level: off, minimal, low, medium, high, xhigh |
 | `stream` | Boolean, enable streaming output |
+| `session` | `false` to save nothing (see Sessions) |
+| `sessionId` | UUID naming the session; an existing one is continued (see Sessions) |
+
+## Sessions
+
+`@pi` saves each call's session to `<project>/.llm/pi-sessions/`, where `<project>` is the calling script's project root. Earlier versions saved nothing (they ran pi with `--no-session`), so this is a change in default behaviour. Saving to the project rather than pi's own store (`~/.pi/agent/sessions`) keeps your pi history clean and keeps every write inside the project.
+
+- Each call gets a fresh session id unless `sessionId` names one. Passing the same `sessionId` again continues that conversation. It must be a UUID (any case), because `@conversation.locate` finds nothing else; anything else is an error.
+- `session: false` turns saving off and runs pi with `--no-session`, as earlier versions did.
+- The first save writes `.llm/pi-sessions/.gitignore` containing `*`, so the sessions stay out of git.
+- The session id travels to the mlld runtime with the result, which it uses to find the conversation. Your script sees only pi's output.
+
+```mlld
+>> Continue one conversation across calls
+var @id = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+@pi("Remember the number 7", { sessionId: @id })
+@pi("What number did I give you?", { sessionId: @id })
+
+>> Save nothing
+@pi("Quick question", { session: false })
+```
+
+`@runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir)` has two optional trailing parameters. When `sessionId` is empty or left out it runs pi with `--no-session`, so direct callers passing eight arguments keep the earlier behaviour. `@piSession(config, projectRoot)` picks the id and folder for a call, and `@piResult(value, session)` wraps a result with its session id.
 
 ## Available Built-in Tools
 
@@ -98,6 +121,9 @@ These can be selectively enabled via the native tools list.
 @piStreamFormat           >> Stream format adapter
 @isPiBuiltin(name)        >> Check if tool is built-in
 @piToolAndMcpFlags(llm)  >> Build tool flags from @mx.llm
+@runPiSh(...)             >> Shell wrapper that runs pi (see Sessions)
+@piSession(config, root)  >> Session id and folder for a call
+@piResult(value, session) >> Result with its session id attached
 @conversation             >> Find and read saved pi sessions (below)
 ```
 
@@ -113,12 +139,12 @@ var @tape = @conversation.ingest(@path)
 show @tape.events.length
 ```
 
-**`@pi` itself does not save sessions yet.** It runs pi with `--no-session`, so its own calls leave nothing to locate. Saving them is ticket #m-c6bf. Until then `@conversation` reads sessions saved by pi run some other way.
 
 **`@conversation.locate(sessionId, cwd, root?)`** returns the absolute path of the session file, with symlinks resolved, or `null`.
 
 - pi saves sessions at `<sessions>/<encoded-cwd>/<timestamp>_<session-id>.jsonl`. Every `<encoded-cwd>` directory is searched, so `cwd` is ignored. It is there so every harness's `locate` takes the same arguments.
-- `root` may be pi's agent directory or the `sessions` directory inside it. Without it, `$PI_CODING_AGENT_DIR/sessions` is searched if that variable is set, else `~/.pi/agent/sessions`.
+- `@pi` saves sessions flat, at `<project>/.llm/pi-sessions/<timestamp>_<session-id>.jsonl` (see Sessions).
+- `root` may be pi's agent directory or the `sessions` directory inside it, and when given only it is searched. Without it, `<project>/.llm/pi-sessions` is searched first, then `$PI_CODING_AGENT_DIR/sessions` if that variable is set, else `~/.pi/agent/sessions`.
 - The id is matched case-insensitively.
 - It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the file would lie outside the root.
 

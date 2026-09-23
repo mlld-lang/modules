@@ -69,11 +69,12 @@ exe @isPiBuiltin(name) = js {
 >>
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Parameters are passed positionally, not by name, so order matters.
-exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) = sh {
+>> sessionId and sessionDir come last so 8-argument callers keep --no-session.
+exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir) = sh {
   set -e
   export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
 
-  >> Build flags
+  # Build flags
   dirFlag=()
   if [ -n "$dir" ]; then dirFlag=(--dir "$dir"); fi
 
@@ -86,8 +87,8 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) =
   systemFlag=()
   if [ -n "$systemArg" ]; then systemFlag=(--append-system-prompt "$systemArg"); fi
 
-  >> Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
-  >> Pass through as-is since bash will word-split correctly
+  # Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
+  # Pass through as-is since bash will word-split correctly
   toolFlag=()
   if [ -n "$toolArg" ]; then toolFlag=($toolArg); fi
 
@@ -97,9 +98,51 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) =
   modeFlag=()
   if [ -n "$mode" ]; then modeFlag=(--mode json); fi
 
-  >> Run pi
-  printf '%s' "$prompt" | pi -p --no-session "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
+  # Nothing ignores .llm/ in a user project yet, so the sessions dir ignores itself.
+  sessionFlag=(--no-session)
+  if [ -n "$sessionId" ]; then
+    mkdir -p "$sessionDir"
+    if [ ! -e "$sessionDir/.gitignore" ]; then printf '*\n' > "$sessionDir/.gitignore"; fi
+    sessionFlag=(--session-id "$sessionId" --session-dir "$sessionDir")
+  fi
+
+  # Run pi
+  printf '%s' "$prompt" | pi -p "${sessionFlag[@]}" "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
 }
+
+>> Picks the session a @pi call saves to: a fresh UUID per call unless
+>> config.sessionId names one (the same id again continues that conversation), in
+>> <projectRoot>/.llm/pi-sessions so writes stay inside the project and the user's
+>> own pi history stays clean. config.session: false turns saving off. Ids must be
+>> UUIDs because @conversation.locate finds nothing else.
+exe @piSession(config, projectRoot) = node {
+  const path = require("path");
+  const cfg = config || {};
+  if (cfg.session === false) return { sessionId: "", sessionDir: "" };
+  let id;
+  if (cfg.sessionId !== undefined && cfg.sessionId !== null && cfg.sessionId !== "") {
+    id = String(cfg.sessionId).trim().toLowerCase();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
+      throw new Error("@mlld/pi: sessionId must be a UUID, got " + JSON.stringify(cfg.sessionId));
+    }
+  } else {
+    id = require("crypto").randomUUID().toLowerCase();
+  }
+  return { sessionId: id, sessionDir: path.join(String(projectRoot), ".llm", "pi-sessions") };
+}
+
+>> The runtime strips `_mlld` before callers see the result and reads the session
+>> id from it to find the conversation.
+exe @piResult(inputValue, session) = when [
+  @session.sessionId => {
+    value: @inputValue,
+    _mlld: {
+      sessionId: @session.sessionId,
+      provider: "pi"
+    }
+  }
+  * => @inputValue
+]
 
 >> @pi(prompt, config)
 >>
@@ -111,6 +154,9 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) =
 >> config.noTools  - boolean, disable all tools
 >> config.thinking - thinking level: off, minimal, low, medium, high, xhigh
 >> config.stream   - boolean, enables JSONL streaming
+>> config.session  - false to save nothing (pi --no-session); default saves to
+>>                   <project>/.llm/pi-sessions
+>> config.sessionId - UUID naming the session; an existing one is continued
 >>
 >> Tool behavior:
 >>   - When config.tools is provided, mlld runtime creates MCP bridge
@@ -158,9 +204,10 @@ exe llm @pi(prompt, config) = [
 
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
-  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode)
+  let @session = @piSession(@cfg, @root)
+  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir)
 
-  => @raw
+  => @piResult(@raw, @session)
 ] with { stream: @cfg.stream, streamFormat: @piStreamFormat }
 
 >> Model shortcuts (all follow standard @fn(prompt, config) pattern)
@@ -175,11 +222,13 @@ exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" 
 >> so the logic follows fray's rather than reading more naturally.
 
 >> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
->> root is pi's agent dir or the sessions dir inside it; without it,
->> $PI_CODING_AGENT_DIR/sessions, else ~/.pi/agent/sessions. cwd is ignored: every
->> encoded-cwd directory is searched rather than rebuilding pi's encoding. The
->> parameter keeps the signature shared with the other harnesses.
-exe @conversationLocate(sessionId, cwd, root) = node {
+>> root is pi's agent dir or the sessions dir inside it, and only it is searched.
+>> Without it, <projectRoot>/.llm/pi-sessions (where @pi saves) is searched first,
+>> then $PI_CODING_AGENT_DIR/sessions, else ~/.pi/agent/sessions. cwd is ignored:
+>> every encoded-cwd directory is searched rather than rebuilding pi's encoding.
+>> The parameter keeps the signature shared with the other harnesses.
+>> projectRoot is a parameter because a node exe cannot see @root.
+exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
   const fs = require("fs");
   const path = require("path");
   const os = require("os");
@@ -187,12 +236,13 @@ exe @conversationLocate(sessionId, cwd, root) = node {
   const id = sessionId.trim().toLowerCase();
   // The id is matched against file names, so anything but a UUID is refused outright.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
-  let base;
-  if (typeof root === "string" && root) base = root;
-  else if (process.env.PI_CODING_AGENT_DIR) base = path.join(process.env.PI_CODING_AGENT_DIR, "sessions");
-  else base = path.join(os.homedir(), ".pi", "agent", "sessions");
-  let realRoot;
-  try { realRoot = fs.realpathSync(base); } catch (e) { return null; }
+  const bases = [];
+  if (typeof root === "string" && root) bases.push(root);
+  else {
+    if (typeof projectRoot === "string" && projectRoot) bases.push(path.join(projectRoot, ".llm", "pi-sessions"));
+    if (process.env.PI_CODING_AGENT_DIR) bases.push(path.join(process.env.PI_CODING_AGENT_DIR, "sessions"));
+    else bases.push(path.join(os.homedir(), ".pi", "agent", "sessions"));
+  }
 
   // A file <timestamp>_<id>.jsonl answers to the text after its first `_`, and
   // after its last `_` when that is a different one.
@@ -225,7 +275,7 @@ exe @conversationLocate(sessionId, cwd, root) = node {
     }
     return null;
   };
-  const confined = (hit) => {
+  const confined = (realRoot, hit) => {
     if (!hit) return null;
     let real;
     try { real = fs.realpathSync(hit); } catch (e) { return null; }
@@ -234,12 +284,25 @@ exe @conversationLocate(sessionId, cwd, root) = node {
     return real;
   };
   // A root may be pi's agent dir, so the sessions dir inside it is read too, after.
-  const hit = confined(searchBase(realRoot));
-  if (hit) return hit;
-  const sessions = path.join(realRoot, "sessions");
-  try { if (!fs.statSync(sessions).isDirectory()) return null; } catch (e) { return null; }
-  return confined(searchBase(sessions));
+  const searchRoot = (base) => {
+    let realRoot;
+    try { realRoot = fs.realpathSync(base); } catch (e) { return null; }
+    const hit = confined(realRoot, searchBase(realRoot));
+    if (hit) return hit;
+    const sessions = path.join(realRoot, "sessions");
+    try { if (!fs.statSync(sessions).isDirectory()) return null; } catch (e) { return null; }
+    return confined(realRoot, searchBase(sessions));
+  };
+  for (const base of bases) {
+    const hit = searchRoot(base);
+    if (hit) return hit;
+  }
+  return null;
 }
+
+>> @root is the calling script's project root. The third parameter cannot be named
+>> root, which would shadow it.
+exe @conversationLocate(sessionId, cwd, storeRoot) = @conversationLocateIn(@sessionId, @cwd, @storeRoot ?? "", @root)
 
 >> @conversation.ingest(path) → { header, events }
 >> header is the tape header line and events the event lines of fray's output, parsed.
@@ -513,5 +576,8 @@ export {
   @piBuiltInTools,
   @isPiBuiltin,
   @runPiSh,
+  @piSession,
+  @piResult,
+  @conversationLocateIn,
   @conversation
 }
