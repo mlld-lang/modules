@@ -72,6 +72,13 @@ var @test_parent_tool_result = @basic.events[5].parent_id == @basic.events[4].id
 
 var @test_failed_tool_is_error = @failed.events[5].payload.is_error == true
 
+>> Parts: tool c1, reasoning, tool c2, reasoning. The first result hangs off the last
+>> call (event 4), not off the reasoning that follows it (event 5).
+var @interleaved = @conversation.ingest("@fixtures/reasoning-after-tool.export.json")
+var @test_sequence_reasoning_after_tool = @types(@interleaved) == "session_start,assistant_turn,tool_call,thinking,tool_call,thinking,tool_result,tool_result"
+var @test_parent_first_result_is_last_call = @interleaved.events[6].parent_id == @interleaved.events[4].id
+var @test_parent_second_result_is_first_result = @interleaved.events[7].parent_id == @interleaved.events[6].id
+
 >> ── locate, against a stub opencode ──
 
 var @rootKnown = @freshRoot()

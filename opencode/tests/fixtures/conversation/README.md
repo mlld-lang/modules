@@ -31,6 +31,8 @@ The `*.export.json` files and the capture notes below are copied from the mlld r
 | `failed-tool.export.json` | same | `--title f548-failed-tool "Use the read tool to read missing.txt in the current directory. If the read fails, reply with the single word FAILED and do not try anything else."` | a `read` tool call with `"status":"error"` (`File not found`), then a text reply |
 | `compacted-overflow.export.json` | `groq/openai/gpt-oss-20b` | `--title f548-basic` and the basic prompt | an automatic compaction: the provider refused the request as too large (`ContextOverflowError`), opencode compacted (`compaction` part with `auto: true, overflow: true`), wrote a summary turn, and added a synthetic continue message |
 
+`reasoning-after-tool.export.json` is hand-written, not captured: one assistant message whose parts are a tool, a reasoning part, a second tool and a second reasoning part. It pins where tool results attach when reasoning follows the last call.
+
 ## Edits made after capture
 
 - Absolute paths: the checkout (opencode's project root) is replaced by `/workspace` and the scratch directory by `/workspace/scratch` (the session `path`, relative to the root, by `scratch`), so root and cwd keep their real relationship. A shortened checkout path the model wrote in one reasoning part (`failed-tool.export.json`) is replaced the same way.

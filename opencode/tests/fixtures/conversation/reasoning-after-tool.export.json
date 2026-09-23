@@ -1,0 +1,6 @@
+{"info":{"id":"ses_x1","directory":"/nope","time":{"created":1790148158000}},
+ "messages":[{"info":{"role":"assistant","time":{"created":1790148158100},"finish":"tool-calls"},
+  "parts":[{"type":"tool","tool":"read","callID":"c1","state":{"status":"completed","input":{"a":1},"output":"one"}},
+           {"type":"reasoning","text":"between"},
+           {"type":"tool","tool":"read","callID":"c2","state":{"status":"error","input":{"a":2},"error":"bad"}},
+           {"type":"reasoning","text":"after"}]}]}
