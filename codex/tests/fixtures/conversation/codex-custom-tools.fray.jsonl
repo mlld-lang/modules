@@ -1,0 +1,8 @@
+{"type":"session","session_id":"0c0ffee0-1234-4321-8abc-def012345678","harness":{"name":"codex","version":"0.153.4"},"cwd":"/tmp/proj","started_at":"2026-09-13T19:14:00Z"}
+{"id":"38c8a951","seq":0,"ts":"0001-01-01T00:00:00Z","type":"session_start"}
+{"id":"ef7e2dae","parent_id":"38c8a951","seq":1,"ts":"0001-01-01T00:00:00Z","type":"context_injection","payload":{"source":"codex","kind":"base_instructions","text":"You are codex."}}
+{"id":"6804fa24","parent_id":"ef7e2dae","seq":2,"ts":"2026-09-13T19:14:01Z","type":"message","payload":{"role":"user","text":"list the skills"}}
+{"id":"27642b20","parent_id":"6804fa24","seq":3,"ts":"2026-09-13T19:14:22Z","type":"thinking","payload":{"text":"","redacted":true}}
+{"id":"1baeecb6","parent_id":"27642b20","seq":4,"ts":"2026-09-13T19:14:22.837Z","type":"tool_call","usage":{"input":16980,"output":101,"cache_read":12160,"thinking":40},"payload":{"tool":"exec","args":{"command":"text(await tools.exec_command({cmd:\"rg --files -g 'SKILL.md' .\",\"max_output_tokens\":5500}));\n"},"tool_use_id":"call_J84v"}}
+{"id":"7da983b6","parent_id":"1baeecb6","seq":5,"ts":"2026-09-13T19:14:23.145Z","type":"tool_result","payload":{"tool_use_id":"call_J84v","content":"Script completed\nWall time 0.3 seconds\nOutput:\n./.agents/skills/a/SKILL.md\n"}}
+{"id":"d327daff","parent_id":"7da983b6","seq":6,"ts":"2026-09-13T19:14:30Z","type":"assistant_turn","usage":{"input":17200,"output":12,"cache_read":17000},"payload":{"text":"one skill: a"}}

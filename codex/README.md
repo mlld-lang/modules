@@ -85,6 +85,39 @@ Event types handled:
 - `thread.started` → `metadata.sessionId`
 - `turn.completed` → `metadata.{inputTokens, outputTokens}`
 
+### `@conversation`
+
+Reads the "rollout" log codex writes for a session and turns it into IFT events, the event format of mlld's run tape. It is an object of two functions, with the same signatures as `@conversation` in `@mlld/claude`:
+
+```mlld
+import { @conversation } from @mlld/codex
+
+var @path = @conversation.locate("0c0ffee0-1234-4321-8abc-def012345678", @base)
+var @tape = @conversation.ingest(@path)
+show @tape.events.length
+```
+
+**`@conversation.locate(sessionId, cwd, root?)`** returns the absolute path of the session's rollout, or `null`.
+
+- Codex keeps rollouts at `<sessions>/YYYY/MM/DD/rollout-<time>-<session-id>.jsonl`; older versions wrote `<session-id>.jsonl`. Both are found.
+- `root` is the sessions directory to search. Without it, `$CODEX_HOME/sessions` is searched, then `~/.codex/sessions`.
+- `cwd` is ignored, because codex does not file rollouts by directory. It is there so every harness's `locate` takes the same arguments.
+- The id is matched case-insensitively.
+- It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the file would lie outside the sessions directory.
+
+**`@conversation.ingest(path)`** returns `{ header, events }`.
+
+- `header` is `{ type: "session", session_id, harness: { name: "codex", version }, cwd, started_at }`.
+- `events` is the conversation as the model currently holds it. After a compaction, codex keeps a condensed history, so the events restart from that history and end with a `context_injection` of kind `compaction`. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
+- It is a port of fray's `IngestCodex` (`internal/ift/ingest_codex.go`), and its output matches fray's exactly. The tests check this against fray's own output (`tests/fixtures/conversation/README.md`). That includes two fray quirks: `session_start`, the base instructions and the compaction mark carry the zero time `0001-01-01T00:00:00Z`, and reasoning codex only stores encrypted appears as a `thinking` event with `redacted: true` and no text.
+- It throws only when the file cannot be read. Unreadable lines are skipped, including a half-written last line. A record type it does not know prints one warning line to stderr and is skipped.
+
+**A failed tool call cannot be told apart from a successful one.** Codex's rollout does not mark failures, so no `tool_result` carries `is_error`.
+
+**Treat an ingested conversation as untrusted input.** The rollout is a plain file that anything on the machine can edit, and nothing in it proves codex produced it.
+
+Codex's rollout format is not documented and changes between versions. The test fixtures are hand-written and carry codex versions 0.139.0 and 0.153.4. No rollout written by a newer codex (0.154.0 at the time of writing) has been checked.
+
 ## Known limitations
 
 - **No per-tool native gating.** Codex exposes its built-in tools (shell, apply_patch, web_search) wholesale — there's no equivalent to claude's `--allowedTools`. When `config.tools` is set, mlld bridges are added *alongside* codex's native tools.

@@ -1,0 +1,6 @@
+{"type":"session","session_id":"0c0ffee0-1234-4321-8abc-def012345678","harness":{"name":"codex","version":"0.139.0"},"cwd":"/tmp/codex-fixture","started_at":"2026-06-22T10:00:00Z"}
+{"id":"38c8a951","seq":0,"ts":"0001-01-01T00:00:00Z","type":"session_start"}
+{"id":"ef7e2dae","parent_id":"38c8a951","seq":1,"ts":"2026-06-22T10:00:05Z","type":"message","payload":{"role":"user","text":"second replacement context"}}
+{"id":"6804fa24","parent_id":"ef7e2dae","seq":2,"ts":"2026-06-22T10:00:05Z","type":"assistant_turn","payload":{"text":"second replacement turn"}}
+{"id":"27642b20","parent_id":"6804fa24","seq":3,"ts":"0001-01-01T00:00:00Z","type":"context_injection","payload":{"source":"codex","kind":"compaction","text":""}}
+{"id":"1baeecb6","parent_id":"27642b20","seq":4,"ts":"2026-06-22T10:00:06Z","type":"assistant_turn","payload":{"text":"post-compaction two"}}
