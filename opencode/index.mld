@@ -654,6 +654,7 @@ exe @conversationIngest(path) = node {
     }
     const turn = chain(turnEv);
 
+    let lastCall = null;
     for (const p of m.parts) {
       if (p.type === "reasoning" && str(p.text)) {
         prev = append({ parent_id: turn.id, ts, type: "thinking", payload: { text: p.text } });
@@ -662,16 +663,19 @@ exe @conversationIngest(path) = node {
         const input = isObj(p.state) ? p.state.input : undefined;
         if (input !== undefined && input !== null) call.args = input;
         if (str(p.callID)) call.tool_use_id = p.callID;
-        prev = append({ parent_id: turn.id, ts, type: "tool_call", payload: call });
+        prev = lastCall = append({ parent_id: turn.id, ts, type: "tool_call", payload: call });
       }
     }
-    // Results chain from the last call, one after another, as claude's do.
+    // Results chain from the last call, one after another, as claude's do. The last
+    // call and not the last child, because a reasoning part can follow it.
+    let resultParent = lastCall;
+    const result = (payload) => { prev = resultParent = append({ parent_id: resultParent.id, ts, type: "tool_result", payload }); };
     for (const p of tools) {
       const st = isObj(p.state) ? p.state : {};
       if (st.status === "completed") {
-        chain({ ts, type: "tool_result", payload: { tool_use_id: str(p.callID), content: str(st.output) } });
+        result({ tool_use_id: str(p.callID), content: str(st.output) });
       } else if (st.status === "error") {
-        chain({ ts, type: "tool_result", payload: { tool_use_id: str(p.callID), content: str(st.error), is_error: true } });
+        result({ tool_use_id: str(p.callID), content: str(st.error), is_error: true });
       }
     }
   }
