@@ -1,0 +1,5 @@
+{"type":"session","session_id":"3f2a1b4c-0000-4000-8000-abcdef000004","harness":{"name":"claude","version":"2.1.270"},"cwd":"/tmp/proj","started_at":"2026-09-10T03:25:23Z"}
+{"id":"6793c6dc","seq":0,"ts":"2026-09-10T03:25:23Z","type":"session_start"}
+{"id":"f81a942a","parent_id":"6793c6dc","seq":1,"ts":"2026-09-10T03:25:23Z","type":"message","payload":{"role":"user","text":"go"}}
+{"id":"68dd3ec3","parent_id":"f81a942a","seq":2,"ts":"2026-09-10T03:25:30Z","type":"assistant_turn","usage":{"input":3,"output":40,"thinking":30},"payload":{"model":"claude-fable-5-1","text":"ok","stop_reason":"end_turn"}}
+{"id":"2dd4cd2c","parent_id":"68dd3ec3","seq":3,"ts":"2026-09-10T03:25:30Z","type":"thinking","payload":{"text":"","redacted":true}}

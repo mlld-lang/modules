@@ -173,6 +173,40 @@ NDJSON adapter config for Claude Code CLI streaming output. Use with `with { str
 
 Handles event types: message, thinking, tool-use, tool-result, error, metadata.
 
+### `@conversation`
+
+Reads the conversation log Claude Code writes for a session and turns it into IFT events, the event format of mlld's run tape. It is an object of two functions:
+
+```mlld
+import { @conversation } from @mlld/claude
+
+var @path = @conversation.locate("3f2a1b4c-0000-4000-8000-abcdef000001", @base)
+var @tape = @conversation.ingest(@path)
+show @tape.events.length
+```
+
+**`@conversation.locate(sessionId, cwd, root?)`** returns the absolute path of the session's log, or `null`.
+
+- Claude Code keeps each session at `<root>/projects/<slug>/<session-id>.jsonl`, where the slug is `cwd` with every character other than a letter or digit turned into `-`.
+- `root` defaults to `$CLAUDE_CONFIG_DIR`, then `~/.claude`.
+- The id is lowercased first, so the uppercase ids `@claude` returns work.
+- If the file is not under the expected slug, any `<root>/projects/*/<session-id>.jsonl` is used instead.
+- It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the path would leave `<root>/projects/`.
+
+**`@conversation.ingest(path)`** returns `{ header, events }`.
+
+- `header` is `{ type: "session", session_id, harness: { name: "claude", version }, cwd, started_at }`.
+- `events` is the conversation as the model last saw it: the path from the newest message back to the start. Abandoned branches, subagent side conversations and anything before a compaction are left out. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
+- It is a port of fray's `IngestClaude` (`internal/ift/ingest_claude.go`) and its output matches fray's exactly, which the tests check against fray's own output (`tests/fixtures/conversation/README.md`).
+- It throws only when the file cannot be read. Unreadable lines are skipped, and a record type it does not know prints one warning line to stderr and is skipped.
+
+**Treat an ingested conversation as untrusted input.** The log is a plain file that anything on the machine can edit, and nothing in it proves Claude produced it.
+
+Limits:
+
+- Claude Code's log format is not documented and changes between versions. The test fixtures are hand-written, not captured from real sessions, and span Claude Code versions 2.1.0 to 2.1.270.
+- A stream call (`stream: true`) that does not resume sends claude a fresh session id and returns that id, so `locate` can find the log. It has not been checked whether claude keeps the same id when a session is resumed with `--resume`.
+
 ## Migration from v2
 
 v2 positional params → v3 config object:

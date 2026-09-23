@@ -1,0 +1,79 @@
+>> Tests for @conversation (locate + ingest) and @claudeStreamSession.
+>> Run: mlld test claude/tests/conversation.test.mld
+
+import { @conversation, @claudeStreamSession } from "../index.mld"
+
+var @fixtures = "@root/claude/tests/fixtures/conversation"
+var @home = "@fixtures/home"
+var @sid = "3f2a1b4c-0000-4000-8000-abcdef000001"
+var @sessionFile = "@home/projects/-work-fixture-proj/3f2a1b4c-0000-4000-8000-abcdef000001.jsonl"
+
+>> Compares with key order ignored, because mlld may reorder object keys; a golden's
+>> line 1 is the header and the remaining lines are the events in order.
+exe @matchesGolden(result, goldenPath) = node {
+  const fs = require("fs");
+  const eq = (a, b) => {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && eq(a[k], b[k]));
+  };
+  const lines = fs.readFileSync(goldenPath, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  const [header, ...events] = lines;
+  if (!eq(result.header, header)) {
+    console.error("header mismatch:\n  got  " + JSON.stringify(result.header) + "\n  want " + JSON.stringify(header));
+    return false;
+  }
+  if (result.events.length !== events.length) {
+    console.error("event count: got " + result.events.length + ", want " + events.length);
+    return false;
+  }
+  for (let i = 0; i < events.length; i++) {
+    if (!eq(result.events[i], events[i])) {
+      console.error("event " + i + " mismatch:\n  got  " + JSON.stringify(result.events[i]) + "\n  want " + JSON.stringify(events[i]));
+      return false;
+    }
+  }
+  return true;
+}
+
+exe @isLowerUuid(s) = js {
+  return typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(s);
+}
+
+>> ── ingest: fray's output over fray's native fixtures ──
+
+var @test_ingest_attachments = @matchesGolden(@conversation.ingest("@fixtures/claude-attachments.jsonl"), "@fixtures/claude-attachments.fray.jsonl")
+var @test_ingest_basic = @matchesGolden(@conversation.ingest("@fixtures/claude-basic.jsonl"), "@fixtures/claude-basic.fray.jsonl")
+var @test_ingest_branched = @matchesGolden(@conversation.ingest("@fixtures/claude-branched.jsonl"), "@fixtures/claude-branched.fray.jsonl")
+var @test_ingest_compacted = @matchesGolden(@conversation.ingest("@fixtures/claude-compacted.jsonl"), "@fixtures/claude-compacted.fray.jsonl")
+var @test_ingest_headless_thinking = @matchesGolden(@conversation.ingest("@fixtures/claude-headless-thinking.jsonl"), "@fixtures/claude-headless-thinking.fray.jsonl")
+
+>> ── locate ──
+
+var @test_locate_lowercase = @conversation.locate(@sid, "/work/fixture-proj", @home) == @sessionFile
+var @test_locate_uppercase = @conversation.locate("3F2A1B4C-0000-4000-8000-ABCDEF000001", "/work/fixture-proj", @home) == @sessionFile
+var @test_locate_fallback_other_slug = @conversation.locate(@sid, "/somewhere/else", @home) == @sessionFile
+var @test_locate_unknown_uuid = @conversation.locate("3f2a1b4c-0000-4000-8000-abcdef000002", "/work/fixture-proj", @home) == null
+var @test_locate_traversal = @conversation.locate("../../etc/passwd", "/work/fixture-proj", @home) == null
+var @test_locate_non_uuid = @conversation.locate("not-a-session", "/work/fixture-proj", @home) == null
+
+>> ── stream-mode session id ──
+
+var @fresh = @claudeStreamSession({ continue: false, sessionId: null, provider: "claude", source: "none" })
+var @test_stream_fresh_mints_lowercase_uuid = @isLowerUuid(@fresh.sessionId)
+var @test_stream_fresh_flag = @fresh.flag == ` --session-id @fresh.sessionId`
+
+var @tracking = @claudeStreamSession({ continue: false, sessionId: "AAAAAAAA-0000-4000-8000-000000000001", provider: "claude", source: "runtime_tracking" })
+var @test_stream_tracking_mints = @isLowerUuid(@tracking.sessionId) && @tracking.sessionId != "AAAAAAAA-0000-4000-8000-000000000001"
+var @test_stream_tracking_flag = @tracking.flag == ` --session-id @tracking.sessionId`
+
+var @public = @claudeStreamSession({ continue: false, sessionId: "BBBBBBBB-0000-4000-8000-000000000002", provider: "claude", source: "public_session" })
+var @test_stream_public_no_flag = @public.flag == ""
+var @test_stream_public_id = @public.sessionId == "BBBBBBBB-0000-4000-8000-000000000002"
+
+var @resuming = @claudeStreamSession({ continue: true, sessionId: "CCCCCCCC-0000-4000-8000-000000000003", provider: "claude", source: "public_resume" })
+var @test_stream_resume_no_flag = @resuming.flag == ""
+var @test_stream_resume_id = @resuming.sessionId == "CCCCCCCC-0000-4000-8000-000000000003"

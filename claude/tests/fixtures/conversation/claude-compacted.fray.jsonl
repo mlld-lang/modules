@@ -1,0 +1,5 @@
+{"type":"session","session_id":"3f2a1b4c-0000-4000-8000-abcdef000003","harness":{"name":"claude","version":"2.1.270"},"cwd":"/tmp/proj","started_at":"2026-09-14T11:00:00Z"}
+{"id":"4fa0e704","seq":0,"ts":"2026-09-14T11:00:00Z","type":"session_start"}
+{"id":"f3a6d645","parent_id":"4fa0e704","seq":1,"ts":"2026-09-14T11:00:01Z","type":"context_injection","payload":{"source":"claude","kind":"compaction","text":"This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier work."}}
+{"id":"91e1d987","parent_id":"f3a6d645","seq":2,"ts":"2026-09-14T11:00:10Z","type":"assistant_turn","usage":{"input":2,"output":116,"cache_read":11474,"cache_write":20153,"thinking":35},"payload":{"model":"claude-sonnet-5","text":"continuing from the summary","stop_reason":"end_turn"}}
+{"id":"7ae5c01d","parent_id":"91e1d987","seq":3,"ts":"2026-09-14T11:00:10Z","type":"thinking","payload":{"text":"where was I"}}

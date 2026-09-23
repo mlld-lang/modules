@@ -135,6 +135,24 @@ exe @claudeResume(config) = [
   ]
 ]
 
+>> Picks the session id a stream call hands to claude, so the id it returns is one
+>> claude actually used and `@conversation.locate` can find the log. Stream output
+>> is NDJSON with no session_id to read back, unlike non-stream mode.
+>>   resuming       - no flag; the resume id is already on the command line
+>>   public_session - no flag; @sessionFlag already forwards the public id
+>>   otherwise      - mint a lowercase UUID and forward it; a runtime tracking id
+>>                    is never sent to claude, so returning it would name a log
+>>                    that does not exist
+exe @claudeStreamSession(resume) = node {
+  const r = resume || {};
+  if (r.continue && r.sessionId) return { flag: "", sessionId: r.sessionId };
+  if (r.source === "public_session" && r.sessionId) return { flag: "", sessionId: r.sessionId };
+  const id = require("crypto").randomUUID().toLowerCase();
+  // Unquoted: interpolation passes quote characters through literally, and a UUID
+  // needs no quoting.
+  return { flag: " --session-id " + id, sessionId: id };
+}
+
 >> Returns a runtime-visible envelope when a resumable session is active.
 >>
 >> The interpreter strips this before normal callers see the result, but uses the hidden
@@ -188,8 +206,10 @@ exe @claudeFlags(llm) = [
 >> - Streaming mode keeps Claude's NDJSON output for the stream adapter above.
 >> - Non-stream mode uses `--output-format json` so we can recover Claude's real
 >>   `session_id` and feed it back to the interpreter.
->> - Runtime-seeded initial tracking ids are placeholders. We only forward
->>   `--session-id` for explicit public ids and otherwise let Claude allocate one.
+>> - Runtime-seeded initial tracking ids are placeholders and are never forwarded.
+>>   Non-stream mode forwards `--session-id` only for explicit public ids and
+>>   otherwise lets Claude allocate one; stream mode mints one instead
+>>   (@claudeStreamSession) because its output carries no session_id to read back.
 exe llm @claude(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
@@ -203,6 +223,12 @@ exe llm @claude(prompt, config) = [
   >> Only explicit public session ids are forwarded on the first call.
   >> Runtime tracking ids become real only after Claude returns a session_id.
   let @sessionFlag = @resume.sessionId && !@resume.continue && @resume.source == "public_session" ? ` --session-id "@resume.sessionId"` : ""
+  >> Stream-only: the non-stream lines recover claude's id from its JSON output instead.
+  let @streamSession = when [
+    @cfg.stream => @claudeStreamSession(@resume)
+    * => { flag: "", sessionId: null }
+  ]
+  let @streamSessionFlag = @streamSession.flag
   let @raw = when [
     >> Streaming path: keep Claude's native NDJSON output untouched.
     @cfg.stream && @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
@@ -230,28 +256,28 @@ exe llm @claude(prompt, config) = [
       env -u CLAUDECODE claude -p --bare --model @model --resume "@resume.sessionId"
     }
     @cfg.stream && @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @cfg.stream && @cfg.system && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system" --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @cfg.stream && @cfg.system && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --append-system-prompt "@cfg.system"@dis?` --disallowedTools "@dis"`
     }
     @cfg.stream && @cfg.system => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model --append-system-prompt "@cfg.system"
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model --append-system-prompt "@cfg.system"
     }
     @cfg.stream && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --mcp-config "@mx.llm.config" --strict-mcp-config@allowedTools?` --allowedTools "@allowedTools"`@dis?` --disallowedTools "@dis"`
     }
     @cfg.stream && @mx.llm && @mx.llm.allowed => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""` --allowedTools "@allowedTools"@dis?` --disallowedTools "@dis"`
     }
     @cfg.stream && @mx.llm && @mx.llm.hasTools => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model@nativeTools?` --tools "@nativeTools"`@needsEmptyNativeTools?` --tools ""`@dis?` --disallowedTools "@dis"`
     }
     @cfg.stream => @prompt | cmd:@dir {
-      env -u CLAUDECODE claude -p @bare@sessionFlag --model @model
+      env -u CLAUDECODE claude -p @bare@sessionFlag@streamSessionFlag --model @model
     }
     >> Non-stream path: ask Claude for structured JSON so we can capture session_id.
     @resume.continue && @resume.sessionId && @cfg.system && @mx.llm && @mx.llm.config => @prompt | cmd:@dir {
@@ -309,7 +335,7 @@ exe llm @claude(prompt, config) = [
   ]
   >> For non-stream calls, prefer Claude's returned session_id over any runtime seed.
   let @sessionId = when [
-    @cfg.stream => @resume.sessionId
+    @cfg.stream => @streamSession.sessionId
     * => @normalizeSessionId(@parsed.session_id ?? @resume.sessionId ?? null)
   ]
   let @value = when [
@@ -472,4 +498,325 @@ exe llm @claudePollEvent(prompt, config) = [
   => @pollEventImpl(@prompt, @cmdLine, @cfg.poll, @cfg.event, @cfg.itemId, @timeout)
 ]
 
-export { @claude, @haiku, @sonnet, @opus, @claudePoll, @claudePollJsonl, @claudePollEvent, @claudeStreamFormat }
+>> ── Conversation adapter ──
+>> Finds the JSONL log Claude Code writes for a session and translates it into IFT
+>> events (the tape's event format). A port of fray's IngestClaude
+>> (internal/ift/ingest_claude.go) whose output must match fray's byte for byte
+>> once parsed, so the logic follows fray's rather than reading more naturally.
+
+>> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
+>> root defaults to $CLAUDE_CONFIG_DIR, then ~/.claude.
+exe @conversationLocate(sessionId, cwd, root) = node {
+  const fs = require("fs");
+  const path = require("path");
+  const os = require("os");
+  if (typeof sessionId !== "string") return null;
+  const id = sessionId.trim().toLowerCase();
+  // The id becomes a file name, so anything but a UUID could walk out of the directory.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
+  const base = (typeof root === "string" && root) ? root
+    : (process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"));
+  const projects = path.resolve(base, "projects");
+  const inside = (p) => {
+    let real;
+    try { real = fs.realpathSync(p); } catch (e) { return null; }
+    let realProjects;
+    try { realProjects = fs.realpathSync(projects); } catch (e) { return null; }
+    if (!real.startsWith(realProjects + path.sep)) return null;
+    try { if (!fs.statSync(real).isFile()) return null; } catch (e) { return null; }
+    return path.resolve(p);
+  };
+  const file = id + ".jsonl";
+  if (typeof cwd === "string" && cwd) {
+    const slug = cwd.replace(/[^A-Za-z0-9]/g, "-");
+    const hit = inside(path.join(projects, slug, file));
+    if (hit) return hit;
+  }
+  // Slug rules we have not seen (very long paths, say) still land under projects/;
+  // session ids are UUIDs, so a match anywhere there is the session.
+  let dirs;
+  try { dirs = fs.readdirSync(projects, { withFileTypes: true }); } catch (e) { return null; }
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue;
+    const hit = inside(path.join(projects, d.name, file));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+>> @conversation.ingest(path) → { header, events }
+>> header is the tape header line and events the event lines of fray's output, parsed.
+>> Throws only when the file cannot be read.
+exe @conversationIngest(path) = node {
+  const fs = require("fs");
+  const crypto = require("crypto");
+
+  // Go's json.Unmarshal fails a whole record when a typed field holds the wrong
+  // JSON type, and fray then skips the line. These checks reproduce that.
+  const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const okStr = (v) => v === undefined || v === null || typeof v === "string";
+  const okBool = (v) => v === undefined || v === null || typeof v === "boolean";
+  const okInt = (v) => v === undefined || v === null || Number.isInteger(v);
+  const okObj = (v) => v === undefined || v === null || isObj(v);
+  const str = (v) => (typeof v === "string" ? v : "");
+  const validUsage = (u) => {
+    if (!okObj(u)) return false;
+    if (!u) return true;
+    if (!["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"].every((k) => okInt(u[k]))) return false;
+    const d = u.output_tokens_details;
+    return okObj(d) && (!d || okInt(d.thinking_tokens));
+  };
+  const validRecord = (r) => {
+    if (r === null) return true;
+    if (!isObj(r)) return false;
+    for (const k of ["type", "uuid", "parentUuid", "sessionId", "cwd", "version"]) if (!okStr(r[k])) return false;
+    if (!okBool(r.isSidechain) || !okBool(r.isCompactSummary)) return false;
+    const m = r.message;
+    if (!okObj(m)) return false;
+    if (m) {
+      for (const k of ["id", "model", "role", "stop_reason"]) if (!okStr(m[k])) return false;
+      if (!validUsage(m.usage)) return false;
+    }
+    const rd = r.rendered;
+    if (rd !== undefined && rd !== null) {
+      if (!Array.isArray(rd)) return false;
+      if (!rd.every((b) => b === null || (isObj(b) && okStr(b.content)))) return false;
+    }
+    return true;
+  };
+  const validBlock = (b) => {
+    if (b === null) return true;
+    if (!isObj(b)) return false;
+    for (const k of ["type", "text", "thinking", "signature", "id", "name", "tool_use_id"]) if (!okStr(b[k])) return false;
+    return okBool(b.is_error);
+  };
+  // A block list decodes whole or not at all, as in Go.
+  const blockList = (content) => {
+    if (typeof content === "string") return [{ type: "text", text: content }];
+    if (!Array.isArray(content) || !content.every(validBlock)) return [];
+    return content.map((b) => b || {});
+  };
+
+  // Go's time.RFC3339Nano, both ways. A record's timestamp never fails the record:
+  // anything unparseable is the zero time.
+  const ZERO = "0001-01-01T00:00:00Z";
+  const formatTS = (v) => {
+    if (typeof v !== "string") return ZERO;
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(v);
+    if (!m) return ZERO;
+    const [, Y, Mo, D, h, mi, s, frac, zone, sign, zh, zm] = m;
+    const y = +Y, mo = +Mo, d = +D;
+    if (mo < 1 || mo > 12 || d < 1 || +h > 23 || +mi > 59 || +s > 59) return ZERO;
+    const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    if (d > [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1]) return ZERO;
+    if (zone !== "Z" && (+zh > 23 || +zm > 59)) return ZERO;
+    const f = (frac || "").slice(0, 9).replace(/0+$/, "");
+    const offset = zone === "Z" || (+zh === 0 && +zm === 0) ? "Z" : sign + zh + ":" + zm;
+    return Y + "-" + Mo + "-" + D + "T" + h + ":" + mi + ":" + s + (f ? "." + f : "") + offset;
+  };
+
+  const raw = fs.readFileSync(path, "utf8");
+  const lines = raw.split("\n");
+  const recs = [];
+  lines.forEach((line) => {
+    if (line.trim() === "") return;
+    let r;
+    try { r = JSON.parse(line); } catch (e) { return; }
+    if (!validRecord(r)) return;
+    recs.push(r || {});
+  });
+
+  const HANDLED = new Set(["user", "assistant", "attachment"]);
+  const SKIPPED = new Set(["last-prompt", "queue-operation", "atis-latch", "mode", "system", "summary"]);
+  const warned = new Set();
+  for (const r of recs) {
+    const t = str(r.type);
+    if (t && !HANDLED.has(t) && !SKIPPED.has(t) && !warned.has(t)) {
+      warned.add(t);
+      console.error("@mlld/claude conversation.ingest: skipping unknown record type " + JSON.stringify(t));
+    }
+  }
+
+  let sessionID = "", cwd = "", version = "";
+  for (const r of recs) {
+    if (!sessionID) sessionID = str(r.sessionId);
+    if (!cwd) cwd = str(r.cwd);
+    if (!version) version = str(r.version);
+  }
+  if (cwd) {
+    try { cwd = fs.realpathSync(cwd); } catch (e) {}
+  }
+
+  const events = [];
+  const taken = new Set();
+  const append = (ev) => {
+    const seq = events.length;
+    let id;
+    for (let nonce = 0; ; nonce++) {
+      id = crypto.createHash("sha256").update(sessionID + "\x00" + seq + "\x00" + nonce).digest("hex").slice(0, 8);
+      if (!taken.has(id)) break;
+    }
+    taken.add(id);
+    const out = { id };
+    if (ev.parent_id) out.parent_id = ev.parent_id;
+    out.seq = seq;
+    out.ts = ev.ts;
+    out.type = ev.type;
+    if (ev.usage) out.usage = ev.usage;
+    if (ev.payload) out.payload = ev.payload;
+    events.push(out);
+    return out;
+  };
+  const header = (startedAt) => {
+    const harness = { name: "claude" };
+    if (version) harness.version = version;
+    return { type: "session", session_id: sessionID, harness, cwd, started_at: startedAt };
+  };
+
+  const byUUID = new Map();
+  for (const r of recs) if (str(r.uuid)) byUUID.set(r.uuid, r);
+  let tip = null;
+  for (const r of recs) {
+    if (!r.isSidechain && (r.type === "user" || r.type === "assistant")) tip = r;
+  }
+  const pathRecs = [];
+  const seen = new Set();
+  for (let cur = tip; cur && !seen.has(str(cur.uuid)); ) {
+    seen.add(str(cur.uuid));
+    pathRecs.push(cur);
+    if (!str(cur.parentUuid)) break;
+    const parent = byUUID.get(cur.parentUuid);
+    if (!parent) break;
+    cur = parent;
+  }
+  if (pathRecs.length === 0) {
+    append({ ts: ZERO, type: "session_start" });
+    return { header: header(ZERO), events };
+  }
+  pathRecs.reverse();
+
+  const usageOf = (u) => {
+    if (!isObj(u)) return null;
+    const out = { input: u.input_tokens || 0, output: u.output_tokens || 0 };
+    if (u.cache_read_input_tokens) out.cache_read = u.cache_read_input_tokens;
+    if (u.cache_creation_input_tokens) out.cache_write = u.cache_creation_input_tokens;
+    const think = isObj(u.output_tokens_details) ? u.output_tokens_details.thinking_tokens : 0;
+    if (think) out.thinking = think;
+    return out;
+  };
+  const isTurnRecord = (r) => r.type === "assistant" && isObj(r.message) && str(r.message.id);
+
+  const groups = new Map();
+  pathRecs.forEach((r, i) => {
+    if (!isTurnRecord(r)) return;
+    if (!groups.has(r.message.id)) groups.set(r.message.id, { indices: [], event: null });
+    groups.get(r.message.id).indices.push(i);
+  });
+
+  const startedAt = formatTS(pathRecs[0].timestamp);
+  let prev = append({ ts: startedAt, type: "session_start" });
+
+  for (const r of pathRecs) {
+    const ts = formatTS(r.timestamp);
+    if (isTurnRecord(r)) {
+      const g = groups.get(r.message.id);
+      if (!g.event) {
+        const turn = {};
+        const model = str(r.message.model);
+        let text = "", stop = "", usage = null;
+        const toolUseIDs = [];
+        for (const k of g.indices) {
+          const m = pathRecs[k].message;
+          stop = str(m.stop_reason);
+          const u = usageOf(m.usage);
+          if (u) usage = u;
+          for (const b of blockList(m.content)) {
+            if (b.type === "text") text += str(b.text);
+            else if (b.type === "tool_use") toolUseIDs.push(str(b.id));
+          }
+        }
+        if (model) turn.model = model;
+        if (text) turn.text = text;
+        if (toolUseIDs.length) turn.tool_use_ids = toolUseIDs;
+        if (stop) turn.stop_reason = stop;
+        g.event = append({ parent_id: prev.id, ts: formatTS(pathRecs[g.indices[0]].timestamp), type: "assistant_turn", usage, payload: turn });
+        prev = g.event;
+      }
+      for (const b of blockList(r.message.content)) {
+        if (b.type === "thinking") {
+          const thinking = str(b.thinking);
+          // A headless (-p) session blanks thinking text and keeps only the
+          // signature: reasoning the transcript withholds, not reasoning absent.
+          // The signature itself never reaches the tape.
+          if (!thinking && !str(b.signature)) continue;
+          const payload = { text: thinking };
+          if (!thinking) payload.redacted = true;
+          append({ parent_id: g.event.id, ts, type: "thinking", payload });
+        } else if (b.type === "tool_use") {
+          const payload = { tool: str(b.name) };
+          if (b.input !== undefined) payload.args = b.input;
+          if (str(b.id)) payload.tool_use_id = b.id;
+          prev = append({ parent_id: g.event.id, ts, type: "tool_call", payload });
+        }
+      }
+    } else if (r.type === "user" && r.isCompactSummary) {
+      let text = "";
+      if (isObj(r.message)) for (const b of blockList(r.message.content)) if (b.type === "text") text += str(b.text);
+      if (text) prev = append({ parent_id: prev.id, ts, type: "context_injection", payload: { source: "claude", kind: "compaction", text } });
+    } else if (r.type === "user") {
+      if (!isObj(r.message)) continue;
+      for (const b of blockList(r.message.content)) {
+        if (b.type === "tool_result") {
+          const payload = { tool_use_id: str(b.tool_use_id), content: resultContent(b.content) };
+          if (b.is_error === true) payload.is_error = true;
+          prev = append({ parent_id: prev.id, ts, type: "tool_result", payload });
+        } else if (b.type === "text" && str(b.text).includes("<system-reminder>")) {
+          prev = append({ parent_id: prev.id, ts, type: "context_injection", payload: { source: "claude", kind: "system-reminder", text: b.text } });
+        } else if (b.type === "text") {
+          prev = append({ parent_id: prev.id, ts, type: "message", payload: { role: "user", text: str(b.text) } });
+        }
+      }
+    } else if (r.type === "attachment") {
+      const text = attachmentText(r);
+      // Blank attachments (prompt_snapshot, command_permissions, ...) are structure
+      // with nothing to show.
+      if (!text) continue;
+      const payload = { source: "claude" };
+      const kind = attachmentType(r.attachment);
+      if (kind) payload.kind = kind;
+      payload.text = text;
+      prev = append({ parent_id: prev.id, ts, type: "context_injection", payload });
+    }
+  }
+  return { header: header(startedAt), events };
+
+  function resultContent(content) {
+    if (typeof content === "string") return content;
+    return blockList(Array.isArray(content) ? content : null).map((b) => str(b.text)).join("");
+  }
+  function attachmentType(a) {
+    if (!isObj(a) || !okStr(a.type)) return "";
+    return str(a.type);
+  }
+  function attachmentText(r) {
+    const a = r.attachment;
+    if (a === undefined || (a !== null && !isObj(a))) return "";
+    const att = a || {};
+    if (!okStr(att.stdout) || !okStr(att.text)) return "";
+    const c = att.content;
+    if (typeof c === "string") {
+      if (c) return c;
+    } else if (Array.isArray(c) && c.length > 0 && c.every(okStr)) {
+      return c.map(str).join("\n");
+    }
+    if (str(att.stdout)) return att.stdout;
+    if (str(att.text)) return att.text;
+    const parts = [];
+    for (const b of r.rendered || []) if (b && str(b.content)) parts.push(b.content);
+    return parts.join("\n");
+  }
+}
+
+var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+
+export { @claude, @haiku, @sonnet, @opus, @claudePoll, @claudePollJsonl, @claudePollEvent, @claudeStreamFormat, @claudeStreamSession, @conversation }

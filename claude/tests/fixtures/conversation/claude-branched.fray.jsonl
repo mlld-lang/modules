@@ -1,0 +1,5 @@
+{"type":"session","session_id":"3f2a1b4c-0000-4000-8000-abcdef000001","harness":{"name":"claude","version":"2.1.241"},"cwd":"/tmp/fixture-proj","started_at":"2026-08-24T10:00:00Z"}
+{"id":"a865da64","seq":0,"ts":"2026-08-24T10:00:00Z","type":"session_start"}
+{"id":"4d31cbf9","parent_id":"a865da64","seq":1,"ts":"2026-08-24T10:00:00Z","type":"message","payload":{"role":"user","text":"start"}}
+{"id":"f34d7d25","parent_id":"4d31cbf9","seq":2,"ts":"2026-08-24T10:00:01Z","type":"assistant_turn","payload":{"model":"claude-sonnet-4-5","text":"branch A answer","stop_reason":"end_turn"}}
+{"id":"b13ee726","parent_id":"f34d7d25","seq":3,"ts":"2026-08-24T10:00:03Z","type":"assistant_turn","payload":{"model":"claude-sonnet-4-5","text":"carry on","stop_reason":"end_turn"}}
