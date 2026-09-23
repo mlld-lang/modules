@@ -181,7 +181,8 @@ Reads the conversation log Claude Code writes for a session and turns it into IF
 import { @conversation } from @mlld/claude
 
 var @path = @conversation.locate("3f2a1b4c-0000-4000-8000-abcdef000001", @base)
-var @tape = @conversation.ingest(@path)
+var @log = <@path>
+var @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 
@@ -193,12 +194,13 @@ show @tape.events.length
 - If the file is not under the expected slug, any `<root>/projects/*/<session-id>.jsonl` is used instead.
 - It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the path would leave `<root>/projects/`.
 
-**`@conversation.ingest(path)`** returns `{ header, events }`.
+**`@conversation.ingest(text)`** returns `{ header, events }`.
 
+- It takes the log's contents, not a path, and reads no files. A file loaded with `<path>` must be passed as `.mx.text`, because mlld parses `.json` and `.jsonl` files when it loads them.
 - `header` is `{ type: "session", session_id, harness: { name: "claude", version }, cwd, started_at }`.
 - `events` is the conversation as the model last saw it: the path from the newest message back to the start. Abandoned branches, subagent side conversations and anything before a compaction are left out. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
 - It is a port of fray's `IngestClaude` (`internal/ift/ingest_claude.go`) and its output matches fray's exactly, which the tests check against fray's own output (`tests/fixtures/conversation/README.md`).
-- It throws only when the file cannot be read. Unreadable lines are skipped, and a record type it does not know prints one warning line to stderr and is skipped.
+- It throws only when `text` is not a string. Unreadable lines are skipped, and a record type it does not know prints one warning line to stderr and is skipped.
 
 **Treat an ingested conversation as untrusted input.** The log is a plain file that anything on the machine can edit, and nothing in it proves Claude produced it.
 

@@ -365,12 +365,16 @@ exe @conversationLocate(sessionId, cwd, root) = node {
   return null;
 }
 
->> @conversation.ingest(path) → { header, events }
->> header is the tape header line and events the event lines of fray's output, parsed.
->> Throws only when the file cannot be read.
-exe @conversationIngest(path) = node {
+>> @conversation.ingest(text) → { header, events }
+>> text is the log's contents; ingest reads no files. header is the tape header line
+>> and events the event lines of fray's output, parsed.
+>> Throws only when text is not a string.
+exe @conversationIngest(text) = node {
   const fs = require("fs");
   const crypto = require("crypto");
+  if (typeof text !== "string") {
+    throw new TypeError("@mlld/codex conversation.ingest: expected the log's text as a string; load the file with <path> and pass .mx.text");
+  }
 
   // Go's json.Unmarshal fails a whole line when a typed field holds the wrong
   // JSON type, and fray then skips the line. These checks reproduce that.
@@ -416,7 +420,7 @@ exe @conversationIngest(path) = node {
   };
 
   const recs = [];
-  for (const line of fs.readFileSync(path, "utf8").split("\n")) {
+  for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     let r;
     try { r = JSON.parse(line); } catch (e) { continue; }

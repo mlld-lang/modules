@@ -103,7 +103,18 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
   if [ -n "$sessionId" ]; then
     mkdir -p "$sessionDir"
     if [ ! -e "$sessionDir/.gitignore" ]; then printf '*\n' > "$sessionDir/.gitignore"; fi
-    sessionFlag=(--session-id "$sessionId" --session-dir "$sessionDir")
+    # pi names a file it creates <timestamp>_<id>.jsonl, which locate could only find
+    # by listing a .llm/ folder the sandbox fences off. Given an existing file holding
+    # only its header line, pi takes the id from the header and appends to that file,
+    # so writing the header first fixes both the name and the id.
+    # pi runs its tools in the cwd the header names, hence $PWD from this shell.
+    sessionFile="$sessionDir/$sessionId.jsonl"
+    if [ ! -e "$sessionFile" ]; then
+      cwdJson=$(printf '%s' "$PWD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+      printf '{"type":"session","version":3,"id":"%s","timestamp":"%s","cwd":"%s"}\n' \
+        "$sessionId" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$cwdJson" > "$sessionFile"
+    fi
+    sessionFlag=(--session "$sessionFile")
   fi
 
   # Run pi
@@ -223,10 +234,13 @@ exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" 
 
 >> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
 >> root is pi's agent dir or the sessions dir inside it, and only it is searched.
->> Without it, <projectRoot>/.llm/pi-sessions (where @pi saves) is searched first,
->> then $PI_CODING_AGENT_DIR/sessions, else ~/.pi/agent/sessions. cwd is ignored:
->> every encoded-cwd directory is searched rather than rebuilding pi's encoding.
->> The parameter keeps the signature shared with the other harnesses.
+>> Without it, the path is <projectRoot>/.llm/pi-sessions/<id>.jsonl (where @pi
+>> saves), built without touching the disk: mlld's sandbox keeps modules out of
+>> .llm/ folders, so the file may exist and still be unreadable here, or not exist
+>> at all. The home store is not searched after it. With neither, pi's own store
+>> $PI_CODING_AGENT_DIR/sessions, else ~/.pi/agent/sessions, is searched. cwd is
+>> ignored: every encoded-cwd directory is searched rather than rebuilding pi's
+>> encoding. The parameter keeps the signature shared with the other harnesses.
 >> projectRoot is a parameter because a node exe cannot see @root.
 exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
   const fs = require("fs");
@@ -236,13 +250,14 @@ exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
   const id = sessionId.trim().toLowerCase();
   // The id is matched against file names, so anything but a UUID is refused outright.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
-  const bases = [];
-  if (typeof root === "string" && root) bases.push(root);
-  else {
-    if (typeof projectRoot === "string" && projectRoot) bases.push(path.join(projectRoot, ".llm", "pi-sessions"));
-    if (process.env.PI_CODING_AGENT_DIR) bases.push(path.join(process.env.PI_CODING_AGENT_DIR, "sessions"));
-    else bases.push(path.join(os.homedir(), ".pi", "agent", "sessions"));
+  const hasRoot = typeof root === "string" && root;
+  if (!hasRoot && typeof projectRoot === "string" && projectRoot) {
+    return path.join(projectRoot, ".llm", "pi-sessions", id + ".jsonl");
   }
+  const bases = [];
+  if (hasRoot) bases.push(root);
+  else if (process.env.PI_CODING_AGENT_DIR) bases.push(path.join(process.env.PI_CODING_AGENT_DIR, "sessions"));
+  else bases.push(path.join(os.homedir(), ".pi", "agent", "sessions"));
 
   // A file <timestamp>_<id>.jsonl answers to the text after its first `_`, and
   // after its last `_` when that is a different one.
@@ -304,12 +319,16 @@ exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
 >> root, which would shadow it.
 exe @conversationLocate(sessionId, cwd, storeRoot) = @conversationLocateIn(@sessionId, @cwd, @storeRoot ?? "", @root)
 
->> @conversation.ingest(path) → { header, events }
->> header is the tape header line and events the event lines of fray's output, parsed.
->> Throws only when the file cannot be read.
-exe @conversationIngest(path) = node {
+>> @conversation.ingest(text) → { header, events }
+>> text is the log's contents; ingest reads no files. header is the tape header line
+>> and events the event lines of fray's output, parsed.
+>> Throws only when text is not a string.
+exe @conversationIngest(text) = node {
   const fs = require("fs");
   const crypto = require("crypto");
+  if (typeof text !== "string") {
+    throw new TypeError("@mlld/pi conversation.ingest: expected the log's text as a string; load the file with <path> and pass .mx.text");
+  }
 
   // Go's json.Unmarshal fails a whole line when a scalar field holds the wrong
   // JSON type (null is always fine), and fray then skips the line. These checks
@@ -365,7 +384,7 @@ exe @conversationIngest(path) = node {
   };
 
   const recs = [];
-  for (const line of fs.readFileSync(path, "utf8").split("\n")) {
+  for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     let r;
     try { r = JSON.parse(line); } catch (e) { continue; }

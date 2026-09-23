@@ -3,6 +3,9 @@
 
 import { @conversation, @claudeStreamSession } from "../index.mld"
 
+>> Reads a fixture raw: <file> would parse a .jsonl, changing what a truncated line does.
+exe @text(p) = node { return require("fs").readFileSync(p, "utf8"); }
+
 var @fixtures = "@root/claude/tests/fixtures/conversation"
 var @home = "@fixtures/home"
 var @sid = "3f2a1b4c-0000-4000-8000-abcdef000001"
@@ -45,11 +48,15 @@ exe @isLowerUuid(s) = js {
 
 >> ── ingest: fray's output over fray's native fixtures ──
 
-var @test_ingest_attachments = @matchesGolden(@conversation.ingest("@fixtures/claude-attachments.jsonl"), "@fixtures/claude-attachments.fray.jsonl")
-var @test_ingest_basic = @matchesGolden(@conversation.ingest("@fixtures/claude-basic.jsonl"), "@fixtures/claude-basic.fray.jsonl")
-var @test_ingest_branched = @matchesGolden(@conversation.ingest("@fixtures/claude-branched.jsonl"), "@fixtures/claude-branched.fray.jsonl")
-var @test_ingest_compacted = @matchesGolden(@conversation.ingest("@fixtures/claude-compacted.jsonl"), "@fixtures/claude-compacted.fray.jsonl")
-var @test_ingest_headless_thinking = @matchesGolden(@conversation.ingest("@fixtures/claude-headless-thinking.jsonl"), "@fixtures/claude-headless-thinking.fray.jsonl")
+>> A loaded file arrives as an object, not text; ingest must refuse it rather than read it.
+var @rejected = try @conversation.ingest({})
+var @test_ingest_rejects_path_like_object = !@rejected.ok
+
+var @test_ingest_attachments = @matchesGolden(@conversation.ingest(@text("@fixtures/claude-attachments.jsonl")), "@fixtures/claude-attachments.fray.jsonl")
+var @test_ingest_basic = @matchesGolden(@conversation.ingest(@text("@fixtures/claude-basic.jsonl")), "@fixtures/claude-basic.fray.jsonl")
+var @test_ingest_branched = @matchesGolden(@conversation.ingest(@text("@fixtures/claude-branched.jsonl")), "@fixtures/claude-branched.fray.jsonl")
+var @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text("@fixtures/claude-compacted.jsonl")), "@fixtures/claude-compacted.fray.jsonl")
+var @test_ingest_headless_thinking = @matchesGolden(@conversation.ingest(@text("@fixtures/claude-headless-thinking.jsonl")), "@fixtures/claude-headless-thinking.fray.jsonl")
 
 >> ── locate ──
 

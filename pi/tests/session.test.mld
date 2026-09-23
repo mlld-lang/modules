@@ -42,16 +42,15 @@ var @test_on_envelope_provider = @onResult._mlld.provider == "pi"
 var @fixtures = "@root/pi/tests/fixtures/conversation"
 var @fixtureProject = "@fixtures/project"
 var @projectSid = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
-exe @realpath(p) = node { return require("fs").realpathSync(p); }
-var @projectFile = @realpath("@fixtureProject/.llm/pi-sessions/2026-09-23T10-00-00-000Z_3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl")
 
-var @test_locate_project_store = @conversationLocateIn(@projectSid, "/anywhere", "", @fixtureProject) == @projectFile
->> The fallback after the project store is the real ~/.pi/agent/sessions (tests
->> cannot set PI_CODING_AGENT_DIR), which never holds this fixture id.
-var @test_locate_empty_project = @conversationLocateIn(@projectSid, "/anywhere", "", "@fixtures/home") == null
+>> Built from the arguments alone, with no symlink resolved.
+var @test_locate_project_store = @conversationLocateIn(@projectSid, "/anywhere", "", @fixtureProject) == "@fixtureProject/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
+>> The folder does not exist, so only a path built without reading can match.
+var @test_locate_project_store_no_read = @conversationLocateIn(@projectSid, "/anywhere", "", "/nonexistent/proj") == "/nonexistent/proj/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
+var @test_locate_project_store_lowercases_id = @conversationLocateIn("3C1F0B52-8E4D-4A7B-9F21-6D5E4C3B2A10", "/anywhere", "", "/nonexistent/proj") == "/nonexistent/proj/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
 >> An explicit root is the only place searched, even with a project set.
 var @test_locate_root_excludes_project = @conversationLocateIn(@projectSid, "/anywhere", "@fixtures/home", @fixtureProject) == null
 
 >> The public wrapper, with the store root left out and given.
-var @test_wrapper_without_root = @conversation.locate(@projectSid, "/anywhere") == null
+var @test_wrapper_without_root = @conversation.locate(@projectSid, "/anywhere") == "@root/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
 var @test_wrapper_with_root = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345678", "/anywhere", "@fixtures/home") != null

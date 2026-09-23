@@ -93,7 +93,8 @@ Reads the "rollout" log codex writes for a session and turns it into IFT events,
 import { @conversation } from @mlld/codex
 
 var @path = @conversation.locate("0c0ffee0-1234-4321-8abc-def012345678", @base)
-var @tape = @conversation.ingest(@path)
+var @log = <@path>
+var @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 
@@ -105,12 +106,13 @@ show @tape.events.length
 - The id is matched case-insensitively.
 - It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the file would lie outside the sessions directory.
 
-**`@conversation.ingest(path)`** returns `{ header, events }`.
+**`@conversation.ingest(text)`** returns `{ header, events }`.
 
+- It takes the log's contents, not a path, and reads no files. A file loaded with `<path>` must be passed as `.mx.text`, because mlld parses `.json` and `.jsonl` files when it loads them.
 - `header` is `{ type: "session", session_id, harness: { name: "codex", version }, cwd, started_at }`.
 - `events` is the conversation as the model currently holds it. After a compaction, codex keeps a condensed history, so the events restart from that history and end with a `context_injection` of kind `compaction`. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
 - It is a port of fray's `IngestCodex` (`internal/ift/ingest_codex.go`), and its output matches fray's exactly. The tests check this against fray's own output (`tests/fixtures/conversation/README.md`). That includes two fray quirks: `session_start`, the base instructions and the compaction mark carry the zero time `0001-01-01T00:00:00Z`, and reasoning codex only stores encrypted appears as a `thinking` event with `redacted: true` and no text.
-- It throws only when the file cannot be read. Unreadable lines are skipped, including a half-written last line. A record type it does not know prints one warning line to stderr and is skipped.
+- It throws only when `text` is not a string. Unreadable lines are skipped, including a half-written last line. A record type it does not know prints one warning line to stderr and is skipped.
 
 **A failed tool call cannot be told apart from a successful one.** Codex's rollout does not mark failures, so no `tool_result` carries `is_error`.
 

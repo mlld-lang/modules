@@ -3,6 +3,9 @@
 
 import { @conversation } from "../index.mld"
 
+>> Reads a fixture raw: <file> would parse a .jsonl, changing what a truncated line does.
+exe @text(p) = node { return require("fs").readFileSync(p, "utf8"); }
+
 var @fixtures = "@root/pi/tests/fixtures/conversation"
 var @agentDir = "@fixtures/home"
 var @sessions = "@fixtures/home/sessions"
@@ -45,10 +48,14 @@ exe @matchesGolden(result, goldenPath) = node {
 
 >> ── ingest: fray's output over fray's native fixtures ──
 
-var @test_ingest_basic = @matchesGolden(@conversation.ingest("@fixtures/pi-basic.jsonl"), "@fixtures/pi-basic.fray.jsonl")
-var @test_ingest_branched = @matchesGolden(@conversation.ingest("@fixtures/pi-branched.jsonl"), "@fixtures/pi-branched.fray.jsonl")
-var @test_ingest_compacted = @matchesGolden(@conversation.ingest("@fixtures/pi-compacted.jsonl"), "@fixtures/pi-compacted.fray.jsonl")
-var @test_ingest_openrouter = @matchesGolden(@conversation.ingest("@fixtures/pi-openrouter.jsonl"), "@fixtures/pi-openrouter.fray.jsonl")
+>> A loaded file arrives as an object, not text; ingest must refuse it rather than read it.
+var @rejected = try @conversation.ingest({})
+var @test_ingest_rejects_path_like_object = !@rejected.ok
+
+var @test_ingest_basic = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-basic.jsonl")), "@fixtures/pi-basic.fray.jsonl")
+var @test_ingest_branched = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-branched.jsonl")), "@fixtures/pi-branched.fray.jsonl")
+var @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-compacted.jsonl")), "@fixtures/pi-compacted.fray.jsonl")
+var @test_ingest_openrouter = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-openrouter.jsonl")), "@fixtures/pi-openrouter.fray.jsonl")
 
 >> ── locate ──
 

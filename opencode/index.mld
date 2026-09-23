@@ -527,12 +527,16 @@ exe @conversationLocate(sessionId, cwd, root, bin) = node {
   } catch (e) { return null; }
 }
 
->> @conversation.ingest(path) → { header, events }
->> path is an `opencode export` JSON file. Throws only when it cannot be read or parsed.
-exe @conversationIngest(path) = node {
+>> @conversation.ingest(text) → { header, events }
+>> text is the JSON of an `opencode export`. Reads no files.
+>> Throws when text is not a string or is not JSON.
+exe @conversationIngest(text) = node {
   const fs = require("fs");
   const crypto = require("crypto");
-  const data = JSON.parse(fs.readFileSync(path, "utf8"));
+  if (typeof text !== "string") {
+    throw new TypeError("@mlld/opencode conversation.ingest: expected the log's text as a string; load the file with <path> and pass .mx.text");
+  }
+  const data = JSON.parse(text);
   const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
   const str = (v) => (typeof v === "string" ? v : "");
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);

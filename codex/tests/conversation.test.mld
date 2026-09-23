@@ -3,6 +3,9 @@
 
 import { @conversation } from "../index.mld"
 
+>> Reads a fixture raw: <file> would parse a .jsonl, changing what a truncated line does.
+exe @text(p) = node { return require("fs").readFileSync(p, "utf8"); }
+
 var @fixtures = "@root/codex/tests/fixtures/conversation"
 var @sessions = "@fixtures/home/sessions"
 var @sid = "0c0ffee0-1234-4321-8abc-def012345678"
@@ -44,13 +47,17 @@ exe @matchesGolden(result, goldenPath, limit) = node {
 
 >> ── ingest: fray's output over fray's native fixtures ──
 
-var @test_ingest_basic = @matchesGolden(@conversation.ingest("@fixtures/codex-basic.jsonl"), "@fixtures/codex-basic.fray.jsonl", null)
-var @test_ingest_compacted = @matchesGolden(@conversation.ingest("@fixtures/codex-compacted.jsonl"), "@fixtures/codex-compacted.fray.jsonl", null)
-var @test_ingest_custom_tools = @matchesGolden(@conversation.ingest("@fixtures/codex-custom-tools.jsonl"), "@fixtures/codex-custom-tools.fray.jsonl", null)
+>> A loaded file arrives as an object, not text; ingest must refuse it rather than read it.
+var @rejected = try @conversation.ingest({})
+var @test_ingest_rejects_path_like_object = !@rejected.ok
+
+var @test_ingest_basic = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-basic.jsonl")), "@fixtures/codex-basic.fray.jsonl", null)
+var @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-compacted.jsonl")), "@fixtures/codex-compacted.fray.jsonl", null)
+var @test_ingest_custom_tools = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-custom-tools.jsonl")), "@fixtures/codex-custom-tools.fray.jsonl", null)
 
 >> codex-basic with its last line (the final tool output) cut in half: that line is
 >> dropped, which leaves the golden's header and first 6 events.
-var @test_ingest_truncated_last_line = @matchesGolden(@conversation.ingest("@fixtures/codex-basic-truncated.jsonl"), "@fixtures/codex-basic.fray.jsonl", 6)
+var @test_ingest_truncated_last_line = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-basic-truncated.jsonl")), "@fixtures/codex-basic.fray.jsonl", 6)
 
 >> ── locate ──
 

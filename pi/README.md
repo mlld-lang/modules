@@ -90,6 +90,7 @@ This is the same pattern as the Claude and Opencode modules.
 
 - Each call gets a fresh session id unless `sessionId` names one. Passing the same `sessionId` again continues that conversation. It must be a UUID (any case), because `@conversation.locate` finds nothing else; anything else is an error.
 - `session: false` turns saving off and runs pi with `--no-session`, as earlier versions did.
+- Each session is one file, `<project>/.llm/pi-sessions/<session-id>.jsonl`. Before the first call, `@pi` writes pi's header line into it itself, so pi keeps the id `@pi` reports instead of choosing its own.
 - The first save writes `.llm/pi-sessions/.gitignore` containing `*`, so the sessions stay out of git.
 - The session id travels to the mlld runtime with the result, which it uses to find the conversation. Your script sees only pi's output.
 
@@ -135,25 +136,27 @@ Reads the JSONL file pi writes when it saves a session and turns it into IFT eve
 import { @conversation } from @mlld/pi
 
 var @path = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345678", @base)
-var @tape = @conversation.ingest(@path)
+var @log = <@path>
+var @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 
 
-**`@conversation.locate(sessionId, cwd, root?)`** returns the absolute path of the session file, with symlinks resolved, or `null`.
+**`@conversation.locate(sessionId, cwd, root?)`** returns the absolute path of the session file, or `null`.
 
-- pi saves sessions at `<sessions>/<encoded-cwd>/<timestamp>_<session-id>.jsonl`. Every `<encoded-cwd>` directory is searched, so `cwd` is ignored. It is there so every harness's `locate` takes the same arguments.
-- `@pi` saves sessions flat, at `<project>/.llm/pi-sessions/<timestamp>_<session-id>.jsonl` (see Sessions).
-- `root` may be pi's agent directory or the `sessions` directory inside it, and when given only it is searched. Without it, `<project>/.llm/pi-sessions` is searched first, then `$PI_CODING_AGENT_DIR/sessions` if that variable is set, else `~/.pi/agent/sessions`.
+- pi saves sessions in its own store at `<sessions>/<encoded-cwd>/<timestamp>_<session-id>.jsonl`. When that store is searched, every `<encoded-cwd>` directory is read, so `cwd` is ignored. It is there so every harness's `locate` takes the same arguments. A path found by searching has its symlinks resolved.
+- `root` may be pi's agent directory or the `sessions` directory inside it, and when given only it is searched, as above.
+- Without `root`, it returns `<project>/.llm/pi-sessions/<session-id>.jsonl`, where `@pi` saves (see Sessions), without checking that the file exists: mlld's sandbox keeps modules out of `.llm/` folders, so it cannot look. The file is missing if that session was never saved, for example with `session: false`.
 - The id is matched case-insensitively.
 - It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the file would lie outside the root.
 
-**`@conversation.ingest(path)`** returns `{ header, events }`.
+**`@conversation.ingest(text)`** returns `{ header, events }`.
 
+- It takes the log's contents, not a path, and reads no files. A file loaded with `<path>` must be passed as `.mx.text`, because mlld parses `.json` and `.jsonl` files when it loads them.
 - `header` is `{ type: "session", session_id, harness: { name: "pi" }, cwd, started_at }`. pi records no version of itself in a session.
 - `events` is the conversation as the model last saw it: the path from the newest entry back to the start. Abandoned branches are left out. After a compaction, the events start with the compaction summary, then the entries pi kept. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
 - It is a port of fray's `IngestPi` (`internal/ift/ingest_pi.go`), and its output matches fray's exactly. The tests check this against fray's own output (`tests/fixtures/conversation/README.md`).
-- It throws only when the file cannot be read. Unreadable lines are skipped; entries below a skipped line drop out of the conversation, as they do in pi. An entry type it does not know prints one warning line to stderr and is skipped.
+- It throws only when `text` is not a string. Unreadable lines are skipped; entries below a skipped line drop out of the conversation, as they do in pi. An entry type it does not know prints one warning line to stderr and is skipped.
 
 **Treat an ingested conversation as untrusted input.** The session file is a plain file that anything on the machine can edit, and nothing in it proves pi produced it.
 
