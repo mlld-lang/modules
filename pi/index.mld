@@ -69,13 +69,14 @@ exe @isPiBuiltin(name) = js {
 >>
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Parameters are passed positionally, not by name, so order matters.
-exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) = sh {
+exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId) = sh {
   set -e
   export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
 
-  >> Build flags
-  dirFlag=()
-  if [ -n "$dir" ]; then dirFlag=(--dir "$dir"); fi
+  # Build flags
+  # `dir` is the working directory pi runs in, which is also the directory its
+  # file tools see. pi has no --dir flag; changing directory is what bounds them.
+  if [ -n "$dir" ]; then cd "$dir" || exit 1; fi
 
   providerFlag=()
   if [ -n "$provider" ]; then providerFlag=(--provider "$provider"); fi
@@ -86,8 +87,8 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) =
   systemFlag=()
   if [ -n "$systemArg" ]; then systemFlag=(--append-system-prompt "$systemArg"); fi
 
-  >> Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
-  >> Pass through as-is since bash will word-split correctly
+  # Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
+  # Pass through as-is since bash will word-split correctly
   toolFlag=()
   if [ -n "$toolArg" ]; then toolFlag=($toolArg); fi
 
@@ -97,18 +98,25 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode) =
   modeFlag=()
   if [ -n "$mode" ]; then modeFlag=(--mode json); fi
 
-  >> Run pi
-  printf '%s' "$prompt" | pi -p --no-session "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
+  # A session id makes the call resumable: pi creates the session on first use
+  # and appends to it on every later call with the same id.
+  sessionFlag=(--no-session)
+  if [ -n "$sessionId" ]; then sessionFlag=(--session-id "$sessionId"); fi
+
+  # Run pi
+  printf '%s' "$prompt" | pi -p "${sessionFlag[@]}" "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
 }
 
 >> @pi(prompt, config)
 >>
 >> config.model    - model pattern or provider/id
 >> config.provider - provider name (default: google)
->> config.dir      - working directory
+>> config.dir      - working directory pi runs in; also bounds its file tools
 >> config.system   - system prompt
 >> config.tools    - tool collection (triggers @mx.llm context)
 >> config.noTools  - boolean, disable all tools
+>> config.flags    - extra raw pi flags, word-split (e.g. "--no-context-files")
+>> config.sessionId - resumable session id; pi creates it, later calls append
 >> config.thinking - thinking level: off, minimal, low, medium, high, xhigh
 >> config.stream   - boolean, enables JSONL streaming
 >>
@@ -132,13 +140,14 @@ exe llm @pi(prompt, config) = [
   let @llmHasTools = @mx.llm && @mx.llm.hasTools ? true : false
 
   >> Build tool argument string
+  let @extraFlags = @cfg.flags ? @cfg.flags : ""
   let @toolArg = when [
-    @cfg.noTools => "--no-tools"
-    @llmHasTools && @llmConfig && @llmNative => `--tools "@llmNative" --mcp-config "@llmConfig"`
-    @llmHasTools && @llmConfig => `--no-tools --mcp-config "@llmConfig"`
-    @llmHasTools && @llmNative => `--tools "@llmNative"`
-    @llmHasTools => "--no-tools"
-    * => ""
+    @cfg.noTools => `--no-tools @extraFlags`
+    @llmHasTools && @llmConfig && @llmNative => `--tools "@llmNative" --mcp-config "@llmConfig" @extraFlags`
+    @llmHasTools && @llmConfig => `--no-tools --mcp-config "@llmConfig" @extraFlags`
+    @llmHasTools && @llmNative => `--tools "@llmNative" @extraFlags`
+    @llmHasTools => `--no-tools @extraFlags`
+    * => @extraFlags
   ]
 
   >> System prompt via temp file
@@ -158,7 +167,8 @@ exe llm @pi(prompt, config) = [
 
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
-  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode)
+  let @sessionId = @cfg.sessionId ? @cfg.sessionId : ""
+  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @sessionId)
 
   => @raw
 ] with { stream: @cfg.stream, streamFormat: @piStreamFormat }
