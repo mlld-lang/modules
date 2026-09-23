@@ -437,9 +437,10 @@ exe @conversationIngest(path) = node {
 
   const tape = { sessionID: "", cwd: "", version: "", startedAt: ZERO };
   let events = [];
+  // Mirrors the ids in events; rebuilding it per append makes ingest quadratic.
+  let taken = new Set();
   const leaf = () => (events.length ? events[events.length - 1] : null);
   const append = (ev) => {
-    const taken = new Set(events.map((e) => e.id));
     const last = leaf();
     const seq = last ? last.seq + 1 : 0;
     let id;
@@ -455,6 +456,7 @@ exe @conversationIngest(path) = node {
     out.type = ev.type;
     if (ev.payload) out.payload = ev.payload;
     events.push(out);
+    taken.add(id);
     return out;
   };
 
@@ -693,6 +695,7 @@ exe @conversationIngest(path) = node {
         // emitted even with empty text so a compaction is always visible.
         const root = events[0];
         events = [{ id: root.id, seq: 0, ts: root.ts, type: "session_start" }];
+        taken = new Set([root.id]);
         for (const item of p.replacement_history || []) emitResponseItem(leaf(), ts, isObj(item) ? item : {});
         append({ type: "context_injection", payload: { source: "codex", kind: "compaction", text: str(p.message) } });
         break;
