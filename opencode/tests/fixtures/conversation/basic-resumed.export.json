@@ -1,0 +1,453 @@
+{
+  "info": {
+    "id": "ses_f32dadd9cffeySLGHspzO7cmgF",
+    "slug": "swift-cactus",
+    "projectID": "00f85cc4e4f4f5f31762346a746379d868053122",
+    "directory": "/workspace/scratch",
+    "path": "scratch",
+    "title": "f548-basic",
+    "version": "0.0.0-dev-202605160127",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "permission": [
+      {
+        "permission": "question",
+        "pattern": "*",
+        "action": "deny"
+      },
+      {
+        "permission": "plan_enter",
+        "pattern": "*",
+        "action": "deny"
+      },
+      {
+        "permission": "plan_exit",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1790148158051,
+      "updated": 1790148183444
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1790148158660
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "fireworks-ai",
+          "modelID": "accounts/fireworks/models/gpt-oss-120b"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_0cd2524c4001ipbJclhbQoY5dm",
+        "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "\"Use the read tool to read notes.txt in the current directory, then reply with its first line only.\"\n",
+          "id": "prt_0cd2524c5001KZpePjDn6yOO21",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2524c4001ipbJclhbQoY5dm"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0cd2524c4001ipbJclhbQoY5dm",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0.00291945,
+        "tokens": {
+          "total": 19172,
+          "input": 19075,
+          "output": 84,
+          "reasoning": 13,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "accounts/fireworks/models/gpt-oss-120b",
+        "providerID": "fireworks-ai",
+        "time": {
+          "created": 1790148158715,
+          "completed": 1790148160415
+        },
+        "finish": "tool-calls",
+        "id": "msg_0cd2524fb001Ru99mmabGQyCp7",
+        "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF"
+      },
+      "parts": [
+        {
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-start",
+          "id": "prt_0cd2528cd001U611JSIWPseMlE",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2524fb001Ru99mmabGQyCp7"
+        },
+        {
+          "type": "reasoning",
+          "text": "User wants to read notes.txt first line. Use read tool.",
+          "time": {
+            "start": 1790148159693,
+            "end": 1790148159812
+          },
+          "id": "prt_0cd2528cd003XGWBTuHl5SxY0U",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2524fb001Ru99mmabGQyCp7"
+        },
+        {
+          "type": "text",
+          "text": "Reading notes.txt.",
+          "time": {
+            "start": 1790148159813,
+            "end": 1790148160350
+          },
+          "id": "prt_0cd2529450017ppdGUMtnOfKiP",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2524fb001Ru99mmabGQyCp7"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_rg3kKxdVXv9w7QSbPL6k3etm",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/scratch/notes.txt",
+              "offset": 1,
+              "limit": 1
+            },
+            "output": "<path>/workspace/scratch/notes.txt</path>\n<type>file</type>\n<content>\n1: alpha line\n\n(Showing lines 1-1 of 2. Use offset=2 to continue.)\n</content>",
+            "metadata": {
+              "preview": "alpha line",
+              "truncated": true,
+              "loaded": []
+            },
+            "title": "scratch/notes.txt",
+            "time": {
+              "start": 1790148160340,
+              "end": 1790148160345
+            }
+          },
+          "id": "prt_0cd2529c9001P8NFW6EAIjoeol",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2524fb001Ru99mmabGQyCp7"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19172,
+            "input": 19075,
+            "output": 84,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0.00291945,
+          "id": "prt_0cd252b60001ltKGfU4gSwLkGw",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2524fb001Ru99mmabGQyCp7"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0cd2524c4001ipbJclhbQoY5dm",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0.00031701,
+        "tokens": {
+          "total": 19262,
+          "input": 182,
+          "output": 6,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 19074
+          }
+        },
+        "modelID": "accounts/fireworks/models/gpt-oss-120b",
+        "providerID": "fireworks-ai",
+        "time": {
+          "created": 1790148160416,
+          "completed": 1790148160795
+        },
+        "finish": "stop",
+        "id": "msg_0cd252ba0001wEDapIdWj2pOHr",
+        "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF"
+      },
+      "parts": [
+        {
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-start",
+          "id": "prt_0cd252ccf001lKL61eYy5eEXri",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd252ba0001wEDapIdWj2pOHr"
+        },
+        {
+          "type": "text",
+          "text": "alpha line",
+          "time": {
+            "start": 1790148160720,
+            "end": 1790148160733
+          },
+          "id": "prt_0cd252cd0002GzY3zGEwJt4GES",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd252ba0001wEDapIdWj2pOHr"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19262,
+            "input": 182,
+            "output": 6,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 19074
+            }
+          },
+          "cost": 0.00031701,
+          "id": "prt_0cd252cde001ymlwqRfTOiQguj",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd252ba0001wEDapIdWj2pOHr"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1790148181321
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "fireworks-ai",
+          "modelID": "accounts/fireworks/models/gpt-oss-120b"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_0cd257d49001evSIcmnhboT4hB",
+        "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "\"Now read notes.txt again and reply with its second line only.\"\n",
+          "id": "prt_0cd257d49002LYNVIEdgKQ6Dmd",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd257d49001evSIcmnhboT4hB"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0cd257d49001evSIcmnhboT4hB",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0.00255522,
+        "tokens": {
+          "total": 19355,
+          "input": 16374,
+          "output": 78,
+          "reasoning": 15,
+          "cache": {
+            "write": 0,
+            "read": 2888
+          }
+        },
+        "modelID": "accounts/fireworks/models/gpt-oss-120b",
+        "providerID": "fireworks-ai",
+        "time": {
+          "created": 1790148181370,
+          "completed": 1790148183384
+        },
+        "finish": "tool-calls",
+        "id": "msg_0cd257d7a001G3SWS2GqeMhFdQ",
+        "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF"
+      },
+      "parts": [
+        {
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-start",
+          "id": "prt_0cd2580e1001elIsMFzj8S5MZI",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd257d7a001G3SWS2GqeMhFdQ"
+        },
+        {
+          "type": "reasoning",
+          "text": "We need second line. Use read with offset=2 limit=1.",
+          "time": {
+            "start": 1790148182242,
+            "end": 1790148182501
+          },
+          "id": "prt_0cd2580e2001KJONq4PmbG6nCc",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd257d7a001G3SWS2GqeMhFdQ"
+        },
+        {
+          "type": "text",
+          "text": "Reading second line.",
+          "time": {
+            "start": 1790148182502,
+            "end": 1790148183318
+          },
+          "id": "prt_0cd2581e6001ofFk8fU9vVpPgd",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd257d7a001G3SWS2GqeMhFdQ"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "call_z8VjgVNXomJgGjTrDivtt6xd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/scratch/notes.txt",
+              "offset": 2,
+              "limit": 1
+            },
+            "output": "<path>/workspace/scratch/notes.txt</path>\n<type>file</type>\n<content>\n2: beta line\n\n(End of file - total 2 lines)\n</content>",
+            "metadata": {
+              "preview": "beta line",
+              "truncated": false,
+              "loaded": []
+            },
+            "title": "scratch/notes.txt",
+            "time": {
+              "start": 1790148183292,
+              "end": 1790148183296
+            }
+          },
+          "id": "prt_0cd2582e80019QxdpNeotLg1U0",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd257d7a001G3SWS2GqeMhFdQ"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19355,
+            "input": 16374,
+            "output": 78,
+            "reasoning": 15,
+            "cache": {
+              "write": 0,
+              "read": 2888
+            }
+          },
+          "cost": 0.00255522,
+          "id": "prt_0cd258518001yWLcwmDEwJQWBG",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd257d7a001G3SWS2GqeMhFdQ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0cd257d49001evSIcmnhboT4hB",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0.000346875,
+        "tokens": {
+          "total": 19462,
+          "input": 381,
+          "output": 6,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 19075
+          }
+        },
+        "modelID": "accounts/fireworks/models/gpt-oss-120b",
+        "providerID": "fireworks-ai",
+        "time": {
+          "created": 1790148183385,
+          "completed": 1790148183877
+        },
+        "finish": "stop",
+        "id": "msg_0cd2585590017cBs13eWT7h9QR",
+        "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF"
+      },
+      "parts": [
+        {
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-start",
+          "id": "prt_0cd2586ce001b2amRJNEM5dw0Q",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2585590017cBs13eWT7h9QR"
+        },
+        {
+          "type": "text",
+          "text": "beta line",
+          "time": {
+            "start": 1790148183786,
+            "end": 1790148183818
+          },
+          "id": "prt_0cd2586ea001xyWIknUG5VtP2M",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2585590017cBs13eWT7h9QR"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-finish",
+          "tokens": {
+            "total": 19462,
+            "input": 381,
+            "output": 6,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 19075
+            }
+          },
+          "cost": 0.000346875,
+          "id": "prt_0cd25870b001256HUJuqnzpPhM",
+          "sessionID": "ses_f32dadd9cffeySLGHspzO7cmgF",
+          "messageID": "msg_0cd2585590017cBs13eWT7h9QR"
+        }
+      ]
+    }
+  ]
+}

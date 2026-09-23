@@ -1,0 +1,12 @@
+{"type":"session","session_id":"7e5e5e5e-1234-4321-8abc-def012345678","harness":{"name":"pi"},"cwd":"/tmp/pi-fixture","started_at":"2026-08-29T10:00:00Z"}
+{"id":"893e468b","seq":0,"ts":"2026-08-29T10:00:00Z","type":"session_start"}
+{"id":"7a627c5c","parent_id":"893e468b","seq":1,"ts":"2026-08-29T10:00:01Z","type":"message","payload":{"role":"user","text":"Fix the bug"}}
+{"id":"6d8ddb2a","parent_id":"7a627c5c","seq":2,"ts":"2026-08-29T10:00:02Z","type":"assistant_turn","usage":{"input":10,"output":20},"payload":{"provider":"anthropic","model":"claude-sonnet-4-5","text":"I'll check the file.","tool_use_ids":["tc_1"],"stop_reason":"toolUse"}}
+{"id":"50af81eb","parent_id":"6d8ddb2a","seq":3,"ts":"2026-08-29T10:00:02Z","type":"thinking","payload":{"text":"Let me look around."}}
+{"id":"c672de57","parent_id":"6d8ddb2a","seq":4,"ts":"2026-08-29T10:00:02Z","type":"tool_call","payload":{"tool":"read","args":{"path":"main.go"},"tool_use_id":"tc_1"}}
+{"id":"a4a8900d","parent_id":"c672de57","seq":5,"ts":"2026-08-29T10:00:03Z","type":"tool_result","payload":{"tool_use_id":"tc_1","content":"package main"}}
+{"id":"9d0f2033","parent_id":"a4a8900d","seq":6,"ts":"2026-08-29T10:01:05Z","type":"assistant_turn","usage":{"input":5,"output":3},"payload":{"provider":"openai","model":"gpt-4o","text":"Done.","stop_reason":"stop"}}
+{"id":"5053cc3e","parent_id":"9d0f2033","seq":7,"ts":"2026-08-29T10:02:00Z","type":"tool_call","payload":{"tool":"bash","args":{"command":"ls"},"tool_use_id":"f6g7h8i9"}}
+{"id":"b0fd87f7","parent_id":"5053cc3e","seq":8,"ts":"2026-08-29T10:02:00Z","type":"tool_result","payload":{"tool_use_id":"f6g7h8i9","content":"main.go\n"}}
+{"id":"3b79fca1","parent_id":"b0fd87f7","seq":9,"ts":"2026-08-29T10:03:00Z","type":"context_injection","payload":{"source":"pi","kind":"custom","text":"Injected context"}}
+{"id":"cc698e6e","parent_id":"3b79fca1","seq":10,"ts":"2026-08-29T10:04:00Z","type":"message","payload":{"role":"user","text":"Thanks!"}}

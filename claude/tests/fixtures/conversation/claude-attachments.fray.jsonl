@@ -1,0 +1,6 @@
+{"type":"session","session_id":"3f2a1b4c-0000-4000-8000-abcdef000002","harness":{"name":"claude","version":"2.1.0"},"cwd":"/tmp/proj","started_at":"2026-09-09T10:00:00Z"}
+{"id":"21619e18","seq":0,"ts":"2026-09-09T10:00:00Z","type":"session_start"}
+{"id":"7c1d2b2c","parent_id":"21619e18","seq":1,"ts":"2026-09-09T10:00:00Z","type":"message","payload":{"role":"user","text":"hello"}}
+{"id":"2e61efe8","parent_id":"7c1d2b2c","seq":2,"ts":"2026-09-09T10:00:01Z","type":"context_injection","payload":{"source":"claude","kind":"environment","text":"<system-reminder>\n# Environment\nPrimary working directory: /tmp/proj\n</system-reminder>"}}
+{"id":"69c839ab","parent_id":"2e61efe8","seq":3,"ts":"2026-09-09T10:00:03Z","type":"context_injection","payload":{"source":"claude","kind":"total_tokens_reminder","text":"<total_tokens>15000000 tokens left</total_tokens>"}}
+{"id":"ee0d176f","parent_id":"69c839ab","seq":4,"ts":"2026-09-09T10:00:04Z","type":"assistant_turn","payload":{"model":"claude-sonnet-5","text":"hi","stop_reason":"end_turn"}}

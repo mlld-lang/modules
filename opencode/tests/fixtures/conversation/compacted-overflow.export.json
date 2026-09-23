@@ -1,0 +1,271 @@
+{
+  "info": {
+    "id": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+    "slug": "cosmic-planet",
+    "projectID": "00f85cc4e4f4f5f31762346a746379d868053122",
+    "directory": "/workspace/scratch",
+    "path": "scratch",
+    "title": "f548-basic",
+    "version": "0.0.0-dev-202605160127",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "permission": [
+      {
+        "permission": "question",
+        "pattern": "*",
+        "action": "deny"
+      },
+      {
+        "permission": "plan_enter",
+        "pattern": "*",
+        "action": "deny"
+      },
+      {
+        "permission": "plan_exit",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1790147902286,
+      "updated": 1790148146691
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1790147902811
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "groq",
+          "modelID": "openai/gpt-oss-20b"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_0cd213d5b001A0DiofLP4vb5Rw",
+        "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "\"Use the read tool to read notes.txt in the current directory, then reply with its first line only.\"\n",
+          "id": "prt_0cd213d5c0016q2gdbTiijKh2U",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd213d5b001A0DiofLP4vb5Rw"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0cd213d5b001A0DiofLP4vb5Rw",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "modelID": "openai/gpt-oss-20b",
+        "providerID": "groq",
+        "time": {
+          "created": 1790147902861,
+          "completed": 1790147903178
+        },
+        "id": "msg_0cd213d8d0015sGvUoa97t7m95",
+        "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55"
+      },
+      "parts": []
+    },
+    {
+      "info": {
+        "role": "user",
+        "model": {
+          "providerID": "groq",
+          "modelID": "openai/gpt-oss-20b"
+        },
+        "agent": "build",
+        "time": {
+          "created": 1790147903179
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_0cd213ecb001dk32kdgSe0G3iK",
+        "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55"
+      },
+      "parts": [
+        {
+          "type": "compaction",
+          "auto": true,
+          "overflow": true,
+          "id": "prt_0cd213ecb00337smiR1L1V15h2",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd213ecb001dk32kdgSe0G3iK"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "parentID": "msg_0cd213ecb001dk32kdgSe0G3iK",
+        "mode": "compaction",
+        "agent": "compaction",
+        "summary": true,
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0.000213225,
+        "tokens": {
+          "total": 1079,
+          "input": 491,
+          "output": 111,
+          "reasoning": 477,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "openai/gpt-oss-20b",
+        "providerID": "groq",
+        "time": {
+          "created": 1790147903182,
+          "completed": 1790147904301
+        },
+        "finish": "stop",
+        "id": "msg_0cd213ece001Y2iQeiFuXhyLzW",
+        "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55"
+      },
+      "parts": [
+        {
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-start",
+          "id": "prt_0cd213ffa001R7dKpqiRe8saGF",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd213ece001Y2iQeiFuXhyLzW"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants an anchored summary from conversation history. There's a request: \"Use the read tool to read notes.txt in the current directory, then reply with its first line only.\" This was a prior turn. Then the user asks to create a new anchored summary from the conversation history above.\n\nWe must provide the Markdown structure exactly as given, no template tags.\n\nWe must summarize conversation history. Let's identify conversation turns:\n\nUser first: \"Use the read tool to read notes.txt in the current directory, then reply with its first line only.\"\n\nThen assistant? There's no assistant reply yet. Then user: \"Create a new anchored summary from the conversation history above.\"\n\nSo conversation history: just the user request, and no assistant answer to that. So anchored summary will reflect that the user wants to read notes.txt. There's no progress, but we can note the pending action: reading file. But the user hasn't gotten a reply yet. So we have no progress. But maybe we should consider \"In Progress\" as reading notes.txt.\n\nBut the conversation: The user asked the assistant to \"Use the read tool to read notes.txt in the current directory, then reply with its first line only.\" The assistant hasn't responded. So the next action is the assistant should read the file. That is the next step. So in the summary, Under \"In Progress\", we can mention \"Reading notes.txt and replying with first line\". Under \"Done\" nothing. Under \"Blocked\" none.\n\nGoal: Summarize the task: \"Read notes.txt and reply with first line.\"\n\nConstraints: none.\n\nKey Decisions: none.\n\nNext Steps: \"Use read tool to read notes.txt\".\n\nCritical Context: none.\n\nRelevant Files: \"notes.txt: file to read\".\n\nThus produce:\n\n## Goal\n- Read notes.txt and reply with its first line.\n\n## Constraints & Preferences\n- (none)\n\n## Progress\n### Done\n- (none)\n\n### In Progress\n- Reading notes.txt and replying with its first line\n\n### Blocked\n- (none)\n\n## Key Decisions\n- (none)\n\n## Next Steps\n- Use read tool to read notes.txt and reply with first line\n\n## Critical Context\n- (none)\n\n## Relevant Files\n- notes.txt: file to read\n\nWe need to keep exact formatting with bullets.\n\nEnsure we use no extra paragraphs.\n\nNow produce answer.",
+          "time": {
+            "start": 1790147903511,
+            "end": 1790147904101
+          },
+          "id": "prt_0cd214017001py1EBXt6Yo0pR3",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd213ece001Y2iQeiFuXhyLzW"
+        },
+        {
+          "type": "text",
+          "text": "## Goal\n- Read notes.txt and reply with its first line.\n\n## Constraints & Preferences\n- (none)\n\n## Progress\n### Done\n- (none)\n\n### In Progress\n- Reading notes.txt and replying with its first line\n\n### Blocked\n- (none)\n\n## Key Decisions\n- (none)\n\n## Next Steps\n- Use read tool to read notes.txt and reply with its first line\n\n## Critical Context\n- (none)\n\n## Relevant Files\n- notes.txt: file to read",
+          "time": {
+            "start": 1790147904102,
+            "end": 1790147904219
+          },
+          "id": "prt_0cd214266001r3FmUNNzStgDY8",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd213ece001Y2iQeiFuXhyLzW"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "type": "step-finish",
+          "tokens": {
+            "total": 1079,
+            "input": 491,
+            "output": 111,
+            "reasoning": 477,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0.000213225,
+          "id": "prt_0cd2142dd001XUEqGwb2Y4hXEw",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd213ece001Y2iQeiFuXhyLzW"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1790147904302
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "groq",
+          "modelID": "openai/gpt-oss-20b"
+        },
+        "id": "msg_0cd21432e0016vj9Plely7KsTb",
+        "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "metadata": {
+            "compaction_continue": true
+          },
+          "synthetic": true,
+          "text": "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\nContinue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.",
+          "time": {
+            "start": 1790147904302,
+            "end": 1790147904302
+          },
+          "id": "prt_0cd21432e003QnDeYXjaE3irND",
+          "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55",
+          "messageID": "msg_0cd21432e0016vj9Plely7KsTb"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0cd21432e0016vj9Plely7KsTb",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/workspace/scratch",
+          "root": "/workspace"
+        },
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "modelID": "openai/gpt-oss-20b",
+        "providerID": "groq",
+        "time": {
+          "created": 1790147904303,
+          "completed": 1790147904459
+        },
+        "id": "msg_0cd21432f0017gTYEJ4eM1FW1b",
+        "sessionID": "ses_f32dec4b1ffee9JKV0ppDRkT55"
+      },
+      "parts": []
+    }
+  ]
+}

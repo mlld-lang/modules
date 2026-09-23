@@ -1,0 +1,8 @@
+{"type":"session","session_id":"0c0ffee0-1234-4321-8abc-def012345678","harness":{"name":"codex","version":"0.139.0"},"cwd":"/tmp/codex-fixture","started_at":"2026-06-21T23:41:44.586Z"}
+{"id":"38c8a951","seq":0,"ts":"0001-01-01T00:00:00Z","type":"session_start"}
+{"id":"ef7e2dae","parent_id":"38c8a951","seq":1,"ts":"0001-01-01T00:00:00Z","type":"context_injection","payload":{"source":"codex","kind":"base_instructions","text":"You are Codex, a coding agent."}}
+{"id":"6804fa24","parent_id":"ef7e2dae","seq":2,"ts":"2026-06-21T23:41:45.1Z","type":"message","payload":{"role":"user","text":"run the tests please"}}
+{"id":"27642b20","parent_id":"6804fa24","seq":3,"ts":"2026-06-21T23:41:46Z","type":"thinking","payload":{"text":"**Planning the run**\nUse the suite"}}
+{"id":"1baeecb6","parent_id":"27642b20","seq":4,"ts":"2026-06-21T23:41:47Z","type":"assistant_turn","payload":{"provider":"openai","model":"gpt-5","text":"Running them now."}}
+{"id":"7da983b6","parent_id":"1baeecb6","seq":5,"ts":"2026-06-21T23:41:49Z","type":"tool_call","payload":{"tool":"shell_command","args":{"command":"ls","workdir":"/tmp/codex-fixture"},"tool_use_id":"call_1"}}
+{"id":"d327daff","parent_id":"7da983b6","seq":6,"ts":"2026-06-21T23:41:50Z","type":"tool_result","payload":{"tool_use_id":"call_1","content":"Exit code: 0\nfile1\nfile2"}}

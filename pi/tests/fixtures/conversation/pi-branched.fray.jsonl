@@ -1,0 +1,6 @@
+{"type":"session","session_id":"9d0d0d0d-1234-4321-8abc-def012345678","harness":{"name":"pi"},"cwd":"/tmp/pi-branched","started_at":"2026-08-29T12:00:00Z"}
+{"id":"43fda2cb","seq":0,"ts":"2026-08-29T12:00:00Z","type":"session_start"}
+{"id":"f6a7a629","parent_id":"43fda2cb","seq":1,"ts":"2026-08-29T12:00:01Z","type":"message","payload":{"role":"user","text":"root question"}}
+{"id":"66f0a746","parent_id":"f6a7a629","seq":2,"ts":"2026-08-29T12:00:02Z","type":"assistant_turn","usage":{"input":1,"output":1},"payload":{"provider":"anthropic","model":"claude-sonnet-4-5","text":"root answer","stop_reason":"stop"}}
+{"id":"78d36fcd","parent_id":"66f0a746","seq":3,"ts":"2026-08-29T12:00:05Z","type":"context_injection","payload":{"source":"pi","kind":"branch_summary","text":"Branch A explored approach X."}}
+{"id":"d5d2fa21","parent_id":"78d36fcd","seq":4,"ts":"2026-08-29T12:00:06Z","type":"message","payload":{"role":"user","text":"branch B followup"}}

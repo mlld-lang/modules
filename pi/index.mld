@@ -1,7 +1,7 @@
 ---
 name: pi
 author: mlld
-version: 1.1.0
+version: 1.2.0
 about: Pi adapter for mlld
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
@@ -69,7 +69,8 @@ exe @isPiBuiltin(name) = js {
 >>
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Parameters are passed positionally, not by name, so order matters.
-exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId) = sh {
+>> sessionId and sessionDir come last so 8-argument callers keep --no-session.
+exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir) = sh {
   set -e
   export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
 
@@ -98,14 +99,62 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
   modeFlag=()
   if [ -n "$mode" ]; then modeFlag=(--mode json); fi
 
-  # A session id makes the call resumable: pi creates the session on first use
-  # and appends to it on every later call with the same id.
+  # Nothing ignores .llm/ in a user project yet, so the sessions dir ignores itself.
   sessionFlag=(--no-session)
-  if [ -n "$sessionId" ]; then sessionFlag=(--session-id "$sessionId"); fi
+  if [ -n "$sessionId" ]; then
+    mkdir -p "$sessionDir"
+    if [ ! -e "$sessionDir/.gitignore" ]; then printf '*\n' > "$sessionDir/.gitignore"; fi
+    # pi names a file it creates <timestamp>_<id>.jsonl, which locate could only find
+    # by listing a .llm/ folder the sandbox fences off. Given an existing file holding
+    # only its header line, pi takes the id from the header and appends to that file,
+    # so writing the header first fixes both the name and the id.
+    # pi runs its tools in the cwd the header names, hence $PWD from this shell.
+    sessionFile="$sessionDir/$sessionId.jsonl"
+    if [ ! -e "$sessionFile" ]; then
+      cwdJson=$(printf '%s' "$PWD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+      printf '{"type":"session","version":3,"id":"%s","timestamp":"%s","cwd":"%s"}\n' \
+        "$sessionId" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$cwdJson" > "$sessionFile"
+    fi
+    sessionFlag=(--session "$sessionFile")
+  fi
 
   # Run pi
   printf '%s' "$prompt" | pi -p "${sessionFlag[@]}" "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
 }
+
+>> Picks the session a @pi call saves to: a fresh UUID per call unless
+>> config.sessionId names one (the same id again continues that conversation), in
+>> <projectRoot>/.llm/pi-sessions so writes stay inside the project and the user's
+>> own pi history stays clean. config.session: false turns saving off. Ids must be
+>> UUIDs because @conversation.locate finds nothing else.
+exe @piSession(config, projectRoot) = node {
+  const path = require("path");
+  const cfg = config || {};
+  if (cfg.session === false) return { sessionId: "", sessionDir: "" };
+  let id;
+  if (cfg.sessionId !== undefined && cfg.sessionId !== null && cfg.sessionId !== "") {
+    id = String(cfg.sessionId).trim().toLowerCase();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
+      throw new Error("@mlld/pi: sessionId must be a UUID, got " + JSON.stringify(cfg.sessionId));
+    }
+  } else {
+    id = require("crypto").randomUUID().toLowerCase();
+  }
+  return { sessionId: id, sessionDir: path.join(String(projectRoot), ".llm", "pi-sessions") };
+}
+
+>> The runtime strips `_mlld` before callers see the result and reads the session
+>> id from it to find the conversation.
+exe @piResult(inputValue, session) = when [
+  @session.sessionId => {
+    value: @inputValue,
+    _mlld: {
+      sessionId: @session.sessionId,
+      provider: "pi"
+    }
+  }
+  * => @inputValue
+]
 
 >> @pi(prompt, config)
 >>
@@ -119,6 +168,9 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
 >> config.sessionId - resumable session id; pi creates it, later calls append
 >> config.thinking - thinking level: off, minimal, low, medium, high, xhigh
 >> config.stream   - boolean, enables JSONL streaming
+>> config.session  - false to save nothing (pi --no-session); default saves to
+>>                   <project>/.llm/pi-sessions
+>> config.sessionId - UUID naming the session; an existing one is continued
 >>
 >> Tool behavior:
 >>   - When config.tools is provided, mlld runtime creates MCP bridge
@@ -167,16 +219,376 @@ exe llm @pi(prompt, config) = [
 
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
-  let @sessionId = @cfg.sessionId ? @cfg.sessionId : ""
-  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @sessionId)
+  let @session = @piSession(@cfg, @root)
+  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir)
 
-  => @raw
+  => @piResult(@raw, @session)
 ] with { stream: @cfg.stream, streamFormat: @piStreamFormat }
 
 >> Model shortcuts (all follow standard @fn(prompt, config) pattern)
 exe llm @haiku(prompt, config) = @pi(@prompt, { ...@config, model: "claude-haiku" })
 exe llm @sonnet(prompt, config) = @pi(@prompt, { ...@config, model: "claude-sonnet" })
 exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
+
+>> ── Conversation adapter ──
+>> Finds the JSONL file pi writes when it saves a session and translates it into
+>> IFT events (the tape's event format). A port of fray's IngestPi
+>> (internal/ift/ingest_pi.go) whose output must match fray's exactly once parsed,
+>> so the logic follows fray's rather than reading more naturally.
+
+>> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
+>> root is pi's agent dir or the sessions dir inside it, and only it is searched.
+>> Without it, the path is <projectRoot>/.llm/pi-sessions/<id>.jsonl (where @pi
+>> saves), built without touching the disk: mlld's sandbox keeps modules out of
+>> .llm/ folders, so the file may exist and still be unreadable here, or not exist
+>> at all. The home store is not searched after it. With neither, pi's own store
+>> $PI_CODING_AGENT_DIR/sessions, else ~/.pi/agent/sessions, is searched. cwd is
+>> ignored: every encoded-cwd directory is searched rather than rebuilding pi's
+>> encoding. The parameter keeps the signature shared with the other harnesses.
+>> projectRoot is a parameter because a node exe cannot see @root.
+exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
+  const fs = require("fs");
+  const path = require("path");
+  const os = require("os");
+  if (typeof sessionId !== "string") return null;
+  const id = sessionId.trim().toLowerCase();
+  // The id is matched against file names, so anything but a UUID is refused outright.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
+  const hasRoot = typeof root === "string" && root;
+  if (!hasRoot && typeof projectRoot === "string" && projectRoot) {
+    return path.join(projectRoot, ".llm", "pi-sessions", id + ".jsonl");
+  }
+  const bases = [];
+  if (hasRoot) bases.push(root);
+  else if (process.env.PI_CODING_AGENT_DIR) bases.push(path.join(process.env.PI_CODING_AGENT_DIR, "sessions"));
+  else bases.push(path.join(os.homedir(), ".pi", "agent", "sessions"));
+
+  // A file <timestamp>_<id>.jsonl answers to the text after its first `_`, and
+  // after its last `_` when that is a different one.
+  const answers = (name) => {
+    if (!name.endsWith(".jsonl")) return false;
+    const trimmed = name.slice(0, -".jsonl".length);
+    const first = trimmed.indexOf("_");
+    if (first < 0) return false;
+    if (trimmed.slice(first + 1).toLowerCase() === id) return true;
+    const last = trimmed.lastIndexOf("_");
+    return last !== first && trimmed.slice(last + 1).toLowerCase() === id;
+  };
+  const sorted = (dir) => {
+    try {
+      return fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    } catch (e) { return []; }
+  };
+  // fray reads <base>/<file> and <base>/<encoded-cwd>/<file>, nothing deeper, in
+  // name order; the first match wins.
+  const searchBase = (dir) => {
+    for (const e of sorted(dir)) {
+      const p = path.join(dir, e.name);
+      if (!e.isDirectory()) {
+        if (answers(e.name)) return p;
+        continue;
+      }
+      for (const f of sorted(p)) {
+        if (!f.isDirectory() && answers(f.name)) return path.join(p, f.name);
+      }
+    }
+    return null;
+  };
+  const confined = (realRoot, hit) => {
+    if (!hit) return null;
+    let real;
+    try { real = fs.realpathSync(hit); } catch (e) { return null; }
+    if (!real.startsWith(realRoot + path.sep)) return null;
+    try { if (!fs.statSync(real).isFile()) return null; } catch (e) { return null; }
+    return real;
+  };
+  // A root may be pi's agent dir, so the sessions dir inside it is read too, after.
+  const searchRoot = (base) => {
+    let realRoot;
+    try { realRoot = fs.realpathSync(base); } catch (e) { return null; }
+    const hit = confined(realRoot, searchBase(realRoot));
+    if (hit) return hit;
+    const sessions = path.join(realRoot, "sessions");
+    try { if (!fs.statSync(sessions).isDirectory()) return null; } catch (e) { return null; }
+    return confined(realRoot, searchBase(sessions));
+  };
+  for (const base of bases) {
+    const hit = searchRoot(base);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+>> @root is the calling script's project root. The third parameter cannot be named
+>> root, which would shadow it.
+exe @conversationLocate(sessionId, cwd, storeRoot) = @conversationLocateIn(@sessionId, @cwd, @storeRoot ?? "", @root)
+
+>> @conversation.ingest(text) → { header, events }
+>> text is the log's contents; ingest reads no files. header is the tape header line
+>> and events the event lines of fray's output, parsed.
+>> Throws only when text is not a string.
+exe @conversationIngest(text) = node {
+  const fs = require("fs");
+  const crypto = require("crypto");
+  if (typeof text !== "string") {
+    throw new TypeError("@mlld/pi conversation.ingest: expected the log's text as a string; load the file with <path> and pass .mx.text");
+  }
+
+  // Go's json.Unmarshal fails a whole line when a scalar field holds the wrong
+  // JSON type (null is always fine), and fray then skips the line. These checks
+  // reproduce that.
+  const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const okStr = (v) => v === undefined || v === null || typeof v === "string";
+  const okBool = (v) => v === undefined || v === null || typeof v === "boolean";
+  const okInt = (v) => v === undefined || v === null || Number.isInteger(v);
+  const okObj = (v) => v === undefined || v === null || isObj(v);
+  const str = (v) => (typeof v === "string" ? v : "");
+  const validMessage = (m) => {
+    if (!okObj(m)) return false;
+    if (!m) return true;
+    for (const k of ["role", "responseId", "model", "provider", "stopReason", "toolCallId", "command", "output"]) if (!okStr(m[k])) return false;
+    if (!okBool(m.isError) || !okBool(m.cancelled) || !okBool(m.excludeFromContext) || !okInt(m.exitCode)) return false;
+    const u = m.usage;
+    if (!okObj(u)) return false;
+    return !u || ["input", "output", "cacheRead", "cacheWrite"].every((k) => okInt(u[k]));
+  };
+  const validRecord = (r) => {
+    if (r === null) return true;
+    if (!isObj(r)) return false;
+    for (const k of ["type", "id", "parentId", "cwd", "summary", "firstKeptEntryId", "fromId", "customType", "provider", "modelId"]) if (!okStr(r[k])) return false;
+    return okInt(r.version) && validMessage(r.message);
+  };
+  // A block list decodes whole or not at all, as in Go; string content has no blocks.
+  const blockList = (content) => {
+    if (!Array.isArray(content)) return [];
+    const ok = content.every((b) => b === null || (isObj(b) && ["type", "text", "thinking", "id", "name"].every((k) => okStr(b[k]))));
+    return ok ? content.map((b) => b || {}) : [];
+  };
+  const textContent = (content) => {
+    if (typeof content === "string") return content;
+    return blockList(content).map((b) => str(b.text)).join("");
+  };
+
+  // Go's time.RFC3339Nano, both ways: offset kept, fraction trimmed of trailing
+  // zeros. A timestamp never fails its record; anything unparseable is the zero time.
+  const ZERO = "0001-01-01T00:00:00Z";
+  const formatTS = (v) => {
+    if (typeof v !== "string") return ZERO;
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(v);
+    if (!m) return ZERO;
+    const [, Y, Mo, D, h, mi, s, frac, zone, sign, zh, zm] = m;
+    const y = +Y, mo = +Mo, d = +D;
+    if (mo < 1 || mo > 12 || d < 1 || +h > 23 || +mi > 59 || +s > 59) return ZERO;
+    const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    if (d > [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1]) return ZERO;
+    if (zone !== "Z" && (+zh > 23 || +zm > 59)) return ZERO;
+    const f = (frac || "").slice(0, 9).replace(/0+$/, "");
+    const offset = zone === "Z" || (+zh === 0 && +zm === 0) ? "Z" : sign + zh + ":" + zm;
+    return Y + "-" + Mo + "-" + D + "T" + h + ":" + mi + ":" + s + (f ? "." + f : "") + offset;
+  };
+
+  const recs = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    let r;
+    try { r = JSON.parse(line); } catch (e) { continue; }
+    if (!validRecord(r)) continue;
+    recs.push(r || {});
+  }
+
+  const HANDLED = new Set(["session", "message", "compaction", "branch_summary", "custom_message", "model_change"]);
+  const SKIPPED = new Set(["custom", "label", "session_info", "thinking_level_change"]);
+  const warned = new Set();
+  for (const r of recs) {
+    const t = str(r.type);
+    if (t && !HANDLED.has(t) && !SKIPPED.has(t) && !warned.has(t)) {
+      warned.add(t);
+      console.error("@mlld/pi conversation.ingest: skipping unknown entry type " + JSON.stringify(t));
+    }
+  }
+
+  let header = null;
+  const byID = new Map();
+  for (const r of recs) {
+    if (r.type === "session" && !header) { header = r; continue; }
+    if (str(r.id)) byID.set(r.id, r);
+  }
+  let leafRec = null;
+  for (let i = recs.length - 1; i >= 0; i--) {
+    if (recs[i].type !== "session") { leafRec = recs[i]; break; }
+  }
+
+  let sessionID = "", cwd = "", startedAt = ZERO;
+  if (header) {
+    sessionID = str(header.id);
+    cwd = str(header.cwd);
+    if (cwd) {
+      try { cwd = fs.realpathSync(cwd); } catch (e) {}
+    }
+    startedAt = formatTS(header.timestamp);
+  }
+
+  const pathRecs = [];
+  const seen = new Set();
+  for (let cur = leafRec; cur && !seen.has(str(cur.id)); ) {
+    seen.add(str(cur.id));
+    pathRecs.push(cur);
+    if (!str(cur.parentId)) break;
+    const parent = byID.get(cur.parentId);
+    if (!parent) break;
+    cur = parent;
+  }
+  pathRecs.reverse();
+  if (startedAt === ZERO && pathRecs.length) startedAt = formatTS(pathRecs[0].timestamp);
+
+  const events = [];
+  const taken = new Set();
+  const append = (ev) => {
+    const seq = events.length;
+    let id;
+    for (let nonce = 0; ; nonce++) {
+      id = crypto.createHash("sha256").update(sessionID + "\x00" + seq + "\x00" + nonce).digest("hex").slice(0, 8);
+      if (!taken.has(id)) break;
+    }
+    taken.add(id);
+    const out = { id };
+    if (ev.parent_id) out.parent_id = ev.parent_id;
+    out.seq = seq;
+    out.ts = ev.ts;
+    out.type = ev.type;
+    if (ev.usage) out.usage = ev.usage;
+    if (ev.payload) out.payload = ev.payload;
+    events.push(out);
+    return out;
+  };
+  const result = () => {
+    return { header: { type: "session", session_id: sessionID, harness: { name: "pi" }, cwd, started_at: startedAt }, events };
+  };
+
+  const root = append({ ts: startedAt, type: "session_start" });
+  if (pathRecs.length === 0) return result();
+
+  // A model_change inside a compacted-away range still governs later turns, so
+  // the model is scanned over the whole path first.
+  let curModel = "";
+  const modelAt = pathRecs.map((r) => {
+    if (r.type === "model_change" && str(r.modelId)) curModel = r.modelId;
+    const m = r.message;
+    if (isObj(m) && m.role === "assistant" && str(m.model)) curModel = m.model;
+    return curModel;
+  });
+
+  // One path entry → its events. An assistant message is the turn followed by its
+  // thinking and tool_call children in block order.
+  const mapEntry = (r, model) => {
+    switch (r.type) {
+      case "message": {
+        const m = r.message;
+        if (!isObj(m)) return [];
+        switch (m.role) {
+          case "user": {
+            const text = textContent(m.content);
+            return text ? [{ type: "message", payload: { role: "user", text } }] : [];
+          }
+          case "assistant": {
+            const turn = {};
+            if (str(m.responseId)) turn.response_id = m.responseId;
+            if (str(m.provider)) turn.provider = m.provider;
+            const turnModel = str(m.model) || model;
+            if (turnModel) turn.model = turnModel;
+            let text = "";
+            const toolUseIDs = [];
+            const children = [];
+            for (const b of blockList(m.content)) {
+              if (b.type === "text") text += str(b.text);
+              else if (b.type === "toolCall") {
+                toolUseIDs.push(str(b.id));
+                const payload = { tool: str(b.name) };
+                if (b.arguments !== undefined && b.arguments !== null) payload.args = b.arguments;
+                if (str(b.id)) payload.tool_use_id = b.id;
+                children.push({ type: "tool_call", payload });
+              } else if (b.type === "thinking" && str(b.thinking)) {
+                children.push({ type: "thinking", payload: { text: b.thinking } });
+              }
+            }
+            if (text) turn.text = text;
+            if (toolUseIDs.length) turn.tool_use_ids = toolUseIDs;
+            if (str(m.stopReason)) turn.stop_reason = m.stopReason;
+            const ev = { type: "assistant_turn", payload: turn };
+            const u = m.usage;
+            if (isObj(u) && (u.input || u.output || u.cacheRead || u.cacheWrite)) {
+              ev.usage = { input: u.input || 0, output: u.output || 0 };
+              if (u.cacheRead) ev.usage.cache_read = u.cacheRead;
+              if (u.cacheWrite) ev.usage.cache_write = u.cacheWrite;
+            }
+            return [ev, ...children];
+          }
+          case "toolResult": {
+            if (!str(m.toolCallId)) return [];
+            const payload = { tool_use_id: m.toolCallId, content: textContent(m.content) };
+            if (m.isError === true) payload.is_error = true;
+            return [{ type: "tool_result", payload }];
+          }
+          case "bashExecution": {
+            if (m.excludeFromContext === true) return [];
+            // pi bash runs have no tool-use id, so the entry's own id keys the pair.
+            const call = { tool: "bash", args: { command: str(m.command) } };
+            if (str(r.id)) call.tool_use_id = r.id;
+            const res = { tool_use_id: str(r.id), content: str(m.output) };
+            if ((Number.isInteger(m.exitCode) && m.exitCode !== 0) || m.cancelled === true) res.is_error = true;
+            return [{ type: "tool_call", payload: call }, { type: "tool_result", payload: res }];
+          }
+          default:
+            return [];
+        }
+      }
+      case "branch_summary":
+        return str(r.summary) ? [{ type: "context_injection", payload: { source: "pi", kind: "branch_summary", text: r.summary } }] : [];
+      case "custom_message": {
+        const text = textContent(r.content);
+        return text ? [{ type: "context_injection", payload: { source: "pi", kind: "custom", text } }] : [];
+      }
+      default:
+        return [];
+    }
+  };
+
+  // The turn chains to the previous event, its children parent to the turn, and
+  // the next entry chains from the batch's last event.
+  let prev = root;
+  const emit = (i) => {
+    const r = pathRecs[i];
+    const ts = formatTS(r.timestamp);
+    const evs = mapEntry(r, modelAt[i]);
+    let turn = null;
+    evs.forEach((e, k) => {
+      const child = k > 0 && evs[0].type === "assistant_turn" && (e.type === "thinking" || e.type === "tool_call");
+      const out = append({ parent_id: child ? turn.id : prev.id, ts, type: e.type, usage: e.usage, payload: e.payload });
+      if (k === 0) turn = out;
+      prev = out;
+    });
+  };
+
+  // Only the last compaction applies: its summary first (even when empty), then
+  // the kept entries before it, skipping other compactions, then everything after.
+  let lastCompaction = -1;
+  pathRecs.forEach((r, i) => { if (r.type === "compaction") lastCompaction = i; });
+  if (lastCompaction >= 0) {
+    const comp = pathRecs[lastCompaction];
+    prev = append({ parent_id: prev.id, ts: formatTS(comp.timestamp), type: "context_injection", payload: { source: "pi", kind: "compaction", text: str(comp.summary) } });
+    let kept = false;
+    for (let i = 0; i < lastCompaction; i++) {
+      if (str(pathRecs[i].id) === str(comp.firstKeptEntryId)) kept = true;
+      if (kept && pathRecs[i].type !== "compaction") emit(i);
+    }
+    for (let i = lastCompaction + 1; i < pathRecs.length; i++) emit(i);
+    return result();
+  }
+  for (let i = 0; i < pathRecs.length; i++) emit(i);
+  return result();
+}
+
+var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
 export {
   @pi,
@@ -186,5 +598,9 @@ export {
   @piStreamFormat,
   @piBuiltInTools,
   @isPiBuiltin,
-  @runPiSh
+  @runPiSh,
+  @piSession,
+  @piResult,
+  @conversationLocateIn,
+  @conversation
 }

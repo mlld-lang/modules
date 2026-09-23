@@ -489,4 +489,204 @@ exe llm @opencode(prompt, config) = [
   })
 ] with { stream: @cfg.stream, streamFormat: @opencodeStreamFormat }
 
-export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules }
+>> ── Conversation adapter ──
+>> Finds a stored opencode session and translates it into IFT events (the tape's
+>> event format), in the same envelope as the claude, codex and pi adapters. fray
+>> has no opencode ingester, so the mapping is this module's own; the goldens in
+>> tests/fixtures/conversation pin it.
+
+>> @conversation.locate(sessionId, cwd, root?, bin?) → absolute path, or null
+>> opencode keeps sessions in a private sqlite schema, so this goes through the
+>> public `opencode export <id>` and snapshots its JSON to a temp file the caller
+>> owns. root is the XDG_DATA_HOME the session ran under (config.dataHome). cwd is
+>> ignored; it keeps the signature shared with the other harnesses. bin replaces
+>> the opencode binary, for tests.
+exe @conversationLocate(sessionId, cwd, root, bin) = node {
+  const fs = require("fs");
+  const os = require("os");
+  const path = require("path");
+  const { execFileSync } = require("child_process");
+  // The id reaches argv, so this pattern is also what keeps it from being read as
+  // a flag or a path. opencode ids are case-sensitive: no normalising.
+  if (typeof sessionId !== "string" || !/^ses_[A-Za-z0-9]+$/.test(sessionId)) return null;
+  const env = { ...process.env };
+  if (typeof root === "string" && root) env.XDG_DATA_HOME = root;
+  const exe = typeof bin === "string" && bin ? bin : "opencode";
+  let out;
+  try {
+    out = execFileSync(exe, ["export", sessionId], { env, timeout: 30000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 256 * 1024 * 1024 });
+  } catch (e) { return null; }
+  let parsed;
+  try { parsed = JSON.parse(out); } catch (e) { return null; }
+  if (!parsed || typeof parsed !== "object" || !parsed.info || parsed.info.id !== sessionId) return null;
+  try {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mlld-opencode-"));
+    const file = path.join(dir, sessionId + ".json");
+    fs.writeFileSync(file, out);
+    return path.resolve(file);
+  } catch (e) { return null; }
+}
+
+>> @conversation.ingest(text) → { header, events }
+>> text is the JSON of an `opencode export`. Reads no files.
+>> Throws when text is not a string or is not JSON.
+exe @conversationIngest(text) = node {
+  const fs = require("fs");
+  const crypto = require("crypto");
+  if (typeof text !== "string") {
+    throw new TypeError("@mlld/opencode conversation.ingest: expected the log's text as a string; load the file with <path> and pass .mx.text");
+  }
+  const data = JSON.parse(text);
+  const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const str = (v) => (typeof v === "string" ? v : "");
+  const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+  const info = isObj(data) && isObj(data.info) ? data.info : {};
+  const messages = (isObj(data) && Array.isArray(data.messages) ? data.messages : [])
+    .filter(isObj)
+    .map((m) => ({ info: isObj(m.info) ? m.info : {}, parts: Array.isArray(m.parts) ? m.parts.filter(isObj) : [] }));
+
+  // Go's time.RFC3339Nano in UTC: the fraction loses trailing zeros, and its dot
+  // when nothing is left.
+  const ZERO = "0001-01-01T00:00:00Z";
+  const formatTS = (ms) => {
+    if (typeof ms !== "number" || !isFinite(ms)) return ZERO;
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return ZERO;
+    return d.toISOString().replace(/\.(\d*?)0*Z$/, (_, f) => (f ? "." + f : "") + "Z");
+  };
+  const created = (m) => formatTS(isObj(m.info.time) ? m.info.time.created : undefined);
+
+  const sessionID = str(info.id);
+  let cwd = str(info.directory);
+  if (cwd) {
+    try { cwd = fs.realpathSync(cwd); } catch (e) {}
+  }
+  const startedAt = formatTS(isObj(info.time) ? info.time.created : undefined);
+  const harness = { name: "opencode" };
+  if (str(info.version)) harness.version = info.version;
+
+  if (isObj(info.revert)) {
+    console.error("@mlld/opencode conversation.ingest: session has a pending revert; ingesting every message");
+  }
+
+  const events = [];
+  const taken = new Set();
+  const append = (ev) => {
+    const seq = events.length;
+    let id;
+    for (let nonce = 0; ; nonce++) {
+      id = crypto.createHash("sha256").update(sessionID + "\x00" + seq + "\x00" + nonce).digest("hex").slice(0, 8);
+      if (!taken.has(id)) break;
+    }
+    taken.add(id);
+    const out = { id };
+    if (ev.parent_id) out.parent_id = ev.parent_id;
+    out.seq = seq;
+    out.ts = ev.ts;
+    out.type = ev.type;
+    if (ev.usage) out.usage = ev.usage;
+    if (ev.payload) out.payload = ev.payload;
+    events.push(out);
+    return out;
+  };
+  let prev = append({ ts: startedAt, type: "session_start" });
+  const chain = (ev) => { prev = append({ ...ev, parent_id: prev.id }); return prev; };
+
+  const texts = (parts) => parts.filter((p) => p.type === "text").map((p) => str(p.text)).join("");
+  const isSummary = (m) => m.info.role === "assistant" && m.info.summary === true;
+
+  // Tip view: the model holds the last compaction's summary, not what came before it.
+  let start = 0;
+  let lastCompaction = -1;
+  messages.forEach((m, i) => { if (m.parts.some((p) => p.type === "compaction")) lastCompaction = i; });
+  if (lastCompaction >= 0) {
+    let summary = -1;
+    for (let i = lastCompaction + 1; i < messages.length; i++) {
+      if (isSummary(messages[i])) { summary = i; break; }
+    }
+    const at = summary >= 0 ? messages[summary] : messages[lastCompaction];
+    chain({ ts: created(at), type: "context_injection", payload: { source: "opencode", kind: "compaction", text: summary >= 0 ? texts(at.parts) : "" } });
+    start = (summary >= 0 ? summary : lastCompaction) + 1;
+  }
+
+  const SKIPPED = new Set(["text", "reasoning", "tool", "compaction", "step-start", "step-finish", "snapshot", "patch", "file", "agent", "subtask"]);
+  const warned = new Set();
+
+  for (let i = start; i < messages.length; i++) {
+    const m = messages[i];
+    const ts = created(m);
+    for (const p of m.parts) {
+      const t = str(p.type);
+      if (!SKIPPED.has(t) && !warned.has(t)) {
+        warned.add(t);
+        console.error("@mlld/opencode conversation.ingest: skipping unknown part type " + JSON.stringify(t));
+      }
+    }
+    if (m.info.role === "user") {
+      const text = m.parts.filter((p) => p.type === "text" && p.synthetic !== true).map((p) => str(p.text)).join("");
+      if (text) chain({ ts, type: "message", payload: { role: "user", text } });
+      for (const p of m.parts) {
+        if (p.type === "text" && p.synthetic === true) {
+          chain({ ts, type: "context_injection", payload: { source: "opencode", kind: "synthetic", text: str(p.text) } });
+        }
+      }
+      continue;
+    }
+    if (m.info.role !== "assistant" || isSummary(m)) continue;
+
+    // A provider error leaves an assistant message with no parts; it emits nothing.
+    const content = m.parts.filter((p) => p.type === "text" || p.type === "tool" || (p.type === "reasoning" && str(p.text)));
+    if (content.length === 0) continue;
+    const tools = m.parts.filter((p) => p.type === "tool");
+    const payload = {};
+    if (str(m.info.providerID)) payload.provider = m.info.providerID;
+    if (str(m.info.modelID)) payload.model = m.info.modelID;
+    const text = texts(m.parts);
+    if (text) payload.text = text;
+    if (tools.length) payload.tool_use_ids = tools.map((p) => str(p.callID));
+    if (str(m.info.finish)) payload.stop_reason = m.info.finish;
+    const turnEv = { ts, type: "assistant_turn", payload };
+    // opencode counts reasoning outside output; IFT's thinking is a share of output.
+    const tk = m.info.tokens;
+    if (isObj(tk)) {
+      const cache = isObj(tk.cache) ? tk.cache : {};
+      const usage = { input: num(tk.input), output: num(tk.output) + num(tk.reasoning) };
+      if (num(cache.read)) usage.cache_read = num(cache.read);
+      if (num(cache.write)) usage.cache_write = num(cache.write);
+      if (num(tk.reasoning)) usage.thinking = num(tk.reasoning);
+      turnEv.usage = usage;
+    }
+    const turn = chain(turnEv);
+
+    let lastCall = null;
+    for (const p of m.parts) {
+      if (p.type === "reasoning" && str(p.text)) {
+        prev = append({ parent_id: turn.id, ts, type: "thinking", payload: { text: p.text } });
+      } else if (p.type === "tool") {
+        const call = { tool: str(p.tool) };
+        const input = isObj(p.state) ? p.state.input : undefined;
+        if (input !== undefined && input !== null) call.args = input;
+        if (str(p.callID)) call.tool_use_id = p.callID;
+        prev = lastCall = append({ parent_id: turn.id, ts, type: "tool_call", payload: call });
+      }
+    }
+    // Results chain from the last call, one after another, as claude's do. The last
+    // call and not the last child, because a reasoning part can follow it.
+    let resultParent = lastCall;
+    const result = (payload) => { prev = resultParent = append({ parent_id: resultParent.id, ts, type: "tool_result", payload }); };
+    for (const p of tools) {
+      const st = isObj(p.state) ? p.state : {};
+      if (st.status === "completed") {
+        result({ tool_use_id: str(p.callID), content: str(st.output) });
+      } else if (st.status === "error") {
+        result({ tool_use_id: str(p.callID), content: str(st.error), is_error: true });
+      }
+    }
+  }
+
+  return { header: { type: "session", session_id: sessionID, harness, cwd, started_at: startedAt }, events };
+}
+
+var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+
+export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation }

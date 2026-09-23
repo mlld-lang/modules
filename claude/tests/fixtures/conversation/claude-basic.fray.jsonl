@@ -1,0 +1,11 @@
+{"type":"session","session_id":"3f2a1b4c-0000-4000-8000-abcdef000001","harness":{"name":"claude","version":"2.1.241"},"cwd":"/tmp/fixture-proj","started_at":"2026-08-24T19:02:00Z"}
+{"id":"a865da64","seq":0,"ts":"2026-08-24T19:02:00Z","type":"session_start"}
+{"id":"4d31cbf9","parent_id":"a865da64","seq":1,"ts":"2026-08-24T19:02:00Z","type":"context_injection","payload":{"source":"claude","kind":"hook_success","text":"session start hook ran"}}
+{"id":"f34d7d25","parent_id":"4d31cbf9","seq":2,"ts":"2026-08-24T19:02:01Z","type":"message","payload":{"role":"user","text":"please list the files"}}
+{"id":"b13ee726","parent_id":"f34d7d25","seq":3,"ts":"2026-08-24T19:02:02Z","type":"assistant_turn","payload":{"model":"claude-sonnet-4-5","text":"I'll list them.","tool_use_ids":["toolu_1"],"stop_reason":"tool_use"}}
+{"id":"f4f87acf","parent_id":"b13ee726","seq":4,"ts":"2026-08-24T19:02:02Z","type":"thinking","payload":{"text":"the user wants a listing"}}
+{"id":"2b696582","parent_id":"b13ee726","seq":5,"ts":"2026-08-24T19:02:04Z","type":"tool_call","payload":{"tool":"Bash","args":{"command":"ls"},"tool_use_id":"toolu_1"}}
+{"id":"6371e5a4","parent_id":"2b696582","seq":6,"ts":"2026-08-24T19:02:05Z","type":"tool_result","payload":{"tool_use_id":"toolu_1","content":"file1\nfile2"}}
+{"id":"f527d0b0","parent_id":"6371e5a4","seq":7,"ts":"2026-08-24T19:02:06Z","type":"context_injection","payload":{"source":"claude","kind":"system-reminder","text":"<system-reminder>Injected context here</system-reminder>"}}
+{"id":"217b5d08","parent_id":"f527d0b0","seq":8,"ts":"2026-08-24T19:02:06Z","type":"message","payload":{"role":"user","text":"what next?"}}
+{"id":"4fc0052e","parent_id":"217b5d08","seq":9,"ts":"2026-08-24T19:02:07Z","type":"assistant_turn","payload":{"model":"claude-sonnet-4-5","text":"All done.","stop_reason":"end_turn"}}

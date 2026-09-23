@@ -1,0 +1,7 @@
+{"timestamp":"2026-06-22T10:00:00.000Z","type":"session_meta","payload":{"id":"0c0ffee0-1234-4321-8abc-def012345678","timestamp":"2026-06-22T10:00:00.000Z","cwd":"/tmp/codex-fixture","cli_version":"0.139.0"}}
+{"timestamp":"2026-06-22T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"pre-compaction question"}]}}
+{"timestamp":"2026-06-22T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"pre-compaction answer"}]}}
+{"timestamp":"2026-06-22T10:00:03.000Z","type":"compacted","payload":{"message":"summary one","replacement_history":[{"type":"message","role":"user","content":[{"type":"input_text","text":"AGENTS.md instructions (first replacement)"}]}]}}
+{"timestamp":"2026-06-22T10:00:04.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"post-compaction one"}]}}
+{"timestamp":"2026-06-22T10:00:05.000Z","type":"compacted","payload":{"message":"","replacement_history":[{"type":"message","role":"user","content":[{"type":"input_text","text":"second replacement context"}]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"second replacement turn"}]}]}}
+{"timestamp":"2026-06-22T10:00:06.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"post-compaction two"}]}}

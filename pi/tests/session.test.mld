@@ -1,0 +1,56 @@
+>> Tests for the session @pi saves to, with no pi call.
+>> Run: mlld test pi/tests/session.test.mld
+
+import { @piSession, @piResult, @conversationLocateIn, @conversation } from "../index.mld"
+
+var @projRoot = "/some/project"
+exe @isUuid(s) = node { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s); }
+exe @keys(o) = node { return Object.keys(o || {}).sort().join(","); }
+
+>> ── @piSession ──
+
+var @fresh = @piSession({}, @projRoot)
+var @fresh2 = @piSession(null, @projRoot)
+var @test_default_id_is_lowercase_uuid = @isUuid(@fresh.sessionId)
+var @test_default_dir_in_project = @fresh.sessionDir == "/some/project/.llm/pi-sessions"
+var @test_default_ids_differ = @fresh.sessionId != @fresh2.sessionId
+
+var @named = @piSession({ sessionId: " 3C1F0B52-8E4D-4A7B-9F21-6D5E4C3B2A10 " }, @projRoot)
+var @test_named_id_lowercased = @named.sessionId == "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+
+var @bad = try @piSession({ sessionId: "my-session" }, @projRoot)
+var @test_non_uuid_throws = !@bad.ok
+var @test_non_uuid_error_names_value = @bad.error.message.includes("my-session")
+
+var @off = @piSession({ session: false }, @projRoot)
+var @test_off_has_no_id = @off.sessionId == ""
+var @test_off_has_no_dir = @off.sessionDir == ""
+
+>> ── @piResult ──
+
+var @offResult = @piResult("answer", @off)
+var @test_off_returns_raw = @offResult == "answer"
+
+var @onResult = @piResult("answer", @named)
+var @test_on_envelope_keys = @keys(@onResult) == "_mlld,value"
+var @test_on_envelope_value = @onResult.value == "answer"
+var @test_on_envelope_session = @onResult._mlld.sessionId == "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+var @test_on_envelope_provider = @onResult._mlld.provider == "pi"
+
+>> ── locate: the project store ──
+
+var @fixtures = "@root/pi/tests/fixtures/conversation"
+var @fixtureProject = "@fixtures/project"
+var @projectSid = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+
+>> Built from the arguments alone, with no symlink resolved.
+var @test_locate_project_store = @conversationLocateIn(@projectSid, "/anywhere", "", @fixtureProject) == "@fixtureProject/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
+>> The folder does not exist, so only a path built without reading can match.
+var @test_locate_project_store_no_read = @conversationLocateIn(@projectSid, "/anywhere", "", "/nonexistent/proj") == "/nonexistent/proj/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
+var @test_locate_project_store_lowercases_id = @conversationLocateIn("3C1F0B52-8E4D-4A7B-9F21-6D5E4C3B2A10", "/anywhere", "", "/nonexistent/proj") == "/nonexistent/proj/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
+>> An explicit root is the only place searched, even with a project set.
+var @test_locate_root_excludes_project = @conversationLocateIn(@projectSid, "/anywhere", "@fixtures/home", @fixtureProject) == null
+
+>> The public wrapper, with the store root left out and given.
+var @test_wrapper_without_root = @conversation.locate(@projectSid, "/anywhere") == "@root/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
+var @test_wrapper_with_root = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345678", "/anywhere", "@fixtures/home") != null

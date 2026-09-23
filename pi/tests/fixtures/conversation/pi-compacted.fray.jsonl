@@ -1,0 +1,8 @@
+{"type":"session","session_id":"8c0c0c0c-1234-4321-8abc-def012345678","harness":{"name":"pi"},"cwd":"/tmp/pi-compacted","started_at":"2026-08-29T11:00:00Z"}
+{"id":"409a0789","seq":0,"ts":"2026-08-29T11:00:00Z","type":"session_start"}
+{"id":"e86399cb","parent_id":"409a0789","seq":1,"ts":"2026-08-29T11:00:20Z","type":"context_injection","payload":{"source":"pi","kind":"compaction","text":"Summary of planning."}}
+{"id":"7664a7bb","parent_id":"e86399cb","seq":2,"ts":"2026-08-29T11:00:10Z","type":"message","payload":{"role":"user","text":"after old compaction"}}
+{"id":"5bea3a8a","parent_id":"7664a7bb","seq":3,"ts":"2026-08-29T11:00:15Z","type":"assistant_turn","usage":{"input":1,"output":1},"payload":{"provider":"anthropic","model":"claude-sonnet-4-5","text":"working","stop_reason":"stop"}}
+{"id":"cf9fdca1","parent_id":"5bea3a8a","seq":4,"ts":"2026-08-29T11:00:25Z","type":"message","payload":{"role":"user","text":"Now execute"}}
+{"id":"176d68aa","parent_id":"cf9fdca1","seq":5,"ts":"2026-08-29T11:00:30Z","type":"assistant_turn","usage":{"input":2,"output":2},"payload":{"provider":"anthropic","model":"claude-sonnet-4-5","text":"Executing","stop_reason":"stop"}}
+{"id":"c23df670","parent_id":"176d68aa","seq":6,"ts":"2026-08-29T11:00:35Z","type":"message","payload":{"role":"user","text":"And verify"}}

@@ -1,0 +1,8 @@
+{"timestamp":"2026-06-21T23:41:44.704Z","type":"session_meta","payload":{"id":"0c0ffee0-1234-4321-8abc-def012345678","timestamp":"2026-06-21T23:41:44.586Z","cwd":"/tmp/codex-fixture","originator":"codex_exec","cli_version":"0.139.0","source":"exec","model_provider":"openai","base_instructions":{"text":"You are Codex, a coding agent."}}}
+{"timestamp":"2026-06-21T23:41:45.000Z","type":"turn_context","payload":{"cwd":"/tmp/codex-fixture","model":"gpt-5"}}
+{"timestamp":"2026-06-21T23:41:45.100Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"run the tests please"}]}}
+{"timestamp":"2026-06-21T23:41:46.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"**Planning the run**"},{"type":"summary_text","text":"Use the suite"}],"content":null,"encrypted_content":"gAAAA-FAKE-ENCRYPTED-NEVER-CARRY"}}
+{"timestamp":"2026-06-21T23:41:47.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Running them "},{"type":"output_text","text":"now."}]}}
+{"timestamp":"2026-06-21T23:41:48.000Z","type":"event_msg","payload":{"type":"agent_message","message":"noise"}}
+{"timestamp":"2026-06-21T23:41:49.000Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\":\"ls\",\"workdir\":\"/tmp/codex-fixture\"}","call_id":"call_1"}}
+{"timestamp":"2026-06-21T23:41:50.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"Exit code: 0\nfile1\nfile2"}}
