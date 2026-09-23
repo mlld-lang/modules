@@ -1,0 +1,95 @@
+>> Tests for @conversation (locate + ingest).
+>> Run: mlld test opencode/tests/conversation.test.mld
+
+import { @conversation } from "../index.mld"
+
+var @fixtures = "@root/opencode/tests/fixtures/conversation"
+var @stub = "@fixtures/opencode-stub.sh"
+var @failedId = "ses_f32dab56cffemtZGIZ407tXu7U"
+
+>> Compares with key order ignored, because mlld may reorder object keys; a golden's
+>> line 1 is the header and the remaining lines are the events in order.
+exe @matchesGolden(result, goldenPath) = node {
+  const fs = require("fs");
+  const eq = (a, b) => {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && eq(a[k], b[k]));
+  };
+  const lines = fs.readFileSync(goldenPath, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  const [header, ...events] = lines;
+  if (!eq(result.header, header)) {
+    console.error("header mismatch:\n  got  " + JSON.stringify(result.header) + "\n  want " + JSON.stringify(header));
+    return false;
+  }
+  if (result.events.length !== events.length) {
+    console.error("event count: got " + result.events.length + ", want " + events.length);
+    return false;
+  }
+  for (let i = 0; i < events.length; i++) {
+    if (!eq(result.events[i], events[i])) {
+      console.error("event " + i + " mismatch:\n  got  " + JSON.stringify(result.events[i]) + "\n  want " + JSON.stringify(events[i]));
+      return false;
+    }
+  }
+  return true;
+}
+
+exe @types(result) = node { return result.events.map((e) => e.type).join(","); }
+
+>> Each locate check gets its own XDG_DATA_HOME, so the stub's marker is per-check.
+exe @freshRoot() = node {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  return fs.mkdtempSync(path.join(os.tmpdir(), "mlld-opencode-test-"));
+}
+exe @ran(root) = node { return require("fs").existsSync(require("path").join(root, "ran")); }
+exe @exportId(p) = node {
+  if (typeof p !== "string") return null;
+  return JSON.parse(require("fs").readFileSync(p, "utf8")).info.id;
+}
+
+>> ── ingest: the hand-written goldens ──
+
+var @basic = @conversation.ingest("@fixtures/basic-resumed.export.json")
+var @failed = @conversation.ingest("@fixtures/failed-tool.export.json")
+var @compacted = @conversation.ingest("@fixtures/compacted-overflow.export.json")
+
+var @test_ingest_basic_resumed = @matchesGolden(@basic, "@fixtures/basic-resumed.opencode.jsonl")
+var @test_ingest_failed_tool = @matchesGolden(@failed, "@fixtures/failed-tool.opencode.jsonl")
+var @test_ingest_compacted_overflow = @matchesGolden(@compacted, "@fixtures/compacted-overflow.opencode.jsonl")
+
+var @test_sequence_basic_resumed = @types(@basic) == "session_start,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn"
+var @test_sequence_failed_tool = @types(@failed) == "session_start,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn"
+var @test_sequence_compacted_overflow = @types(@compacted) == "session_start,context_injection,context_injection"
+
+>> The first turn has one tool: its thinking and call hang off the turn, the result off the call.
+var @test_parent_thinking = @basic.events[3].parent_id == @basic.events[2].id
+var @test_parent_tool_call = @basic.events[4].parent_id == @basic.events[2].id
+var @test_parent_tool_result = @basic.events[5].parent_id == @basic.events[4].id
+
+var @test_failed_tool_is_error = @failed.events[5].payload.is_error == true
+
+>> ── locate, against a stub opencode ──
+
+var @rootKnown = @freshRoot()
+var @known = @conversation.locate(@failedId, "", @rootKnown, @stub)
+var @test_locate_known = @exportId(@known) == @failedId
+var @test_locate_stub_ran = @ran(@rootKnown)
+
+var @rootUnknown = @freshRoot()
+var @test_locate_unknown = @conversation.locate("ses_unknownSession123", "", @rootUnknown, @stub) == null
+
+var @rootTraversal = @freshRoot()
+var @test_locate_traversal = @conversation.locate("../x", "", @rootTraversal, @stub) == null
+var @test_locate_traversal_not_run = !@ran(@rootTraversal)
+
+var @rootFlag = @freshRoot()
+var @test_locate_flag = @conversation.locate("--help", "", @rootFlag, @stub) == null
+var @test_locate_flag_not_run = !@ran(@rootFlag)
+
+var @rootCase = @freshRoot()
+var @test_locate_wrong_case = @conversation.locate("SES_f32dab56cffemtZGIZ407tXu7U", "", @rootCase, @stub) == null
+var @test_locate_wrong_case_not_run = !@ran(@rootCase)
