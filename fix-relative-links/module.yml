@@ -1,0 +1,10 @@
+name: fix-relative-links
+author: mlld
+type: library
+about: "Fix relative markdown links based on context"
+version: 3.0.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+keywords: ["markdown", "relative", "links", "paths", "pipeline"]
+mlldVersion: ">=2.2.0"

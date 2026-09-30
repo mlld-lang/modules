@@ -1,0 +1,24 @@
+>> Rewrites relative markdown links so they point at the same files after the
+>> content moves from sourceDir to destDir.
+
+>> Node because it needs path.resolve/path.relative and a replace callback,
+>> neither of which mlld has.
+exe @fixRelativeLinks(content, sourceDir, destDir) = node {
+  const path = require('path');
+  const fromDir = sourceDir || '.';
+  const toDir = destDir || '.';
+
+  // [text](path); the [text](path) inside an image link ![alt](path) matches too.
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+  return String(content || '').replace(linkRegex, (match, linkText, linkPath) => {
+    // URLs of any scheme (https:, ftp:, mailto:), absolute paths and #anchors stay.
+    if (/^[a-z][a-z0-9+.-]*:/i.test(linkPath) || linkPath.startsWith('/') || linkPath.startsWith('#')) {
+      return match;
+    }
+    const moved = path.relative(toDir, path.resolve(fromDir, linkPath)).replace(/\\/g, '/');
+    return `[${linkText}](${moved.startsWith('.') ? moved : './' + moved})`;
+  });
+}
+
+export { @fixRelativeLinks }
