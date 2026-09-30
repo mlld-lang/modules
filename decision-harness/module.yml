@@ -1,0 +1,9 @@
+name: decision-harness
+author: mlld
+type: library
+about: "Typed decisions — choice, score, noul and classify — with the model chosen in config (jev for now)"
+version: 0.1.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: ">=2.2.0"

@@ -9,6 +9,15 @@
         "config": {
           "basePath": "./llm/modules"
         }
+      },
+      {
+        "prefix": "@mlld/",
+        "resolver": "LOCAL",
+        "type": "input",
+        "priority": 10,
+        "config": {
+          "basePath": "."
+        }
       }
     ]
   },

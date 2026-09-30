@@ -1,0 +1,96 @@
+---
+name: decision-harness
+author: mlld
+version: 0.1.0
+about: Typed decisions (choice, score, noul, classify) with the model chosen in config
+license: CC0
+---
+
+import @mlld/jev as @jev
+import { @choice, @score, @noul } from @mlld/jev
+import { @resolveModel, @toCriteria, @keyList, @pickKey } from "./helpers.mld"
+
+>> ── Model pick ──
+
+>> The config a jev call gets: the caller's own, with model set to the jev id
+>> that config.model resolved to.
+exe @jevConfig(config, target) = [
+  let @cfg = @config ?? {}
+  => { ...@cfg, model: @target.model }
+]
+
+>> ── Core ──
+
+>> Full response envelope: { model, answers, usage }.
+exe @askFull(state, questions, config) = [
+  let @target = @resolveModel(@config)
+  => match @target.provider [
+    "jev" => @jev.askFull(@state, @questions, @jevConfig(@config, @target))
+  ]
+]
+
+>> Answers only, keyed the way you keyed the questions.
+exe @ask(state, questions, config) = [
+  let @target = @resolveModel(@config)
+  => match @target.provider [
+    "jev" => @jev.ask(@state, @questions, @jevConfig(@config, @target))
+  ]
+]
+
+>> ── One question, one call ──
+
+exe @askChoice(state, instructions, criteria, config) = [
+  let @target = @resolveModel(@config)
+  => match @target.provider [
+    "jev" => @jev.askChoice(@state, @instructions, @criteria, @jevConfig(@config, @target))
+  ]
+]
+
+exe @askScore(state, instructions, criteria, config) = [
+  let @target = @resolveModel(@config)
+  => match @target.provider [
+    "jev" => @jev.askScore(@state, @instructions, @criteria, @jevConfig(@config, @target))
+  ]
+]
+
+exe @askNoul(state, instructions, criteria, config) = [
+  let @target = @resolveModel(@config)
+  => match @target.provider [
+    "jev" => @jev.askNoul(@state, @instructions, @criteria ?? null, @jevConfig(@config, @target))
+  ]
+]
+
+>> Map of name to statement in, map of name to 0..1 out. One call.
+exe @flags(state, statements, config) = [
+  let @target = @resolveModel(@config)
+  => match @target.provider [
+    "jev" => @jev.flags(@state, @statements, @jevConfig(@config, @target))
+  ]
+]
+
+>> Model names the configured provider accepts in config.model.
+exe @models(config) = [
+  let @target = @resolveModel(@config ?? {})
+  => match @target.provider [
+    "jev" => @jev.models()
+  ]
+]
+
+>> ── Classify ──
+
+>> Which of `keys` the text is, or null. `keys` is an array of keys or an object
+>> of key to description. An answer outside the keys gets one retry; an answer
+>> below config.minConfidence is null without a retry, since asking again would
+>> not make it more certain. Null is meant for the `*` arm of a `match choice`.
+exe @classify(text, keys, question, config) = [
+  let @cfg = @config ?? {}
+  let @criteria = @toCriteria(@keys)
+  let @listed = @keyList(@keys)
+  let @min = @cfg.minConfidence ?? null
+  let @first = @askChoice(@text, @question, @criteria, @cfg)
+  if @listed.includes(@first.choice) [ => @pickKey(@first, @keys, @min) ]
+  let @second = @askChoice(@text, @question, @criteria, @cfg)
+  => @pickKey(@second, @keys, @min)
+]
+
+export { @ask, @askFull, @askChoice, @askScore, @askNoul, @flags, @models, @choice, @score, @noul, @classify }

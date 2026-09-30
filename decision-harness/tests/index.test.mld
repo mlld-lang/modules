@@ -1,0 +1,24 @@
+>> Tests that index.mld loads through @mlld/jev and refuses an unknown model
+>> before any call, with no model call.
+>> Run: mlld test decision-harness/tests/
+
+import @mlld/decision-harness as @dh
+import { @ask, @askFull, @askChoice, @askScore, @askNoul, @flags, @models, @choice, @score, @noul, @classify } from "../index.mld"
+
+const @expected = ["ask", "askFull", "askChoice", "askScore", "askNoul", "flags", "models", "choice", "score", "noul", "classify"]
+const @missing = for @name in @expected if !@dh.mx.keys.includes(@name) => @name
+const @test_exports_present = @missing.length == 0
+
+>> The question builders are jev's own.
+const @q = @choice("which team?", { billing: "payments" })
+const @test_choice_builder = @q.type == "choice" && @q.criteria.billing == "payments"
+const @test_score_builder = @score("how bad?", ["low", "high"]).type == "score"
+const @test_noul_builder = @noul("is it spam?", null).type == "noul"
+
+>> An unknown model raises from the harness, before jev is reached.
+const @unknownAsk = try @askChoice("text", "which?", { a: "a" }, { model: "luna" })
+const @test_unknown_model_raises = !@unknownAsk.ok && @unknownAsk.error.message.includes("decision-harness: unknown model 'luna' (supported: jev)")
+const @unknownClassify = try @classify("text", ["a", "b"], "which?", { model: "kev" })
+const @test_classify_unknown_model_raises = !@unknownClassify.ok && @unknownClassify.error.message.includes("unknown model 'kev'")
+const @unknownModels = try @models({ model: "luna" })
+const @test_models_unknown_model_raises = !@unknownModels.ok
