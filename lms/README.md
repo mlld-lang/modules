@@ -22,7 +22,7 @@ const @result = @lms("Classify: patient SSN 123-45-6789", {
 show @result.labels
 ```
 
-Requires LM Studio's local server running (`lms server start`, default `http://localhost:1234`). The endpoint returns the model's final answer with reasoning split out, so there is no `<think>` block to strip.
+Requires LM Studio's local server running (`lms server start`, default `http://localhost:1234`). mlld's `@http` refuses local and private addresses by default, so set `MLLD_URL_ALLOW_PRIVATE_HOSTS=1` in the environment; that setting applies to every request in the run. The endpoint returns the model's final answer with reasoning split out, so there is no `<think>` block to strip.
 
 ## docs
 

@@ -1,0 +1,89 @@
+>> Tests for the claude command line @claude builds, against a stub claude that
+>> prints the directory it ran in, each argument, and its stdin. No model is called.
+>> Run: mlld test claude/tests/
+
+import { @claude, @runClaudeSh } from "../index.mld"
+
+const @fixtures = `${@root}/claude/tests/fixtures/run`
+const @stub = `${@fixtures}/claude-stub.sh`
+const @workdir = `${@fixtures}/workdir`
+const @sid = "3f2a1b4c-0000-4000-8000-abcdef000002"
+>> @claude normalizes a session id to uppercase before passing it on.
+const @sidUpper = "3F2A1B4C-0000-4000-8000-ABCDEF000002"
+
+>> The arguments the stub saw, joined with | so a whole command line compares at once.
+exe @argv(out) = [
+  let @text = `${@out}`
+  let @lines = @text.split("\n")
+  let @args = for @line in @lines if @line.startsWith("arg=") => @line.slice(4)
+  => @args.join("|")
+]
+
+exe @stdinOf(out) = [
+  let @text = `${@out}`
+  let @lines = @text.split("\n")
+  let @found = for @line in @lines if @line.startsWith("stdin=") => @line.slice(6)
+  => @found.join("\n")
+]
+
+exe @pwdOf(out) = [
+  let @text = `${@out}`
+  let @lines = @text.split("\n")
+  let @found = for @line in @lines if @line.startsWith("pwd=") => @line.slice(4)
+  => @found.join("")
+]
+
+>> ── through @claude: the flags worked out from config ──
+
+const @plain = @claude("hi", { claudeBin: @stub })
+const @test_plain_call = @argv(@plain) == "-p|--output-format|json|--model|sonnet"
+
+const @inDir = @claude("hi", { claudeBin: @stub, dir: @workdir, model: "haiku" })
+const @test_dir_is_pwd = @pwdOf(@inDir) == @workdir
+const @test_model_passed = @argv(@inDir) == "-p|--output-format|json|--model|haiku"
+
+const @withSystem = @claude("hi", { claudeBin: @stub, system: "be brief, and plain" })
+const @test_system_prompt = @argv(@withSystem) == "-p|--output-format|json|--model|sonnet|--append-system-prompt|be brief, and plain"
+
+const @bareCall = @claude("hi", { claudeBin: @stub, bare: true })
+const @test_bare_flag = @argv(@bareCall) == "-p|--bare|--output-format|json|--model|sonnet"
+
+const @publicSession = @claude("hi", { claudeBin: @stub, sessionId: @sid })
+const @test_public_session_id_forwarded = @argv(@publicSession) == `-p|--session-id|${@sidUpper}|--output-format|json|--model|sonnet`
+
+const @resumed = @claude("again", { claudeBin: @stub, resume: @sid, system: "s" })
+const @test_resume_flags = @argv(@resumed) == `-p|--bare|--output-format|json|--model|sonnet|--resume|${@sidUpper}|--append-system-prompt|s`
+
+>> Stream mode keeps claude's own output and mints a session id, since its output has none to read back.
+const @streamed = @claude("hi", { claudeBin: @stub, stream: true })
+const @streamArgs = @argv(@streamed)
+const @test_stream_has_no_output_format = !@streamArgs.includes("--output-format")
+const @test_stream_mints_session_id = @streamArgs.startsWith("-p|--session-id|") && @streamArgs.endsWith("|--model|sonnet")
+
+const @resumedStream = @claude("hi", { claudeBin: @stub, stream: true, resume: @sid })
+const @test_stream_resume_mints_nothing = @argv(@resumedStream) == `-p|--bare|--model|sonnet|--resume|${@sidUpper}`
+
+>> config.tools goes through the runtime's tool bridge, which sets @mx.llm.
+const @withTools = @claude("hi", { claudeBin: @stub, tools: ["Read", "Bash"] })
+const @toolArgs = @argv(@withTools)
+const @test_tools_native_flag = @toolArgs.includes("|--tools|Read,Bash|")
+const @test_tools_mcp_config_is_strict = @toolArgs.includes("|--mcp-config|") && @toolArgs.includes("|--strict-mcp-config|")
+const @test_tools_allowed = @toolArgs.includes("|--allowedTools|Read,Bash|")
+const @test_tools_disallow_the_rest = @toolArgs.includes("|--disallowedTools|Agent,") && !@toolArgs.includes(",Read,") && !@toolArgs.includes(",Bash,")
+
+>> ── the prompt reaches claude's stdin untouched ──
+
+const @tricky = "a `backtick`, a \"quote\" and $(echo no) plus $HOME"
+const @echoed = @claude(@tricky, { claudeBin: @stub })
+const @test_prompt_unchanged_on_stdin = @stdinOf(@echoed) == @tricky
+
+>> ── @runClaudeSh directly: flags @claude only sets from the tool bridge ──
+
+const @tooled = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "", "", "", "/tmp/mcp config.json", "Read,Write Bash", "Edit", @stub)
+const @test_mcp_allowed_disallowed = @argv(@tooled) == "-p|--model|sonnet|--mcp-config|/tmp/mcp config.json|--strict-mcp-config|--allowedTools|Read,Write Bash|--disallowedTools|Edit"
+
+const @emptyNative = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "1", "", "", "", "", "", @stub)
+const @test_empty_native_tools_keeps_empty_value = @argv(@emptyNative) == "-p|--model|sonnet|--tools|"
+
+const @missingDir = try @runClaudeSh("hi", `${@fixtures}/nonexistent`, "sonnet", "", "", "", "", "", "", "", "", "", "", @stub)
+const @test_missing_dir_fails = !@missingDir.ok

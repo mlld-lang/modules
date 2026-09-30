@@ -3,35 +3,6 @@ needs { network }
 >> Looked up in the keychain first, then the OPENAI_API_KEY environment variable.
 creds @openai = "OPENAI_API_KEY"
 
->> Stream format adapter for OpenAI NDJSON output
-const @openaiStreamFormat = {
-  name: "openai",
-  format: "ndjson",
-  schemas: [
-    {
-      kind: "message",
-      matchPath: "type",
-      matchValue: "text",
-      extract: { chunk: "content" }
-    },
-    {
-      kind: "error",
-      matchPath: "type",
-      matchValue: "error",
-      extract: { message: "message" }
-    },
-    {
-      kind: "metadata",
-      matchPath: "type",
-      matchValue: "result",
-      extract: {
-        inputTokens: "input_tokens",
-        outputTokens: "output_tokens"
-      }
-    }
-  ]
-}
-
 >> ── Request ──
 >> The chat/completions body, built in mlld so it can be read and tested apart
 >> from the network call.
@@ -43,7 +14,6 @@ exe @openaiRequest(prompt, cfg) = [
   let @format = @cfg.responseFormat ? { response_format: @cfg.responseFormat } : {}
   let @fnTools = @cfg.fnTools ? { tools: @cfg.fnTools } : {}
   let @fnToolChoice = @cfg.fnToolChoice ? { tool_choice: @cfg.fnToolChoice } : {}
-  let @stream = @cfg.stream ? { stream: true, stream_options: { include_usage: true } } : {}
   => {
     model: @cfg.model ?? "gpt-4o",
     messages: [...@sys, ...@prior, { role: "user", content: @prompt }],
@@ -51,81 +21,41 @@ exe @openaiRequest(prompt, cfg) = [
     ...@maxTokens,
     ...@format,
     ...@fnTools,
-    ...@fnToolChoice,
-    ...@stream
+    ...@fnToolChoice
   }
 ]
 
->> ── Network call ──
->> Node because it needs fetch and reads the server-sent event stream.
->> Streaming prints NDJSON lines for @openaiStreamFormat and returns the full text.
-exe @openaiPost(body, baseUrl) using creds:openai = node {
-  const resp = await fetch((baseUrl || "https://api.openai.com/v1") + "/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + process.env.OPENAI_API_KEY
-    },
-    body: JSON.stringify(body)
-  });
+>> ── Response ──
 
-  if (!resp.ok) {
-    throw new Error("OpenAI API " + resp.status + ": " + await resp.text());
-  }
-
-  if (!body.stream) {
-    const json = await resp.json();
-    const msg = json.choices[0].message;
-
-    // Native function calling: return structured tool_calls
-    if (msg.tool_calls && msg.tool_calls.length > 0) {
-      return {
-        type: "tool_calls",
-        tool_calls: msg.tool_calls.map(tc => ({
-          function: tc.function.name,
-          args: JSON.parse(tc.function.arguments)
-        }))
-      };
-    }
-
-    return msg.content;
-  }
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let full = "";
-  let buf = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop();
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
-        try {
-          const chunk = JSON.parse(trimmed.slice(6));
-          const content = chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content;
-          if (content) {
-            full += content;
-            console.log(JSON.stringify({ type: "text", content: content }));
-          }
-          if (chunk.usage) {
-            console.log(JSON.stringify({
-              type: "result",
-              input_tokens: chunk.usage.prompt_tokens,
-              output_tokens: chunk.usage.completion_tokens
-            }));
-          }
-        } catch (e) {}
-      }
-    }
-  }
-
-  return full;
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @raise(message) = js {
+  throw new Error(message);
 }
+
+>> OpenAI sends a call's arguments as JSON text.
+exe @openaiToolCall(call) = [
+  let @args = @call.function.arguments | @parse
+  => { function: @call.function.name, args: @args }
+]
+
+>> The reply text, or { type: "tool_calls", tool_calls: [{ function, args }] } when
+>> the model called functions. A non-2xx status raises.
+exe @openaiResult(res) = [
+  if !@res.ok [ => @raise(`OpenAI API ${@res.status}: ${@res.body}`) ]
+  let @msg = @res.body.choices[0].message
+  let @calls = for @c in (@msg.tool_calls ?? []) => @openaiToolCall(@c)
+  => match [
+    @calls.length > 0 => { type: "tool_calls", tool_calls: @calls }
+    * => @msg.content
+  ]
+]
+
+>> ── Network call ──
+
+exe @openaiPost(body, baseUrl) = [
+  let @res = @http.post(`${@baseUrl || "https://api.openai.com/v1"}/chat/completions`, @body) using creds:openai
+  => @openaiResult(@res)
+]
 
 >> ── Core invocation ──
 
@@ -139,8 +69,10 @@ exe @openaiPost(body, baseUrl) using creds:openai = node {
 >> config.fnTools        - array of tool definitions for native function calling
 >> config.fnToolChoice   - "auto", "required", "none", or {type: "function", function: {name: "..."}}
 >> config.baseUrl        - API base URL (default: https://api.openai.com/v1)
->> config.stream         - boolean, enables streaming
-llm @openai(prompt, config) with { stream: @config.stream, stream_format: @openaiStreamFormat } = [
+>>
+>> Replies arrive whole: mlld's @http reads a response only once it is complete,
+>> so there is no streaming.
+llm @openai(prompt, config) = [
   let @cfg = @config ? @config : {}
   => @openaiPost(@openaiRequest(@prompt, @cfg), @cfg.baseUrl)
 ]
@@ -151,4 +83,4 @@ llm @gpt4o(prompt) = @openai(@prompt, { model: "gpt-4o" })
 llm @gpt4oMini(prompt) = @openai(@prompt, { model: "gpt-4o-mini" })
 llm @o3Mini(prompt) = @openai(@prompt, { model: "o3-mini" })
 
-export { @openai, @gpt4o, @gpt4oMini, @o3Mini, @openaiStreamFormat, @openaiRequest }
+export { @openai, @gpt4o, @gpt4oMini, @o3Mini, @openaiRequest, @openaiResult }

@@ -29,32 +29,46 @@ exe @lmsRequest(prompt, cfg) = [
   }
 ]
 
->> ── Network call ──
->> Node because it needs fetch. LM Studio returns the model's final answer in
->> choices[0].message.content with reasoning split out, so no <think> stripping.
-exe @lmsPost(body, baseUrl, apiKey, full) = node {
-  const url = String(baseUrl || "http://localhost:1234/v1").replace(/\/$/, "") + "/chat/completions";
-  const headers = { "Content-Type": "application/json" };
-  if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
+>> ── Response ──
 
-  const resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-  if (!resp.ok) {
-    throw new Error("LM Studio REST " + resp.status + ": " + await resp.text());
-  }
-
-  const json = await resp.json();
-  const choice = json.choices && json.choices[0];
-  const content = choice && choice.message ? (choice.message.content || "") : "";
-  if (full) {
-    return {
-      content,
-      model: json.model || body.model || "",
-      usage: json.usage || null,
-      finishReason: choice ? choice.finish_reason : null
-    };
-  }
-  return content;
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @raise(message) = js {
+  throw new Error(message);
 }
+
+>> LM Studio returns the model's final answer in choices[0].message.content with
+>> reasoning split out, so there is no <think> stripping. `full` returns
+>> { content, model, usage, finishReason }. A non-2xx status raises.
+exe @lmsResult(res, requestedModel, full) = [
+  if !@res.ok [ => @raise(`LM Studio REST ${@res.status}: ${@res.body}`) ]
+  let @choice = @res.body.choices[0]
+  let @content = @choice.message.content || ""
+  => match [
+    @full => {
+      content: @content,
+      model: @res.body.model || @requestedModel || "",
+      usage: @res.body.usage ?? null,
+      finishReason: @choice.finish_reason ?? null
+    }
+    * => @content
+  ]
+]
+
+>> ── Network call ──
+
+>> The API key is optional and belongs to the caller's local server, so it goes
+>> in a header here rather than through a declared credential.
+exe @lmsPost(body, baseUrl, apiKey, full) = [
+  let @givenBase = @baseUrl || "http://localhost:1234/v1"
+  let @base = @givenBase.endsWith("/") ? @givenBase.slice(0, -1) : @givenBase
+  let @auth = @apiKey ? { Authorization: `Bearer ${@apiKey}` } : {}
+  let @res = @http.request(`${@base}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...@auth },
+    body: @body
+  })
+  => @lmsResult(@res, @body.model, @full)
+]
 
 >> ── Public API ──
 >> @lms(prompt, config) — call a local LM Studio model over its REST API.
@@ -75,4 +89,4 @@ llm @lms(prompt, config) = [
   => @lmsPost(@lmsRequest(@prompt, @cfg), @cfg.baseUrl, @cfg.apiKey, @cfg.full)
 ]
 
-export { @lms, @lmsRequest }
+export { @lms, @lmsRequest, @lmsResult }

@@ -1,7 +1,7 @@
 >> Tests for the request body @lms sends, with no server.
 >> Run: mlld test lms/tests/
 
-import { @lmsRequest } from "../index.mld"
+import { @lmsRequest, @lmsResult } from "../index.mld"
 
 const @bare = @lmsRequest("hi", {})
 const @test_bare_has_only_user_turn = @bare.messages.length == 1 && @bare.messages[0].content == "hi"
@@ -28,3 +28,18 @@ const @test_schema_becomes_json_schema = @withSchema.response_format.type == "js
 const @test_schema_name_defaults = @withSchema.response_format.json_schema.name == "response"
 const @test_schema_is_strict = @withSchema.response_format.json_schema.strict
 const @test_response_format_overrides_schema = @lmsRequest("x", { schema: @schema, responseFormat: { type: "json_object" } }).response_format.type == "json_object"
+
+>> ── reading the reply (the { status, body, ok } record @http returns) ──
+
+const @reply = { ok: true, status: 200, body: { model: "qwen", choices: [{ message: { content: "pong" }, finish_reason: "stop" }], usage: { total_tokens: 7 } } }
+const @test_reply_text = @lmsResult(@reply, "", false) == "pong"
+const @fullReply = @lmsResult(@reply, "", true)
+const @test_full_shape = @fullReply.content == "pong" && @fullReply.model == "qwen" && @fullReply.usage.total_tokens == 7 && @fullReply.finishReason == "stop"
+
+const @sparse = { ok: true, status: 200, body: { choices: [{ message: { content: null } }] } }
+const @bareFull = @lmsResult(@sparse, "asked-model", true)
+const @test_missing_fields_default = @bareFull.content == "" && @bareFull.model == "asked-model" && @bareFull.usage == null && @bareFull.finishReason == null
+const @test_null_content_is_empty_text = @lmsResult(@sparse, "", false) == ""
+
+const @failed = try @lmsResult({ ok: false, status: 500, body: "server exploded" }, "", false)
+const @test_non_2xx_raises = !@failed.ok && @failed.error.message == "LM Studio REST 500: server exploded"
