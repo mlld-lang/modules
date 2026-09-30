@@ -72,20 +72,18 @@ Essential environment management:
 /when @env.isCI() => /show "Running in CI environment"
 ```
 
-### [@mlld/fix-relative-links](./llm/modules/fix-relative-links.mld.md)
+### [@mlld/fix-relative-links](./fix-relative-links)
 
 Recalculates relative links when moving content between directories:
 
 ```mlld
-/import { fixRelativeLinks } from @mlld/fix-relative-links
+import { @fixRelativeLinks } from @mlld/fix-relative-links
 
-/var @content = "See the [docs](../docs/guide.md) for details."
+const @content = "See the [docs](../docs/guide.md) for details."
 
->> The function asks: "How do I get from dist/ to src/docs/guide.md?"
->> Answer: "../src/docs/guide.md"
-/var @fixed = @fixRelativeLinks(@content, "src/modules", "dist")
->>                                        ↑                ↑
->>                   where content thinks it is    where it's actually going
+>> Where the content was written, then where it is going:
+>> from dist/, src/modules/../docs/guide.md is ../src/docs/guide.md
+const @fixed = @fixRelativeLinks(@content, "src/modules", "dist")
 ```
 
 ### [@mlld/fs](./llm/modules/fs.mld.md)
