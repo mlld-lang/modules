@@ -1,0 +1,70 @@
+>> Array helpers mlld's builtin methods don't cover. Each returns an empty
+>> result (an empty array, 0, or {}) when given something that is not an array.
+>> For what moved to builtins, see README.md.
+
+>> Per-element work is JS here: an mlld loop costs about a millisecond per
+>> element (2,000 items: 3-4 s for @unique or @zip, over two minutes for a
+>> reduce like @sum, whose carried result is copied each pass). @chunk and @avg
+>> do per-chunk or constant work, so they stay mlld.
+
+>> Elements in first-seen order, duplicates dropped (same-value for text and
+>> numbers; objects are distinct unless they are the same object).
+exe @unique(array) = js {
+  return Array.isArray(array) ? [...new Set(array)] : [];
+}
+
+>> An object from each element's key field (as text) to the elements with it.
+exe @groupBy(array, key) = js {
+  if (!Array.isArray(array)) return {};
+  const groups = {};
+  for (const item of array) {
+    const name = String(item[key]);
+    (groups[name] = groups[name] || []).push(item);
+  }
+  return groups;
+}
+
+>> A copy ordered by each element's key field, ascending.
+>> JS because mlld's .sort() orders only as text and takes no comparator.
+exe @sortBy(array, key) = js {
+  if (!Array.isArray(array)) return [];
+  return array.slice().sort((a, b) => {
+    const aVal = a[key];
+    const bVal = b[key];
+    if (aVal < bVal) return -1;
+    if (aVal > bVal) return 1;
+    return 0;
+  });
+}
+
+>> The total of the elements, or of their key field when key is given; text is read as a number.
+exe @sum(array, key = null) = js {
+  if (!Array.isArray(array)) return 0;
+  return array.reduce((total, item) => total + Number(key ? item[key] : item), 0);
+}
+
+>> The mean of the elements, or of their key field; 0 for an empty array.
+exe @avg(array, key = null) = [
+  if !@array.isArray() || @array.length == 0 [ => 0 ]
+  => @sum(@array, @key) / @array.length
+]
+
+>> Numbers from start up to, not including, end; step defaults to 1 and may be negative.
+exe @range(start, end, step = null) = js {
+  const by = step || 1;
+  return Array.from({ length: Math.ceil((end - start) / by) }, (_, i) => start + i * by);
+}
+
+>> The array cut into pieces of size elements; the last may be shorter.
+exe @chunk(array, size) = [
+  if !@array.isArray() || !(@size > 0) [ => [] ]
+  => for @start in @range(0, @array.length, @size) => @array.slice(@start, @start + @size)
+]
+
+>> Pairs [a[i], b[i]] for each element of a; b[i] is null past b's end.
+exe @zip(a, b) = js {
+  if (!Array.isArray(a) || !Array.isArray(b)) return [];
+  return a.map((item, i) => [item, b[i] ?? null]);
+}
+
+export { @unique, @groupBy, @sortBy, @sum, @avg, @range, @chunk, @zip }

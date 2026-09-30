@@ -1,0 +1,98 @@
+>> String helpers mlld's builtin methods don't cover. Each reads its input as
+>> text. For what moved to builtins, see README.md.
+
+>> Text without leading whitespace.
+exe @trimStart(str) = [
+  let @s = `${@str}`
+  => @s.replaceAll(/^\s+/g, "")
+]
+
+>> Text without trailing whitespace.
+exe @trimEnd(str) = [
+  let @s = `${@str}`
+  => @s.replaceAll(/\s+$/g, "")
+]
+
+>> First letter upper case, the rest lower case.
+exe @capitalize(str) = [
+  let @s = `${@str}`
+  => `${@s.slice(0, 1).toUpperCase()}${@s.slice(1).toLowerCase()}`
+]
+
+>> Each space-separated word capitalized.
+exe @title(str) = [
+  let @s = `${@str}`
+  => @s.split(" ").map(@capitalize(@item)).join(" ")
+]
+
+>> "hello world" → "helloWorld": each run of other characters is dropped and the
+>> character after it upper-cased; the first character is lower-cased.
+>> JS because upper-casing the matched character needs a replace callback.
+exe @camelCase(str) = js {
+  return String(str)
+    .replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase())
+    .replace(/^[A-Z]/, chr => chr.toLowerCase());
+}
+
+>> "helloWorld" → "hello_world"; runs of other characters become one "_".
+exe @snakeCase(str) = [
+  let @s = `${@str}`
+  => @s.replaceAll(/([A-Z])/g, "_$1").replaceAll(/^_/g, "").replaceAll(/[^a-zA-Z0-9]+/g, "_").toLowerCase()
+]
+
+>> "helloWorld" → "hello-world"; runs of other characters become one "-".
+exe @kebabCase(str) = [
+  let @s = `${@str}`
+  => @s.replaceAll(/([A-Z])/g, "-$1").replaceAll(/^-/g, "").replaceAll(/[^a-zA-Z0-9]+/g, "-").toLowerCase()
+]
+
+>> Lower-case words joined by "-", with punctuation dropped: "Hello, World!" → "hello-world".
+exe @slugify(str) = [
+  let @s = `${@str}`
+  => @s.toLowerCase().trim().replaceAll(/[^\w\s-]/g, "").replaceAll(/[\s_-]+/g, "-").replaceAll(/^-+|-+$/g, "")
+]
+
+>> The characters in reverse order.
+exe @reverse(str) = [
+  let @s = `${@str}`
+  => @s.split("").reverse().join("")
+]
+
+>> Backslashes, quotes, newlines, carriage returns and tabs as their escapes.
+exe @escape(str) = [
+  let @s = `${@str}`
+  => @s.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"").replaceAll("'", "\\'").replaceAll("\n", "\\n").replaceAll("\r", "\\r").replaceAll("\t", "\\t")
+]
+
+>> JS because mlld has no URI encoding builtin.
+exe @encodeUri(str) = js { return encodeURI(String(str)); }
+exe @encodeUriComponent(str) = js { return encodeURIComponent(String(str)); }
+
+>> true for text shaped like name@domain.tld.
+exe @isEmail(str) = [
+  let @s = `${@str}`
+  => @s ~= /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+]
+
+>> true when the text parses as an absolute URL.
+>> JS because this is the URL parser's judgement, which a regex would only approximate.
+exe @isUrl(str) = js {
+  try {
+    new URL(String(str));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+>> true when the text reads as a number, including "1e3", "0x10" and "Infinity".
+>> JS because this is JavaScript's number parsing, which a regex would only approximate.
+exe @isNumeric(str) = js { return !isNaN(str) && !isNaN(parseFloat(str)); }
+
+>> Lines split on "\n" or "\r\n".
+exe @splitLines(str) = [
+  let @s = `${@str}`
+  => @s.replaceAll("\r\n", "\n").split("\n")
+]
+
+export { @trimStart, @trimEnd, @capitalize, @title, @camelCase, @snakeCase, @kebabCase, @slugify, @reverse, @escape, @encodeUri, @encodeUriComponent, @isEmail, @isUrl, @isNumeric, @splitLines }
