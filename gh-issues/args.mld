@@ -17,15 +17,17 @@ exe @prFilesArgs(target, number) = [ => ["api", @prPath(@target, @number, "/file
 >> The diff media type makes GitHub answer with plain unified diff text.
 exe @prDiffArgs(target, number) = [ => ["api", "-H", "Accept: application/vnd.github.v3.diff", @prPath(@target, @number, "")] ]
 
->> `-f` makes gh send a POST unless the method is named, so a filtered list
->> needs `-X GET`. GitHub filters pulls by head branch, not author, and
->> "author:" as the head matches every branch that author pushed.
+>> The fields `gh pr list --json` returns for each pull request.
+const @prListFields = "number,title,state,author,headRefName,baseRefName,labels,isDraft,url,createdAt,updatedAt"
+
+>> `gh pr list`, not `gh api`: the REST pulls list ignores author and label
+>> filters, and gh applies them. The result is gh's camelCase shape.
 exe @prListArgs(target, options) = [
   let @opts = @options ?? {}
-  let @head = @opts.author ? `${@opts.author}:` : null
-  let @pairs = [["state", @opts.state ?? null], ["head", @head], ["labels", @opts.label ?? null]]
-  let @flags = for @p in @pairs if @p[1] != null => ["-f", `${@p[0]}=${@p[1]}`]
-  => ["api", "-X", "GET", @repoPath(@target, "/pulls")].concat(@flags.flat())
+  let @pairs = [["--author", @opts.author ?? null], ["--label", @opts.label ?? null]]
+  let @filters = for @p in @pairs if @p[1] != null => [@p[0], `${@p[1]}`]
+  let @base = ["pr", "list", "--repo", `${@target.owner}/${@target.repo}`, "--state", @opts.state ?? "open"]
+  => @base.concat(@filters.flat()).concat(["--limit", `${@opts.limit ?? 30}`, "--json", @prListFields])
 ]
 
 >> A pull request's conversation comments live on its issue.
@@ -65,6 +67,20 @@ exe @repoCloneArgs(target, dir) = [
 ]
 
 exe @collabArgs(target, user) = [ => ["api", @repoPath(@target, `/collaborators/${@user}`)] ]
+
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @raise(message) = js {
+  throw new Error(message);
+}
+
+>> A collaborator check's `try` result: success is true, GitHub's 404 is false,
+>> and any other failure (a 403 without push access, auth, network) is raised,
+>> since it answers nothing about the user.
+exe @collabResult(check) = match [
+  @check.ok => true
+  @check.error.message.includes("(HTTP 404)") => false
+  * => @raise(@check.error.message)
+]
 
 >> ── Workflows ──
 
@@ -112,4 +128,4 @@ exe @diffFor(diff, paths) = [
   => @kept.join("\n")
 ]
 
-export { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewEvent, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor }
+export { @prListFields, @collabResult, @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewEvent, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor }

@@ -3,7 +3,7 @@
 >> Run: mlld test gh-issues/tests/
 
 import { @repoFrom } from "../repo.mld"
-import { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewEvent, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor } from "../args.mld"
+import { @prListFields, @collabResult, @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewEvent, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor } from "../args.mld"
 
 const @t = { owner: "acme", repo: "app" }
 
@@ -26,10 +26,12 @@ const @diffArgs = @prDiffArgs(@t, 7)
 const @test_diff_header = @diffArgs[2] == "Accept: application/vnd.github.v3.diff"
 const @test_diff_path = @diffArgs[3] == "repos/acme/app/pulls/7"
 
-const @test_list_plain = @prListArgs(@t, null).join(" ") == "api -X GET repos/acme/app/pulls"
-const @list = @prListArgs(@t, { state: "closed", author: "octocat", label: "bug" }).join(" ")
-const @test_list_filters = @list == "api -X GET repos/acme/app/pulls -f state=closed -f head=octocat: -f labels=bug"
-const @test_list_one_filter = @prListArgs(@t, { label: "bug" }).join(" ") == "api -X GET repos/acme/app/pulls -f labels=bug"
+const @jsonTail = "--json number,title,state,author,headRefName,baseRefName,labels,isDraft,url,createdAt,updatedAt"
+const @test_list_plain = @prListArgs(@t, null).join(" ") == `pr list --repo acme/app --state open --limit 30 ${@jsonTail}`
+const @list = @prListArgs(@t, { state: "closed", author: "octocat", label: "bug", limit: 5 }).join(" ")
+const @test_list_filters = @list == `pr list --repo acme/app --state closed --author octocat --label bug --limit 5 ${@jsonTail}`
+const @test_list_one_filter = @prListArgs(@t, { label: "bug" }).join(" ") == `pr list --repo acme/app --state open --label bug --limit 30 ${@jsonTail}`
+const @test_list_fields_exported = @prListFields.startsWith("number,title,state,author")
 
 const @test_comment = @prCommentArgs(@t, 7).join(" ") == "api repos/acme/app/issues/7/comments --input -"
 const @test_review = @prReviewArgs(@t, 7).join(" ") == "api repos/acme/app/pulls/7/reviews --input -"
@@ -54,6 +56,14 @@ const @test_repo_view = @repoViewArgs(@t).join(" ") == "api repos/acme/app"
 const @test_clone = @repoCloneArgs(@t, null).join(" ") == "repo clone acme/app"
 const @test_clone_dir = @repoCloneArgs(@t, "./copy").join(" ") == "repo clone acme/app ./copy"
 const @test_collab = @collabArgs(@t, "octocat").join(" ") == "api repos/acme/app/collaborators/octocat"
+
+>> @collabResult reads a `try` of the check; these stand in for its three outcomes.
+const @test_collab_yes = @collabResult({ ok: true, value: "" }) == true
+const @notFound = { ok: false, error: { message: "Command failed: gh api repos/acme/app/collaborators/octocat\ngh: Not Found (HTTP 404)" } }
+const @test_collab_no = @collabResult(@notFound) == false
+const @forbidden = { ok: false, error: { message: "gh: Must have push access to view repository collaborators. (HTTP 403)" } }
+const @raised = try @collabResult(@forbidden)
+const @test_collab_403_raises = !@raised.ok && @raised.error.message.includes("(HTTP 403)")
 
 >> ── Workflows ──
 

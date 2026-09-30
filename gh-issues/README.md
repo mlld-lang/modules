@@ -60,24 +60,25 @@ These take the repo as one `"owner/name"` string.
 | `@viewPr(number, repo?, fields?)` | `.op:net:r` | Get a PR. `fields` is a comma list of keys to keep. `files` is always present, as an array |
 | `@listPrFiles(number, repo?)` | `.op:net:r` | Files the PR changes, each with `filename`, `status`, `additions`, `deletions`, `patch` |
 | `@prDiff(number, repo?, paths?)` | `.op:net:r` | The PR's unified diff as text. `paths` (comma list) keeps only files whose diff header mentions one |
-| `@listPrs(repo?, options?)` | `.op:net:r` | List PRs. `options` is `{ state, author, label }` |
+| `@listPrs(repo?, options?)` | `.op:net:r` | List PRs through `gh pr list`. `options` is `{ state, author, label, limit }`; `state` is `open` (default), `closed`, `merged` or `all`, and `limit` defaults to 30. Each PR has gh's fields (`number`, `title`, `state`, `author`, `headRefName`, `baseRefName`, `labels`, `isDraft`, `url`, `createdAt`, `updatedAt`), not the GitHub API object `@viewPr` returns |
 | `@commentPr(number, repo, body)` | `.op:net:rw` | Comment on a PR |
 | `@reviewPr(number, repo, event, body)` | `.op:net:rw` | Review a PR. `event` is `approve`, `request-changes` or `comment` |
-| `@editPr(number, repo, options)` | `.op:net:rw` | Edit a PR. `options` is `{ title, body, labels }`; labels are added to the existing ones |
+| `@editPr(number, repo, options)` | `.op:net:rw` | Edit a PR. `options` is `{ title, body, labels }`; labels are added to the existing ones. Given no title or body, it changes only the labels (if any) and returns the PR as `@viewPr` does |
 | `@viewRepo(repo?, fields?)` | `.op:net:r` | Get a repo. `fields` works as in `@viewPr` |
 | `@cloneRepo(repo, dir?)` | `.op:net:r`, `.op:fs:w` | Clone the repo to `dir` (default: the repo name). Returns `{ repo, directory }` |
-| `@isCollaborator(user, repo?)` | `.op:net:r` | `true` if the user is a collaborator, else `false` |
+| `@isCollaborator(user, repo?)` | `.op:net:r` | `true` if the user is a collaborator, `false` if GitHub says not found. You need push access to the repo to check; without it, or on any other failure, it raises an error. A missing or private repo also answers not found, so it reads as `false` |
 | `@runWorkflow(repo, workflow, options?)` | `.op:net:rw` | Start a GitHub Actions workflow, named by display name, file name or id. `options` is `{ ref }`, default `"main"`. Returns `{ success, workflow, ref }` |
 | `@listWorkflowRuns(repo?)` | `.op:net:r` | Recent Actions runs, as `{ total_count, workflow_runs }` |
 | `@tools` | | MCP tools collection |
 
 ## Moving from @mlld/github
 
-`@mlld/github` called the GitHub API with `MLLD_GITHUB_TOKEN`. These functions use `gh` and its login instead, and return the same GitHub API shapes. What else changed:
+`@mlld/github` called the GitHub API with `MLLD_GITHUB_TOKEN`. These functions use `gh` and its login instead, and return the same GitHub API shapes, except `@listPrs`. What else changed:
 
 | @mlld/github | @mlld/gh-issues |
 |--------------|-----------------|
 | `@github.pr.view`, `.files`, `.diff`, `.list`, `.comment`, `.review`, `.edit` | `@viewPr`, `@listPrFiles`, `@prDiff`, `@listPrs`, `@commentPr`, `@reviewPr`, `@editPr` |
+| `pr.list` returned GitHub API objects, and its author and label filters did nothing | `@listPrs` returns gh's fields, and its filters work |
 | `@github.repo.view`, `.clone` | `@viewRepo`, `@cloneRepo` |
 | `@github.collab.check` | `@isCollaborator` |
 | `@github.workflow.run`, `.list` | `@runWorkflow`, `@listWorkflowRuns` |

@@ -4,7 +4,7 @@
 >> Repo: auto-detected from git context, or pass owner/repo explicitly
 
 import { @repoOf, @repoFrom, @repoPath } from "./repo.mld"
-import { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor } from "./args.mld"
+import { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @collabResult, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor } from "./args.mld"
 
 >> Node because execFileSync hands each value to gh as its own argument; a cmd
 >> body pastes values in as text, so a title with spaces would split.
@@ -73,7 +73,7 @@ exe .op:net:r @prDiff(number, repo = null, paths = null) with { description: "Ge
   => @paths ? @diffFor(@diff, @paths) : @diff
 ]
 
-exe .op:net:r @listPrs(repo = null, options = null) with { description: "List pull requests, filtered by state, author or label" } = @gh(@prListArgs(@repoTarget(@repo), @options), null)
+exe .op:net:r @listPrs(repo = null, options = null) with { description: "List pull requests, filtered by state (open, closed, merged, all), author or label; returns gh pr list fields" } = @gh(@prListArgs(@repoTarget(@repo), @options), null)
 
 exe .op:net:rw @commentPr(number, repo, body) with { description: "Comment on a pull request" } = @gh(@prCommentArgs(@repoTarget(@repo), @number), { body: @body })
 
@@ -83,8 +83,9 @@ exe .op:net:rw @reviewPr(number, repo, event, body = "") with { description: "Re
 exe .op:net:rw @editPr(number, repo, options) with { description: "Edit a pull request's title or body, or add labels" } = [
   let @target = @repoTarget(@repo)
   let @labels = @options.labels ?? null
+  let @body = @prEditBody(@options)
   if @labels [ @gh(@prLabelArgs(@target, @number), { labels: @labels }) ]
-  => @gh(@prEditArgs(@target, @number), @prEditBody(@options))
+  => @body.mx.keys.length > 0 ? @gh(@prEditArgs(@target, @number), @body) : @viewPr(@number, `${@target.owner}/${@target.repo}`, null)
 ]
 
 >> ── Repos and collaborators ──
@@ -101,10 +102,10 @@ exe .op:net:r,.op:fs:w @cloneRepo(repo, dir = null) with { description: "Clone a
 ]
 
 >> GitHub answers 204 for a collaborator and 404 otherwise, and gh exits
->> nonzero on the 404.
-exe .op:net:r @isCollaborator(user, repo = null) with { description: "Check whether a user is a collaborator on a repository" } = [
+>> nonzero on either failure. Checking needs push access to the repo.
+exe .op:net:r @isCollaborator(user, repo = null) with { description: "Check whether a user is a collaborator on a repository (needs push access to it)" } = [
   let @check = try @ghText(@collabArgs(@repoTarget(@repo), @user), null)
-  => @check.ok
+  => @collabResult(@check)
 ]
 
 >> ── Workflows ──
