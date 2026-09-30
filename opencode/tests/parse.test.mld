@@ -1,0 +1,25 @@
+>> Tests for how @opencode reads opencode's output and builds its prompt, with no opencode call.
+>> Run: mlld test opencode/tests/
+
+import { @parseOpencodeJsonl, @prependOpencodeSystem, @normalizeOpencodeSessionId, @opencodeToolAgentName } from "../index.mld"
+
+const @raw = "{\"type\":\"step_start\",\"sessionID\":\"ses_Abc\"}\nnot json\n{\"type\":\"text\",\"sessionID\":\"ses_Abc\",\"part\":{\"text\":\"Hello, \"}}\r\n{\"type\":\"tool_use\",\"sessionID\":\"ses_Abc\",\"part\":{\"tool\":\"read\"}}\n{\"type\":\"text\",\"part\":{\"text\":\"world\"}}\n{\"type\":\"step_finish\",\"part\":{\"tokens\":{\"input\":0,\"output\":5,\"total\":5},\"cost\":0.01}}\n"
+const @parsed = @parseOpencodeJsonl(@raw)
+const @test_session_from_first_event = @parsed.sessionId == "ses_Abc"
+const @test_text_joins_every_text_event = @parsed.text == "Hello, world"
+const @test_zero_input_tokens_kept = @parsed.inputTokens == 0
+const @test_output_and_total = @parsed.outputTokens == 5 && @parsed.totalTokens == 5
+const @test_cost = @parsed.cost == 0.01
+
+const @none = @parseOpencodeJsonl("")
+const @test_empty_has_no_session = @none.sessionId == null && @none.text == "" && @none.cost == null
+
+const @test_system_prepended = @prependOpencodeSystem("do it", "be brief") == "be brief\n\ndo it"
+const @test_no_system_leaves_prompt = @prependOpencodeSystem("do it", null) == "do it"
+
+const @test_session_id_keeps_case = @normalizeOpencodeSessionId(" ses_AbC ") == "ses_AbC"
+const @test_blank_session_id_is_null = @normalizeOpencodeSessionId("") == null
+
+const @test_agent_name_given = @opencodeToolAgentName(" reviewer ") == "reviewer"
+const @test_agent_name_default = @opencodeToolAgentName("") == "mlld"
+const @test_agent_name_missing = @opencodeToolAgentName(null) == "mlld"

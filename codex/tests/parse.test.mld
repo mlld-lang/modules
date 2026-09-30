@@ -1,0 +1,23 @@
+>> Tests for how @codex reads codex's output and builds its prompt, with no codex call.
+>> Run: mlld test codex/tests/
+
+import { @parseCodexJsonl, @prependSystemPrompt, @normalizeCodexSessionId } from "../index.mld"
+
+const @raw = "{\"type\":\"thread.started\",\"thread_id\":\"T1\"}\r\nnot json\n[1,2]\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"first\"}}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"reasoning\",\"text\":\"thinking\"}}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"last\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":0,\"output_tokens\":7}}\n"
+const @parsed = @parseCodexJsonl(@raw)
+const @test_session_from_thread_started = @parsed.sessionId == "T1"
+const @test_text_is_last_agent_message = @parsed.text == "last"
+const @test_zero_input_tokens_kept = @parsed.inputTokens == 0
+const @test_output_tokens = @parsed.outputTokens == 7
+
+const @none = @parseCodexJsonl("")
+const @test_empty_has_no_session = @none.sessionId == null && @none.text == "" && @none.inputTokens == null
+const @test_garbage_is_empty = @parseCodexJsonl("not json at all").text == ""
+
+const @test_system_prepended = @prependSystemPrompt("do it", "be brief") == "be brief\n\ndo it"
+const @test_no_system_leaves_prompt = @prependSystemPrompt("do it", "") == "do it"
+const @test_empty_prompt = @prependSystemPrompt("", "") == ""
+
+const @test_session_id_lowercased = @normalizeCodexSessionId("  0199A213-81C0 ") == "0199a213-81c0"
+const @test_blank_session_id_is_null = @normalizeCodexSessionId("   ") == null
+const @test_missing_session_id_is_null = @normalizeCodexSessionId(null) == null

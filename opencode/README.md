@@ -9,9 +9,9 @@ import { @opencode } from @mlld/opencode
 
 show @opencode("What is REST?")
 
-var @review = @opencode("Review code in src/", {
+const @review = @opencode("Review code in src/", {
   model: "anthropic/claude-sonnet-4-5",
-  dir: @base,
+  dir: @root,
   stream: true,
   bypass: true
 })
@@ -34,37 +34,37 @@ Runs `opencode run --format json` and returns the final agent message. Session i
 | `stream` | boolean | — | Stream chunks through `@opencodeStreamFormat`. The adapter also emits session id + token usage + cost metadata. |
 | `sessionId` | string | — | Explicit conversation tracking id (`ses_...`). Case-sensitive. |
 | `resume` | string | — | Explicit resume session id. Equivalent to `opencode run -s <id>`. |
-| `tools` | array | — | Standard mlld `exe llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config`; this module translates it into opencode's `{ mcp: { name: { type: "local", command, environment } } }` config and exposes it via a shadow `XDG_CONFIG_HOME`. Opencode has no per-tool gating, so `@mx.llm.native` is informational only. |
+| `tools` | array | — | Standard mlld `llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config`; this module translates it into opencode's `{ mcp: { name: { type: "local", command, environment } } }` config and exposes it via a shadow `XDG_CONFIG_HOME`. Opencode has no per-tool gating, so `@mx.llm.native` is informational only. |
 | `mcpTimeoutMs` | number | — | Optional per-request timeout (ms) opencode applies to MCP tool calls. Maps to opencode's `experimental.mcp_timeout`. When omitted, opencode's built-in default applies. Only takes effect when an inline MCP config is emitted (i.e. when `tools` is set or the runtime has bridged tools). Set this only when you have a specific reason to override opencode's default — for example, when long tool calls indicate planner failure rather than legitimate slow work, a short value lets the planner LLM see failures faster and exit cleanly via a terminal call instead of consuming wall budget. |
 
 ```mlld
 >> Simple call
-var @answer = @opencode("Explain TCP/IP")
+const @answer = @opencode("Explain TCP/IP")
 
 >> Anthropic via opencode
-var @review = @opencode("Code review this PR", {
+const @review = @opencode("Code review this PR", {
   model: "anthropic/claude-sonnet-4-5",
-  dir: @base
+  dir: @root
 })
 
 >> High-reasoning variant
-var @deep = @opencode("Trace this race condition", {
+const @deep = @opencode("Trace this race condition", {
   model: "anthropic/claude-opus-4-5",
   variant: "high"
 })
 
 >> System prompt (prepended)
-var @r = @opencode("What's your codename?", {
+const @r = @opencode("What's your codename?", {
   system: "Your codename is Zephyr. Answer in one word."
 })
 
 >> Explicit resume
-var @followup = @opencode("Keep going", { resume: "ses_28591e74fffey5oyFDw6nSuzpk" })
+const @followup = @opencode("Keep going", { resume: "ses_28591e74fffey5oyFDw6nSuzpk" })
 
 >> mlld tool bridging — requires bypass so tool calls aren't blocked on permissions
 exe @getOrders() = js { return JSON.stringify([{ id: 1 }]); }
 
-var @summary = @opencode("Call getOrders and summarise the results.", {
+const @summary = @opencode("Call getOrders and summarise the results.", {
   tools: [@getOrders],
   bypass: true
 })
@@ -104,9 +104,9 @@ Reads a stored opencode session and turns it into IFT events, the event format o
 ```mlld
 import { @conversation } from @mlld/opencode
 
-var @path = @conversation.locate("ses_f32dadd9cffeySLGHspzO7cmgF", @base)
-var @log = <@path>
-var @tape = @conversation.ingest(@log.mx.text)
+const @path = @conversation.locate("ses_f32dadd9cffeySLGHspzO7cmgF", @root)
+const @log = <@path>
+const @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 

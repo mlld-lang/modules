@@ -6,11 +6,11 @@ import { @conversation } from "../index.mld"
 >> Reads a fixture raw: <file> would parse a .jsonl, changing what a truncated line does.
 exe @text(p) = node { return require("fs").readFileSync(p, "utf8"); }
 
-var @fixtures = "@root/codex/tests/fixtures/conversation"
-var @sessions = "@fixtures/home/sessions"
-var @sid = "0c0ffee0-1234-4321-8abc-def012345678"
-var @rolloutFile = "@sessions/2026/09/13/rollout-2026-09-13T19-14-00-0c0ffee0-1234-4321-8abc-def012345678.jsonl"
-var @legacyFile = "@sessions/2025/01/02/5e55a1d0-aaaa-4bbb-8ccc-0123456789ab.jsonl"
+const @fixtures = `${@root}/codex/tests/fixtures/conversation`
+const @sessions = `${@fixtures}/home/sessions`
+const @sid = "0c0ffee0-1234-4321-8abc-def012345678"
+const @rolloutFile = `${@sessions}/2026/09/13/rollout-2026-09-13T19-14-00-0c0ffee0-1234-4321-8abc-def012345678.jsonl`
+const @legacyFile = `${@sessions}/2025/01/02/5e55a1d0-aaaa-4bbb-8ccc-0123456789ab.jsonl`
 
 >> Compares with key order ignored, because mlld may reorder object keys. A golden's
 >> line 1 is the header and the remaining lines are the events in order; `limit`
@@ -48,22 +48,22 @@ exe @matchesGolden(result, goldenPath, limit) = node {
 >> ── ingest: fray's output over fray's native fixtures ──
 
 >> A loaded file arrives as an object, not text; ingest must refuse it rather than read it.
-var @rejected = try @conversation.ingest({})
-var @test_ingest_rejects_path_like_object = !@rejected.ok
+const @rejected = try @conversation.ingest({})
+const @test_ingest_rejects_path_like_object = !@rejected.ok
 
-var @test_ingest_basic = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-basic.jsonl")), "@fixtures/codex-basic.fray.jsonl", null)
-var @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-compacted.jsonl")), "@fixtures/codex-compacted.fray.jsonl", null)
-var @test_ingest_custom_tools = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-custom-tools.jsonl")), "@fixtures/codex-custom-tools.fray.jsonl", null)
+const @test_ingest_basic = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/codex-basic.jsonl`)), `${@fixtures}/codex-basic.fray.jsonl`, null)
+const @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/codex-compacted.jsonl`)), `${@fixtures}/codex-compacted.fray.jsonl`, null)
+const @test_ingest_custom_tools = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/codex-custom-tools.jsonl`)), `${@fixtures}/codex-custom-tools.fray.jsonl`, null)
 
 >> codex-basic with its last line (the final tool output) cut in half: that line is
 >> dropped, which leaves the golden's header and first 6 events.
-var @test_ingest_truncated_last_line = @matchesGolden(@conversation.ingest(@text("@fixtures/codex-basic-truncated.jsonl")), "@fixtures/codex-basic.fray.jsonl", 6)
+const @test_ingest_truncated_last_line = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/codex-basic-truncated.jsonl`)), `${@fixtures}/codex-basic.fray.jsonl`, 6)
 
 >> ── locate ──
 
-var @test_locate_rollout = @conversation.locate(@sid, "/anywhere", @sessions) == @rolloutFile
-var @test_locate_uppercase = @conversation.locate("0C0FFEE0-1234-4321-8ABC-DEF012345678", "/anywhere", @sessions) == @rolloutFile
-var @test_locate_legacy = @conversation.locate("5e55a1d0-aaaa-4bbb-8ccc-0123456789ab", "/anywhere", @sessions) == @legacyFile
-var @test_locate_unknown_uuid = @conversation.locate("0c0ffee0-1234-4321-8abc-def012345679", "/anywhere", @sessions) == null
-var @test_locate_traversal = @conversation.locate("../../etc/passwd", "/anywhere", @sessions) == null
-var @test_locate_non_uuid = @conversation.locate("not-a-session", "/anywhere", @sessions) == null
+const @test_locate_rollout = @conversation.locate(@sid, "/anywhere", @sessions) == @rolloutFile
+const @test_locate_uppercase = @conversation.locate("0C0FFEE0-1234-4321-8ABC-DEF012345678", "/anywhere", @sessions) == @rolloutFile
+const @test_locate_legacy = @conversation.locate("5e55a1d0-aaaa-4bbb-8ccc-0123456789ab", "/anywhere", @sessions) == @legacyFile
+const @test_locate_unknown_uuid = @conversation.locate("0c0ffee0-1234-4321-8abc-def012345679", "/anywhere", @sessions) == null
+const @test_locate_traversal = @conversation.locate("../../etc/passwd", "/anywhere", @sessions) == null
+const @test_locate_non_uuid = @conversation.locate("not-a-session", "/anywhere", @sessions) == null

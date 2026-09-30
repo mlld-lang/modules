@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stands in for `opencode run --format json`: prints the events @opencode parses,
+# with the arguments it was given in the reply text. Put this folder first on
+# PATH to run @opencode without a model call.
+args=$(printf '%s ' "$@" | tr -d '"\\\n')
+printf '{"type":"step_start","sessionID":"ses_stub0000000000000000000000"}\n'
+printf '{"type":"text","sessionID":"ses_stub0000000000000000000000","part":{"text":"stub opencode: %s"}}\n' "$args"
+printf '{"type":"step_finish","sessionID":"ses_stub0000000000000000000000","part":{"tokens":{"input":3,"output":5,"total":8},"cost":0}}\n'

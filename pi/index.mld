@@ -7,14 +7,14 @@ bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 homepage: https://github.com/mlld-lang/modules
 license: CC0
-mlld-version: "2.0.6"
+mlld-version: ">=2.2.0"
 ---
 
 needs { sh }
 
 >> Stream format adapter for Pi CLI JSONL output (pi --mode json)
 >> Maps pi's AgentEvent types to mlld's stream format conventions
-var @piStreamFormat = {
+const @piStreamFormat = {
   name: "pi",
   format: "ndjson",
   schemas: [
@@ -57,13 +57,12 @@ var @piStreamFormat = {
 }
 
 >> Pi's built-in tool names (lowercase)
-var @piBuiltInTools = "read,bash,edit,write,grep,find,ls"
+const @piBuiltInTools = "read,bash,edit,write,grep,find,ls"
 
 >> Check if tool name is a pi built-in
-exe @isPiBuiltin(name) = js {
-  const piTools = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
-  return piTools.has(String(name));
-}
+exe @isPiBuiltin(name) = [
+  => @piBuiltInTools.split(",").includes(`${@name}`)
+]
 
 >> ── Shell wrapper for pi ──
 >>
@@ -86,8 +85,15 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
   modelFlag=()
   if [ -n "$model" ]; then modelFlag=(--model "$model"); fi
 
+  # systemArg is the prompt text. It goes to pi as a file because pi reads a value
+  # that names an existing file as that file. It lives in the scratch TMPDIR of the run.
   systemFlag=()
-  if [ -n "$systemArg" ]; then systemFlag=(--append-system-prompt "$systemArg"); fi
+  if [ -n "$systemArg" ]; then
+    systemFile=$(mktemp "${TMPDIR:-/tmp}/pi-system-XXXXXX")
+    trap 'rm -f "$systemFile"' EXIT
+    printf '%s' "$systemArg" > "$systemFile"
+    systemFlag=(--append-system-prompt "$systemFile")
+  fi
 
   # Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
   # Pass through as-is since bash will word-split correctly
@@ -146,7 +152,7 @@ exe @piSession(config, projectRoot) = node {
 
 >> The runtime strips `_mlld` before callers see the result and reads the session
 >> id from it to find the conversation.
-exe @piResult(inputValue, session) = when [
+exe @piResult(inputValue, session) = match [
   @session.sessionId => {
     value: @inputValue,
     _mlld: {
@@ -178,7 +184,7 @@ exe @piResult(inputValue, session) = when [
 >>   - pi-mcp-adapter extension loads MCP servers from config
 >>   - Built-in pi tools can be selectively enabled via @mx.llm.native
 >>   - Use config.noTools: true to disable all tools
-exe llm @pi(prompt, config) = [
+llm @pi(prompt, config) with { stream: @config.stream, stream_format: @piStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : ""
   let @provider = @cfg.provider ? @cfg.provider : ""
@@ -193,29 +199,16 @@ exe llm @pi(prompt, config) = [
 
   >> Build tool argument string
   let @extraFlags = @cfg.flags ? @cfg.flags : ""
-  let @toolArg = when [
-    @cfg.noTools => `--no-tools @extraFlags`
-    @llmHasTools && @llmConfig && @llmNative => `--tools "@llmNative" --mcp-config "@llmConfig" @extraFlags`
-    @llmHasTools && @llmConfig => `--no-tools --mcp-config "@llmConfig" @extraFlags`
-    @llmHasTools && @llmNative => `--tools "@llmNative" @extraFlags`
-    @llmHasTools => `--no-tools @extraFlags`
+  let @toolArg = match [
+    @cfg.noTools => `--no-tools ${@extraFlags}`
+    @llmHasTools && @llmConfig && @llmNative => `--tools "${@llmNative}" --mcp-config "${@llmConfig}" ${@extraFlags}`
+    @llmHasTools && @llmConfig => `--no-tools --mcp-config "${@llmConfig}" ${@extraFlags}`
+    @llmHasTools && @llmNative => `--tools "${@llmNative}" ${@extraFlags}`
+    @llmHasTools => `--no-tools ${@extraFlags}`
     * => @extraFlags
   ]
 
-  >> System prompt via temp file
-  let @systemArg = when [
-    @cfg.system => [
-      let @ts = js { return Date.now() }
-      let @systemFile = `/tmp/pi-system-@ts.txt`
-      let @b64 = node {
-        const content = `@cfg.system`;
-        return Buffer.from(content).toString('base64');
-      }
-      run sh { echo @b64 | base64 -d > @systemFile }
-      => @systemFile
-    ]
-    * => ""
-  ]
+  let @systemArg = @cfg.system ? @cfg.system : ""
 
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
@@ -223,12 +216,12 @@ exe llm @pi(prompt, config) = [
   let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir)
 
   => @piResult(@raw, @session)
-] with { stream: @cfg.stream, streamFormat: @piStreamFormat }
+]
 
 >> Model shortcuts (all follow standard @fn(prompt, config) pattern)
-exe llm @haiku(prompt, config) = @pi(@prompt, { ...@config, model: "claude-haiku" })
-exe llm @sonnet(prompt, config) = @pi(@prompt, { ...@config, model: "claude-sonnet" })
-exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
+llm @haiku(prompt, config) = @pi(@prompt, { ...@config, model: "claude-haiku" })
+llm @sonnet(prompt, config) = @pi(@prompt, { ...@config, model: "claude-sonnet" })
+llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
 
 >> ── Conversation adapter ──
 >> Finds the JSONL file pi writes when it saves a session and translates it into
@@ -236,8 +229,8 @@ exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" 
 >> (internal/ift/ingest_pi.go) whose output must match fray's exactly once parsed,
 >> so the logic follows fray's rather than reading more naturally.
 
->> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
->> root is pi's agent dir or the sessions dir inside it, and only it is searched.
+>> @conversation.locate(sessionId, cwd, storeRoot?) → absolute path, or null
+>> storeRoot is pi's agent dir or the sessions dir inside it, and only it is searched.
 >> Without it, the path is <projectRoot>/.llm/pi-sessions/<id>.jsonl (where @pi
 >> saves), built without touching the disk: mlld's sandbox keeps modules out of
 >> .llm/ folders, so the file may exist and still be unreadable here, or not exist
@@ -246,7 +239,7 @@ exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" 
 >> ignored: every encoded-cwd directory is searched rather than rebuilding pi's
 >> encoding. The parameter keeps the signature shared with the other harnesses.
 >> projectRoot is a parameter because a node exe cannot see @root.
-exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
+exe @conversationLocateIn(sessionId, cwd, storeRoot, projectRoot) = node {
   const fs = require("fs");
   const path = require("path");
   const os = require("os");
@@ -254,12 +247,12 @@ exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
   const id = sessionId.trim().toLowerCase();
   // The id is matched against file names, so anything but a UUID is refused outright.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
-  const hasRoot = typeof root === "string" && root;
+  const hasRoot = typeof storeRoot === "string" && storeRoot;
   if (!hasRoot && typeof projectRoot === "string" && projectRoot) {
     return path.join(projectRoot, ".llm", "pi-sessions", id + ".jsonl");
   }
   const bases = [];
-  if (hasRoot) bases.push(root);
+  if (hasRoot) bases.push(storeRoot);
   else if (process.env.PI_CODING_AGENT_DIR) bases.push(path.join(process.env.PI_CODING_AGENT_DIR, "sessions"));
   else bases.push(path.join(os.homedir(), ".pi", "agent", "sessions"));
 
@@ -302,7 +295,7 @@ exe @conversationLocateIn(sessionId, cwd, root, projectRoot) = node {
     try { if (!fs.statSync(real).isFile()) return null; } catch (e) { return null; }
     return real;
   };
-  // A root may be pi's agent dir, so the sessions dir inside it is read too, after.
+  // A storeRoot may be pi's agent dir, so the sessions dir inside it is read too, after.
   const searchRoot = (base) => {
     let realRoot;
     try { realRoot = fs.realpathSync(base); } catch (e) { return null; }
@@ -588,7 +581,7 @@ exe @conversationIngest(text) = node {
   return result();
 }
 
-var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
 export {
   @pi,

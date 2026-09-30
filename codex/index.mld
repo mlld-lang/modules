@@ -1,7 +1,7 @@
 needs { sh }
 
 >> ── Stream format adapter for Codex CLI JSONL output (codex exec --json) ──
-var @codexStreamFormat = {
+const @codexStreamFormat = {
   name: "codex",
   format: "ndjson",
   schemas: [
@@ -33,46 +33,50 @@ var @codexStreamFormat = {
 
 >> Normalizes a session id while tolerating missing/non-string inputs.
 >> Codex thread ids are UUIDs; we lowercase them to match codex's own output.
-exe @normalizeCodexSessionId(sessionId) = js {
-  if (typeof sessionId !== "string") return null;
-  const trimmed = sessionId.trim();
-  return trimmed ? trimmed.toLowerCase() : null;
-}
+exe @normalizeCodexSessionId(sessionId) = [
+  if !(@sessionId && @sessionId.isString()) [ => null ]
+  let @trimmed = @sessionId.trim()
+  => @trimmed ? @trimmed.toLowerCase() : null
+]
+
+>> Each line of raw that holds a JSON object, parsed; other lines are skipped.
+exe @jsonLines(raw) = [
+  let @text = @raw ? `${@raw}` : ""
+  let @parsed = for @line in @text.split("\n") if @line.trim() => @tryParse(@line.trim())
+  => for @p in @parsed if @p.ok && @p.value.isObject() => @p.value
+]
+
+exe @tryParse(line) = [
+  let @r = try @line | @parse
+  => @r
+]
 
 >> Parses codex exec --json JSONL output for session id, final message text, and usage.
-exe @parseCodexJsonl(raw) = js {
-  const result = { sessionId: null, text: "", inputTokens: null, outputTokens: null };
-  if (typeof raw !== "string" || !raw) return result;
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let obj;
-    try { obj = JSON.parse(trimmed); } catch { continue; }
-    if (!obj || typeof obj !== "object") continue;
-    if (obj.type === "thread.started" && typeof obj.thread_id === "string") {
-      result.sessionId = obj.thread_id;
-    } else if (
-      obj.type === "item.completed" &&
-      obj.item && obj.item.type === "agent_message" &&
-      typeof obj.item.text === "string"
-    ) {
-      result.text = obj.item.text;
-    } else if (obj.type === "turn.completed" && obj.usage && typeof obj.usage === "object") {
-      if (typeof obj.usage.input_tokens === "number") result.inputTokens = obj.usage.input_tokens;
-      if (typeof obj.usage.output_tokens === "number") result.outputTokens = obj.usage.output_tokens;
-    }
+exe @parseCodexJsonl(raw) = [
+  let @events = @jsonLines(@raw)
+  let @started = @events.filter(@item.type == "thread.started" && @item.thread_id && @item.thread_id.isString())
+  let @messages = @events.filter(@item.type == "item.completed" && @item.item && @item.item.type == "agent_message" && @item.item.text && @item.item.text.isString())
+  let @turns = @events.filter(@item.type == "turn.completed" && @item.usage && @item.usage.isObject())
+  let @inputs = @turns.filter(@item.usage.input_tokens != null && @item.usage.input_tokens.isNumber())
+  let @outputs = @turns.filter(@item.usage.output_tokens != null && @item.usage.output_tokens.isNumber())
+  => {
+    sessionId: @started.length ? @started.at(-1).thread_id : null,
+    text: @messages.length ? @messages.at(-1).item.text : "",
+    inputTokens: @inputs.length ? @inputs.at(-1).usage.input_tokens : null,
+    outputTokens: @outputs.length ? @outputs.at(-1).usage.output_tokens : null
   }
-  return result;
-}
+]
 
 >> Prepends a system prompt to the user prompt.
 >> Codex has no --append-system-prompt; injecting into the prompt is the only
 >> per-invocation hook without clobbering codex's base_instructions.
-exe @prependSystemPrompt(prompt, system) = js {
-  const sys = typeof system === "string" ? system : "";
-  const body = typeof prompt === "string" ? prompt : "";
-  return sys ? sys + "\n\n" + body : body;
-}
+exe @prependSystemPrompt(prompt, system) = [
+  let @body = @prompt ? `${@prompt}` : ""
+  if !@system [ => @body ]
+  => `${@system}
+
+${@body}`
+]
 
 >> Reads the public and runtime-injected resume/session config for codex.
 >>
@@ -93,7 +97,7 @@ exe @codexResume(config) = [
   let @runtimeSessionId = @normalizeCodexSessionId(@resume.sessionId)
   let @publicSessionId = @normalizeCodexSessionId(@cfg.sessionId)
   let @publicResumeId = @normalizeCodexSessionId(@cfg.resume)
-  => when [
+  => match [
     @resume.continue && @runtimeSessionId && @runtimeProvider == "codex" => {
       continue: true,
       sessionId: @runtimeSessionId,
@@ -131,7 +135,7 @@ exe @codexResume(config) = [
 >>
 >> The interpreter strips this before normal callers see the result, but uses the
 >> hidden `_mlld` block to persist the provider session across guard-driven resume.
-exe @codexResult(inputValue, resume) = when [
+exe @codexResult(inputValue, resume) = match [
   @resume.sessionId => {
     value: @inputValue,
     _mlld: {
@@ -277,7 +281,7 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
 >>   consumes chunks as they arrive; @raw still holds the full JSONL.
 >> - Uses a `sh { }` block instead of `cmd { }` so interpolated values flow as
 >>   bash env vars and TOML `"` literals in MCP overrides survive unescaped.
-exe llm @codex(prompt, config) = [
+llm @codex(prompt, config) with { stream: @config.stream, stream_format: @codexStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "gpt-5.4"
@@ -292,7 +296,7 @@ exe llm @codex(prompt, config) = [
   let @raw = @runCodexSh(@finalPrompt, @dir, @model, @sandbox, @search, @bypass, @mcpArgsFile, @doResume, @resumeId)
   let @parsed = @parseCodexJsonl(@raw)
   let @sessionId = @normalizeCodexSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
-  let @value = when [
+  let @value = match [
     @cfg.stream => @raw
     @parsed.text => @parsed.text
     * => @raw
@@ -302,7 +306,7 @@ exe llm @codex(prompt, config) = [
     provider: "codex",
     source: @resume.source
   })
-] with { stream: @cfg.stream, streamFormat: @codexStreamFormat }
+]
 
 >> ── Conversation adapter ──
 >> Finds the rollout JSONL codex writes for a session and translates it into IFT
@@ -311,11 +315,11 @@ exe llm @codex(prompt, config) = [
 >> parsed, so the logic follows fray's, quirks included, rather than reading more
 >> naturally.
 
->> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
->> root is the sessions directory to search; without it, $CODEX_HOME/sessions and
+>> @conversation.locate(sessionId, cwd, storeRoot?) → absolute path, or null
+>> storeRoot is the sessions directory to search; without it, $CODEX_HOME/sessions and
 >> then ~/.codex/sessions. cwd is ignored: codex does not file rollouts by
 >> directory. The parameter keeps the signature shared with the other harnesses.
-exe @conversationLocate(sessionId, cwd, root) = node {
+exe @conversationLocate(sessionId, cwd, storeRoot) = node {
   const fs = require("fs");
   const path = require("path");
   const os = require("os");
@@ -324,13 +328,13 @@ exe @conversationLocate(sessionId, cwd, root) = node {
   // The id is matched against file names, so anything but a UUID is refused outright.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
   const roots = [];
-  if (typeof root === "string" && root) {
-    roots.push(root);
+  if (typeof storeRoot === "string" && storeRoot) {
+    roots.push(storeRoot);
   } else {
     if (process.env.CODEX_HOME) roots.push(path.join(process.env.CODEX_HOME, "sessions"));
     roots.push(path.join(os.homedir(), ".codex", "sessions"));
   }
-  // fray walks the root in lexical order without following symlinked directories
+  // fray walks the storeRoot in lexical order without following symlinked directories
   // and takes the first file whose id matches: rollout-YYYY-MM-DDTHH-MM-SS-<id>.jsonl,
   // or a legacy <id>.jsonl.
   const walk = (dir) => {
@@ -716,6 +720,6 @@ exe @conversationIngest(text) = node {
   };
 }
 
-var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
-export { @codex, @codexStreamFormat, @conversation }
+export { @codex, @codexStreamFormat, @conversation, @parseCodexJsonl, @prependSystemPrompt, @normalizeCodexSessionId }

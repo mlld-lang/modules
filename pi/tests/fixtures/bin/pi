@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stands in for pi -p: replies with the arguments and prompt it was given. Put
+# this folder first on PATH to run @pi without a model call.
+prompt=$(cat)
+printf 'stub pi: %s | %s\n' "$*" "$prompt"

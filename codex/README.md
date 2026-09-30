@@ -9,9 +9,9 @@ import { @codex } from @mlld/codex
 
 show @codex("What is REST?")
 
-var @review = @codex("Review code in src/", {
+const @review = @codex("Review code in src/", {
   model: "gpt-5.4",
-  dir: @base,
+  dir: @root,
   search: true,
   stream: true
 })
@@ -34,36 +34,36 @@ Runs `codex exec` and returns the final agent message. Output is parsed from `co
 | `stream` | boolean | — | Stream chunks through `@codexStreamFormat`. The adapter also emits session id + token usage metadata. |
 | `sessionId` | string | — | Explicit conversation tracking id (UUID, any case). Captured on the first call so the interpreter can persist it into subsequent resumes. |
 | `resume` | string | — | Explicit resume session id. Equivalent to `codex exec resume <id>`. |
-| `tools` | array | — | Standard mlld `exe llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config` and this module translates it into codex `-c mcp_servers.*` overrides. Requires `bypass: true`. Codex cannot selectively gate its native tools, so `@mx.llm.native` is informational only. |
+| `tools` | array | — | Standard mlld `llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config` and this module translates it into codex `-c mcp_servers.*` overrides. Requires `bypass: true`. Codex cannot selectively gate its native tools, so `@mx.llm.native` is informational only. |
 
 ```mlld
 >> Simple call
-var @answer = @codex("Explain TCP/IP")
+const @answer = @codex("Explain TCP/IP")
 
 >> With search + custom model
-var @review = @codex("What are the latest best practices for auth?", {
+const @review = @codex("What are the latest best practices for auth?", {
   model: "o3",
   search: true
 })
 
 >> Read-only sandbox
-var @analysis = @codex("Analyze the codebase", {
-  dir: @base,
+const @analysis = @codex("Analyze the codebase", {
+  dir: @root,
   sandbox: "read-only"
 })
 
 >> System prompt (prepended to the prompt text)
-var @r = @codex("What's your codename?", {
+const @r = @codex("What's your codename?", {
   system: "Your codename is Zephyr. Answer in one word."
 })
 
 >> Explicit resume
-var @followup = @codex("Keep going", { resume: "019d7a01-b45a-7c90-baea-3c0238ee02c8" })
+const @followup = @codex("Keep going", { resume: "019d7a01-b45a-7c90-baea-3c0238ee02c8" })
 
 >> mlld tool bridging — requires bypass so MCP tool calls are auto-approved
 exe @getOrders() = js { return JSON.stringify([{ id: 1 }]); }
 
-var @summary = @codex("Call getOrders and summarise the results.", {
+const @summary = @codex("Call getOrders and summarise the results.", {
   tools: [@getOrders],
   bypass: true
 })
@@ -92,9 +92,9 @@ Reads the "rollout" log codex writes for a session and turns it into IFT events,
 ```mlld
 import { @conversation } from @mlld/codex
 
-var @path = @conversation.locate("0c0ffee0-1234-4321-8abc-def012345678", @base)
-var @log = <@path>
-var @tape = @conversation.ingest(@log.mx.text)
+const @path = @conversation.locate("0c0ffee0-1234-4321-8abc-def012345678", @root)
+const @log = <@path>
+const @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 

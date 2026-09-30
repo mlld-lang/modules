@@ -1,0 +1,20 @@
+>> Tests for pi's stream format and built-in tool list, ported from the old
+>> test-tool-compatibility.mld checks that need no model call.
+>> Run: mlld test pi/tests/
+
+import { @piStreamFormat, @piBuiltInTools, @isPiBuiltin } from "../index.mld"
+
+const @schemas = @piStreamFormat.schemas
+const @test_format_is_ndjson = @piStreamFormat.format == "ndjson"
+const @test_format_has_four_schemas = @schemas.length == 4
+const @test_message_reads_delta = @schemas[0].kind == "message" && @schemas[0].extract.chunk == "assistantMessageEvent.delta"
+const @test_tool_use_schema = @schemas[1].kind == "tool-use" && @schemas[1].matchValue == "tool_execution_start" && @schemas[1].extract.name == "toolName" && @schemas[1].extract.input == "args" && @schemas[1].extract.id == "toolCallId"
+const @test_tool_result_schema = @schemas[2].kind == "tool-result" && @schemas[2].matchValue == "tool_execution_end" && @schemas[2].extract.toolUseId == "toolCallId" && @schemas[2].extract.isError == "isError"
+const @test_metadata_reads_usage = @schemas[3].kind == "metadata" && @schemas[3].extract.inputTokens == "message.usage.input"
+
+const @test_builtins_listed = @piBuiltInTools == "read,bash,edit,write,grep,find,ls"
+const @test_read_is_builtin = @isPiBuiltin("read")
+const @test_bash_is_builtin = @isPiBuiltin("bash")
+const @test_unknown_is_not_builtin = !@isPiBuiltin("invalid")
+const @test_mcp_tool_is_not_builtin = !@isPiBuiltin("mcp_tool")
+const @test_empty_is_not_builtin = !@isPiBuiltin("")

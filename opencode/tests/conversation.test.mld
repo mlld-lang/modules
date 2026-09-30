@@ -6,9 +6,9 @@ import { @conversation } from "../index.mld"
 >> Reads a fixture raw: <file> would parse a .jsonl, changing what a truncated line does.
 exe @text(p) = node { return require("fs").readFileSync(p, "utf8"); }
 
-var @fixtures = "@root/opencode/tests/fixtures/conversation"
-var @stub = "@fixtures/opencode-stub.sh"
-var @failedId = "ses_f32dab56cffemtZGIZ407tXu7U"
+const @fixtures = `${@root}/opencode/tests/fixtures/conversation`
+const @stub = `${@fixtures}/opencode-stub.sh`
+const @failedId = "ses_f32dab56cffemtZGIZ407tXu7U"
 
 >> Compares with key order ignored, because mlld may reorder object keys; a golden's
 >> line 1 is the header and the remaining lines are the events in order.
@@ -48,7 +48,7 @@ exe @freshRoot() = node {
   const fs = require("fs"), os = require("os"), path = require("path");
   return fs.mkdtempSync(path.join(os.tmpdir(), "mlld-opencode-test-"));
 }
-exe @ran(root) = node { return require("fs").existsSync(require("path").join(root, "ran")); }
+exe @ran(dataHome) = node { return require("fs").existsSync(require("path").join(dataHome, "ran")); }
 exe @exportId(p) = node {
   if (typeof p !== "string") return null;
   return JSON.parse(require("fs").readFileSync(p, "utf8")).info.id;
@@ -57,53 +57,53 @@ exe @exportId(p) = node {
 >> ── ingest: the hand-written goldens ──
 
 >> A loaded file arrives as an object, not text; ingest must refuse it rather than read it.
-var @rejected = try @conversation.ingest({})
-var @test_ingest_rejects_path_like_object = !@rejected.ok
+const @rejected = try @conversation.ingest({})
+const @test_ingest_rejects_path_like_object = !@rejected.ok
 
-var @basic = @conversation.ingest(@text("@fixtures/basic-resumed.export.json"))
-var @failed = @conversation.ingest(@text("@fixtures/failed-tool.export.json"))
-var @compacted = @conversation.ingest(@text("@fixtures/compacted-overflow.export.json"))
+const @basic = @conversation.ingest(@text(`${@fixtures}/basic-resumed.export.json`))
+const @failed = @conversation.ingest(@text(`${@fixtures}/failed-tool.export.json`))
+const @compacted = @conversation.ingest(@text(`${@fixtures}/compacted-overflow.export.json`))
 
-var @test_ingest_basic_resumed = @matchesGolden(@basic, "@fixtures/basic-resumed.opencode.jsonl")
-var @test_ingest_failed_tool = @matchesGolden(@failed, "@fixtures/failed-tool.opencode.jsonl")
-var @test_ingest_compacted_overflow = @matchesGolden(@compacted, "@fixtures/compacted-overflow.opencode.jsonl")
+const @test_ingest_basic_resumed = @matchesGolden(@basic, `${@fixtures}/basic-resumed.opencode.jsonl`)
+const @test_ingest_failed_tool = @matchesGolden(@failed, `${@fixtures}/failed-tool.opencode.jsonl`)
+const @test_ingest_compacted_overflow = @matchesGolden(@compacted, `${@fixtures}/compacted-overflow.opencode.jsonl`)
 
-var @test_sequence_basic_resumed = @types(@basic) == "session_start,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn"
-var @test_sequence_failed_tool = @types(@failed) == "session_start,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn"
-var @test_sequence_compacted_overflow = @types(@compacted) == "session_start,context_injection,context_injection"
+const @test_sequence_basic_resumed = @types(@basic) == "session_start,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn"
+const @test_sequence_failed_tool = @types(@failed) == "session_start,message,assistant_turn,thinking,tool_call,tool_result,assistant_turn"
+const @test_sequence_compacted_overflow = @types(@compacted) == "session_start,context_injection,context_injection"
 
 >> The first turn has one tool: its thinking and call hang off the turn, the result off the call.
-var @test_parent_thinking = @basic.events[3].parent_id == @basic.events[2].id
-var @test_parent_tool_call = @basic.events[4].parent_id == @basic.events[2].id
-var @test_parent_tool_result = @basic.events[5].parent_id == @basic.events[4].id
+const @test_parent_thinking = @basic.events[3].parent_id == @basic.events[2].id
+const @test_parent_tool_call = @basic.events[4].parent_id == @basic.events[2].id
+const @test_parent_tool_result = @basic.events[5].parent_id == @basic.events[4].id
 
-var @test_failed_tool_is_error = @failed.events[5].payload.is_error == true
+const @test_failed_tool_is_error = @failed.events[5].payload.is_error == true
 
 >> Parts: tool c1, reasoning, tool c2, reasoning. The first result hangs off the last
 >> call (event 4), not off the reasoning that follows it (event 5).
-var @interleaved = @conversation.ingest(@text("@fixtures/reasoning-after-tool.export.json"))
-var @test_sequence_reasoning_after_tool = @types(@interleaved) == "session_start,assistant_turn,tool_call,thinking,tool_call,thinking,tool_result,tool_result"
-var @test_parent_first_result_is_last_call = @interleaved.events[6].parent_id == @interleaved.events[4].id
-var @test_parent_second_result_is_first_result = @interleaved.events[7].parent_id == @interleaved.events[6].id
+const @interleaved = @conversation.ingest(@text(`${@fixtures}/reasoning-after-tool.export.json`))
+const @test_sequence_reasoning_after_tool = @types(@interleaved) == "session_start,assistant_turn,tool_call,thinking,tool_call,thinking,tool_result,tool_result"
+const @test_parent_first_result_is_last_call = @interleaved.events[6].parent_id == @interleaved.events[4].id
+const @test_parent_second_result_is_first_result = @interleaved.events[7].parent_id == @interleaved.events[6].id
 
 >> ── locate, against a stub opencode ──
 
-var @rootKnown = @freshRoot()
-var @known = @conversation.locate(@failedId, "", @rootKnown, @stub)
-var @test_locate_known = @exportId(@known) == @failedId
-var @test_locate_stub_ran = @ran(@rootKnown)
+const @rootKnown = @freshRoot()
+const @known = @conversation.locate(@failedId, "", @rootKnown, @stub)
+const @test_locate_known = @exportId(@known) == @failedId
+const @test_locate_stub_ran = @ran(@rootKnown)
 
-var @rootUnknown = @freshRoot()
-var @test_locate_unknown = @conversation.locate("ses_unknownSession123", "", @rootUnknown, @stub) == null
+const @rootUnknown = @freshRoot()
+const @test_locate_unknown = @conversation.locate("ses_unknownSession123", "", @rootUnknown, @stub) == null
 
-var @rootTraversal = @freshRoot()
-var @test_locate_traversal = @conversation.locate("../x", "", @rootTraversal, @stub) == null
-var @test_locate_traversal_not_run = !@ran(@rootTraversal)
+const @rootTraversal = @freshRoot()
+const @test_locate_traversal = @conversation.locate("../x", "", @rootTraversal, @stub) == null
+const @test_locate_traversal_not_run = !@ran(@rootTraversal)
 
-var @rootFlag = @freshRoot()
-var @test_locate_flag = @conversation.locate("--help", "", @rootFlag, @stub) == null
-var @test_locate_flag_not_run = !@ran(@rootFlag)
+const @rootFlag = @freshRoot()
+const @test_locate_flag = @conversation.locate("--help", "", @rootFlag, @stub) == null
+const @test_locate_flag_not_run = !@ran(@rootFlag)
 
-var @rootCase = @freshRoot()
-var @test_locate_wrong_case = @conversation.locate("SES_f32dab56cffemtZGIZ407tXu7U", "", @rootCase, @stub) == null
-var @test_locate_wrong_case_not_run = !@ran(@rootCase)
+const @rootCase = @freshRoot()
+const @test_locate_wrong_case = @conversation.locate("SES_f32dab56cffemtZGIZ407tXu7U", "", @rootCase, @stub) == null
+const @test_locate_wrong_case_not_run = !@ran(@rootCase)
