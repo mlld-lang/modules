@@ -1,0 +1,10 @@
+name: array
+author: mlld
+type: library
+about: "Array helpers the builtin methods don't cover: unique, groupBy, sortBy, sum, avg, range, chunk, zip"
+version: 3.0.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+keywords: ["arrays", "unique", "groupBy", "sortBy", "sum", "avg", "range", "chunk", "zip"]
+mlldVersion: ">=2.2.0"

@@ -17,26 +17,23 @@ Easy AI integration for your mlld scripts:
 /show `LLM says: @answer`
 ```
 
-### [@mlld/array](./llm/modules/array.mld.md)
+### [@mlld/array](./array)
 
-Process data arrays with powerful operations:
+Array helpers the builtin methods don't cover:
 
 ```mlld
-/import { filter, sortBy, pluck, sum, groupBy } from @mlld/array
+import { @sortBy, @sum, @groupBy } from @mlld/array
 
-/var @users = [
-  {"name": "alice", "age": 30, "dept": "engineering"},
-  {"name": "bob", "age": 25, "dept": "design"},
-  {"name": "charlie", "age": 35, "dept": "engineering"}
+const @users = [
+  { name: "alice", age: 30, dept: "engineering" },
+  { name: "bob", age: 25, dept: "design" },
+  { name: "charlie", age: 35, dept: "engineering" }
 ]
 
-/var @engineers = @filter(@users, "dept", "engineering")
-/var @sortedByAge = @sortBy(@users, "age")
-/var @names = @pluck(@users, "name")
-/var @totalAge = @sum(@users, "age")
-
-/show `Engineers: @engineers`
-/show `Total age: @totalAge`
+const @byDept = @groupBy(@users, "dept")
+const @sortedByAge = @sortBy(@users, "age")
+const @totalAge = @sum(@users, "age")
+const @engineers = @users.filter(@item.dept == "engineering")
 ```
 
 ### [@mlld/conditions](./llm/modules/conditions.mld.md)
@@ -156,22 +153,21 @@ Debug your pipelines by inserting logging between transformations:
 
 All loggers output to stderr, ensuring your pipeline data flows unchanged to stdout.
 
-### [@mlld/string](./llm/modules/string.mld.md)
+### [@mlld/string](./string)
 
-Common string operations:
+String helpers the builtin methods don't cover:
 
 ```mlld
-/import { title, camelCase, split, join, trim, includes } from @mlld/string
+import { @title, @camelCase, @slugify } from @mlld/string
 
-/var @name = "john doe smith"
-/var @formatted = @title(@name)
-/var @slug = @camelCase(@formatted)
+const @name = "john doe smith"
+const @formatted = @title(@name)
+const @key = @camelCase(@name)
+const @slug = @slugify(@name)
+const @words = @name.split(" ")
 
-/var @words = @split(@name, " ")
-/var @rejoined = @join(@words, "-")
-
-/when @includes(@name, "doe") => /show "Contains 'doe'"
-/show `Formatted: @formatted`
+if @name.includes("doe") [ show "Contains 'doe'" ]
+show `Formatted: ${@formatted}`
 ```
 
 ### [@mlld/test](./llm/modules/test.mld.md)

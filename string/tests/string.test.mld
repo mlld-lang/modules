@@ -1,0 +1,105 @@
+>> Tests for @mlld/string. The old llm/tests/string.test.mld covered none of the
+>> functions kept here, so these are written from the old module's code, and the
+>> last section checks each mlld rewrite against that code on awkward inputs.
+>> Run: mlld test string/tests/
+
+import { @trimStart, @trimEnd, @capitalize, @title, @camelCase, @snakeCase, @kebabCase, @slugify, @reverse, @escape, @encodeUri, @encodeUriComponent, @isEmail, @isUrl, @isNumeric, @splitLines } from "../index.mld"
+
+>> ── trimStart / trimEnd ──
+const @test_trimStart = @trimStart(" \t\n hi  ") == "hi  "
+const @test_trimStart_empty = @trimStart("") == ""
+const @test_trimEnd = @trimEnd("  hi \t\n") == "  hi"
+const @test_trimEnd_empty = @trimEnd("") == ""
+
+>> ── capitalize / title ──
+const @test_capitalize = @capitalize("hELLO") == "Hello"
+const @test_capitalize_empty = @capitalize("") == ""
+const @test_title = @title("the qUICK fox") == "The Quick Fox"
+const @test_title_keeps_extra_spaces = @title("a  b") == "A  B"
+const @test_title_empty = @title("") == ""
+
+>> ── case conversions ──
+const @test_camelCase = @camelCase("hello world-foo_bar") == "helloWorldFooBar"
+const @test_camelCase_leading_capital = @camelCase("Hello World") == "helloWorld"
+const @test_camelCase_empty = @camelCase("") == ""
+const @test_snakeCase = @snakeCase("helloWorld Foo-bar") == "hello_world_foo_bar"
+const @test_snakeCase_leading_capital = @snakeCase("HelloWorld") == "hello_world"
+const @test_snakeCase_empty = @snakeCase("") == ""
+const @test_kebabCase = @kebabCase("helloWorld Foo_bar") == "hello-world-foo-bar"
+const @test_kebabCase_empty = @kebabCase("") == ""
+
+>> ── slugify / reverse / escape ──
+const @test_slugify = @slugify("  Hello, World! It's  here ") == "hello-world-its-here"
+const @test_slugify_trims_dashes = @slugify("--a__b--") == "a-b"
+const @test_slugify_empty = @slugify("") == ""
+const @test_reverse = @reverse("abc") == "cba"
+const @test_reverse_empty = @reverse("") == ""
+const @test_escape = @escape("a\"b'c\\d\ne\tf") == "a\\\"b\\'c\\\\d\\ne\\tf"
+const @test_escape_empty = @escape("") == ""
+
+>> ── encoding ──
+const @test_encodeUri_keeps_reserved = @encodeUri("https://x.org/a b?q=1&r=2") == "https://x.org/a%20b?q=1&r=2"
+const @test_encodeUri_empty = @encodeUri("") == ""
+const @test_encodeUriComponent = @encodeUriComponent("a b&c/d") == "a%20b%26c%2Fd"
+const @test_encodeUriComponent_empty = @encodeUriComponent("") == ""
+
+>> ── checks ──
+const @test_isEmail_true = @isEmail("ada@example.com")
+const @test_isEmail_no_tld = !@isEmail("ada@example")
+const @test_isEmail_space = !@isEmail("ada @example.com")
+const @test_isEmail_empty = !@isEmail("")
+const @test_isUrl_true = @isUrl("https://mlld.ai/docs")
+const @test_isUrl_relative = !@isUrl("/docs")
+const @test_isUrl_empty = !@isUrl("")
+const @test_isNumeric_int = @isNumeric("42")
+const @test_isNumeric_exponent = @isNumeric("1e3")
+const @test_isNumeric_word = !@isNumeric("12abc")
+const @test_isNumeric_empty = !@isNumeric("")
+
+>> ── splitLines ──
+const @lines = @splitLines("a\r\nb\nc")
+const @test_splitLines_both_endings = @lines.length == 3 && @lines[1] == "b" && @lines[2] == "c"
+const @test_splitLines_no_carriage_return_left = !@lines[0].includes("\r")
+const @test_splitLines_empty = @splitLines("").length == 1
+
+>> ── against the old module's code ──
+exe @oldAll(inputs) = js {
+  const cases = {
+    trimStart: s => s.trimStart(),
+    trimEnd: s => s.trimEnd(),
+    capitalize: s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(),
+    title: s => s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
+    snakeCase: s => s.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`).replace(/^_/, '').replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase(),
+    kebabCase: s => s.replace(/[A-Z]/g, l => `-${l.toLowerCase()}`).replace(/^-/, '').replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase(),
+    slugify: s => s.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, ''),
+    reverse: s => s.split('').reverse().join(''),
+    escape: s => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t'),
+    splitLines: s => JSON.stringify(s.split(/\r?\n/))
+  };
+  const out = {};
+  for (const [name, f] of Object.entries(cases)) out[name] = inputs.map(f);
+  return out;
+}
+const @awkward = ["", " ", "__Foo__Bar__", "ABC", "a-B_c D", "it's \"quoted\"\\", "tab\there\r\nline", "  --Mixed Case--  ", "émile Zola", "x1Y2z3", "\n"]
+const @old = @oldAll(@awkward)
+const @newTrimStart = for @s in @awkward => @trimStart(@s)
+const @newTrimEnd = for @s in @awkward => @trimEnd(@s)
+const @newCapitalize = for @s in @awkward => @capitalize(@s)
+const @newTitle = for @s in @awkward => @title(@s)
+const @newSnake = for @s in @awkward => @snakeCase(@s)
+const @newKebab = for @s in @awkward => @kebabCase(@s)
+const @newSlug = for @s in @awkward => @slugify(@s)
+const @newReverse = for @s in @awkward => @reverse(@s)
+const @newEscape = for @s in @awkward => @escape(@s)
+const @newLines = for @s in @awkward => @splitLines(@s) | @pretty
+const @oldLines = for @s in @old.splitLines => @s | @parse | @pretty
+const @test_same_as_old_trimStart = @newTrimStart == @old.trimStart
+const @test_same_as_old_trimEnd = @newTrimEnd == @old.trimEnd
+const @test_same_as_old_capitalize = @newCapitalize == @old.capitalize
+const @test_same_as_old_title = @newTitle == @old.title
+const @test_same_as_old_snakeCase = @newSnake == @old.snakeCase
+const @test_same_as_old_kebabCase = @newKebab == @old.kebabCase
+const @test_same_as_old_slugify = @newSlug == @old.slugify
+const @test_same_as_old_reverse = @newReverse == @old.reverse
+const @test_same_as_old_escape = @newEscape == @old.escape
+const @test_same_as_old_splitLines = @newLines == @oldLines

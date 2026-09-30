@@ -1,0 +1,10 @@
+name: string
+author: mlld
+type: library
+about: "String helpers the builtin methods don't cover: case conversion, slugs, escaping, URI encoding and checks"
+version: 2.0.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+keywords: ["strings", "camelCase", "snake_case", "kebab-case", "slugify", "escape", "encode", "trimStart", "trimEnd"]
+mlldVersion: ">=2.2.0"
