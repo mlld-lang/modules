@@ -150,9 +150,13 @@ exe @add(date, duration) = @shiftMs(@toMs(@date), @duration, 1)
 exe @subtract(date, duration) = @shiftMs(@toMs(@date), @duration, -1)
 
 >> dateTo minus dateFrom in the unit given; milliseconds for any other unit.
->> Months and years use average lengths (30.44 and 365.25 days).
+>> Months and years use average lengths (30.44 and 365.25 days). null when either
+>> date is invalid.
 exe @diff(dateFrom, dateTo, unit) = [
-  let @ms = @toMs(@dateTo) - @toMs(@dateFrom)
+  let @fromMs = @toMs(@dateFrom)
+  let @toMsValue = @toMs(@dateTo)
+  if @fromMs == null || @toMsValue == null [ => null ]
+  let @ms = @toMsValue - @fromMs
   let @unitMs = match @unit [
     "years" => 31557600000
     "months" => 2630016000
@@ -167,27 +171,47 @@ exe @diff(dateFrom, dateTo, unit) = [
 ]
 
 >> ── Comparisons ──
+>> An invalid date is never before, after, equal to or between anything, as with
+>> JavaScript's Date: each check needs every date it reads to be valid.
 
-exe @before(dateA, dateB) = [ => @toMs(@dateA) < @toMs(@dateB) ]
+exe @before(dateA, dateB) = [
+  let @a = @toMs(@dateA)
+  let @b = @toMs(@dateB)
+  => @a != null && @b != null && @a < @b
+]
 
-exe @after(dateA, dateB) = [ => @toMs(@dateA) > @toMs(@dateB) ]
+exe @after(dateA, dateB) = [
+  let @a = @toMs(@dateA)
+  let @b = @toMs(@dateB)
+  => @a != null && @b != null && @a > @b
+]
 
-exe @equal(dateA, dateB) = [ => @toMs(@dateA) == @toMs(@dateB) ]
+exe @equal(dateA, dateB) = [
+  let @a = @toMs(@dateA)
+  let @b = @toMs(@dateB)
+  => @a != null && @b != null && @a == @b
+]
 
 >> Inclusive at both ends.
 exe @between(date, start, end) = [
   let @ms = @toMs(@date)
-  => @ms >= @toMs(@start) && @ms <= @toMs(@end)
+  let @lo = @toMs(@start)
+  let @hi = @toMs(@end)
+  => @ms != null && @lo != null && @hi != null && @ms >= @lo && @ms <= @hi
 ]
 
 >> ── Shortcuts ──
 
 exe @iso(date) = @parse(@date, null)
 
->> Seconds since the epoch, rounded down.
+>> Seconds since the epoch, rounded down (also before 1970, where % is negative).
+>> null for an invalid date.
 exe @unix(date) = [
   let @ms = @toMs(@date)
-  => (@ms - @ms % 1000) / 1000
+  if @ms == null [ => null ]
+  let @rem = @ms % 1000
+  let @floored = @rem < 0 ? @ms - @rem - 1000 : @ms - @rem
+  => @floored / 1000
 ]
 
 exe @dateOnly(date) = @format(@date, "YYYY-MM-DD")
@@ -203,8 +227,11 @@ exe @endOf(date, unit) = @boundaryMs(@toMs(@date), @unit, "end")
 
 >> ── Business days ──
 
+>> false for an invalid date.
 exe @isBizDay(date) = [
-  let @day = @weekdayMs(@toMs(@date))
+  let @ms = @toMs(@date)
+  if @ms == null [ => false ]
+  let @day = @weekdayMs(@ms)
   => @day != 0 && @day != 6
 ]
 
@@ -215,10 +242,14 @@ exe @addBizDays(date, days) = @addBizDaysMs(@toMs(@date), @days)
 
 >> "3 hours ago", "in 2 days", "just now". options.precise adds the next unit down;
 >> options.now sets the reference instant, which defaults to the current time.
+>> "Invalid Date" when the date or options.now is invalid.
 exe @relative(date, options) = [
   let @opts = @options ?? {}
   let @reference = @opts.now ?? @now
-  => @relativeMs(@toMs(@date), @toMs(@reference), @opts.precise == true)
+  let @targetMs = @toMs(@date)
+  let @referenceMs = @toMs(@reference)
+  if @targetMs == null || @referenceMs == null [ => "Invalid Date" ]
+  => @relativeMs(@targetMs, @referenceMs, @opts.precise == true)
 ]
 
 >> ── Durations ──

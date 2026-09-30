@@ -28,7 +28,7 @@ Every function is also exported by its own name (`@format`, `@add`, `@before`, â
 
 ## dates in, dates out
 
-A date can be anything JavaScript's `Date` accepts: an ISO string, a date-only string such as `"2025-07-08"`, or epoch milliseconds. Functions that return a date return an ISO 8601 string in UTC, such as `"2025-07-08T10:30:45.000Z"`, or `"Invalid Date"` when the input is not a date.
+A date can be anything JavaScript's `Date` accepts: an ISO string, a date-only string such as `"2025-07-08"`, or epoch milliseconds. Functions that return a date return an ISO 8601 string in UTC, such as `"2025-07-08T10:30:45.000Z"`, or `"Invalid Date"` when the input is not a date. For an invalid date, comparisons and `isBizDay` return `false`, `diff` and `unix` return `null`, and `relative` returns `"Invalid Date"`.
 
 `format`, `date`, `time`, `startOf`, `endOf` and the business-day functions read the date in the machine's local timezone. A string without an offset (`"2025-07-08T10:30:45"`) is local time; one ending in `Z` is UTC. A date-only string is UTC midnight, which is the previous day in timezones west of UTC.
 
