@@ -60,61 +60,65 @@ const @opencodeStreamFormat = {
 
 >> Opencode session ids look like `ses_<base36>` and are case-sensitive,
 >> so we trim but preserve case.
-exe @normalizeOpencodeSessionId(sessionId) = js {
-  if (typeof sessionId !== "string") return null;
-  const trimmed = sessionId.trim();
-  return trimmed || null;
-}
+exe @normalizeOpencodeSessionId(sessionId) = [
+  if !(@sessionId && @sessionId.isString()) [ => null ]
+  let @trimmed = @sessionId.trim()
+  => @trimmed ? @trimmed : null
+]
+
+>> Each line of raw that holds a JSON object, parsed; other lines are skipped.
+exe @jsonLines(raw) = [
+  let @text = @raw ? `${@raw}` : ""
+  let @parsed = for @line in @text.split("\n") if @line.trim() => @tryParse(@line.trim())
+  => for @p in @parsed if @p.ok && @p.value.isObject() => @p.value
+]
+
+exe @tryParse(line) = [
+  let @r = try @line | @parse
+  => @r
+]
 
 >> Parses opencode run --format json NDJSON output for session id, final text, and usage.
 >> Concatenates every `text` event's `part.text` in order to reconstruct the agent message.
-exe @parseOpencodeJsonl(raw) = js {
-  const result = { sessionId: null, text: "", inputTokens: null, outputTokens: null, totalTokens: null, cost: null };
-  if (typeof raw !== "string" || !raw) return result;
-  const chunks = [];
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let obj;
-    try { obj = JSON.parse(trimmed); } catch { continue; }
-    if (!obj || typeof obj !== "object") continue;
-    if (!result.sessionId && typeof obj.sessionID === "string") {
-      result.sessionId = obj.sessionID;
-    }
-    if (obj.type === "text" && obj.part && typeof obj.part.text === "string") {
-      chunks.push(obj.part.text);
-    } else if (obj.type === "step_finish" && obj.part && obj.part.tokens && typeof obj.part.tokens === "object") {
-      const t = obj.part.tokens;
-      if (typeof t.input === "number") result.inputTokens = t.input;
-      if (typeof t.output === "number") result.outputTokens = t.output;
-      if (typeof t.total === "number") result.totalTokens = t.total;
-      if (typeof obj.part.cost === "number") result.cost = obj.part.cost;
-    }
+exe @parseOpencodeJsonl(raw) = [
+  let @events = @jsonLines(@raw)
+  let @withSession = @events.filter(@item.sessionID && @item.sessionID.isString())
+  let @texts = @events.filter(@item.type == "text" && @item.part && @item.part.text != null && @item.part.text.isString())
+  let @steps = @events.filter(@item.type == "step_finish" && @item.part && @item.part.tokens && @item.part.tokens.isObject())
+  let @inputs = @steps.filter(@item.part.tokens.input != null && @item.part.tokens.input.isNumber())
+  let @outputs = @steps.filter(@item.part.tokens.output != null && @item.part.tokens.output.isNumber())
+  let @totals = @steps.filter(@item.part.tokens.total != null && @item.part.tokens.total.isNumber())
+  let @costs = @steps.filter(@item.part.cost != null && @item.part.cost.isNumber())
+  => {
+    sessionId: @withSession.length ? @withSession[0].sessionID : null,
+    text: @texts.map(@item.part.text).join(""),
+    inputTokens: @inputs.length ? @inputs.at(-1).part.tokens.input : null,
+    outputTokens: @outputs.length ? @outputs.at(-1).part.tokens.output : null,
+    totalTokens: @totals.length ? @totals.at(-1).part.tokens.total : null,
+    cost: @costs.length ? @costs.at(-1).part.cost : null
   }
-  result.text = chunks.join("");
-  return result;
-}
+]
 
 >> Prepends a system prompt to the user prompt.
 >> Opencode has no per-invocation `--system` flag; agents carry their own prompts
 >> and modifying the prompt text is the only per-call hook.
-exe @prependOpencodeSystem(prompt, system) = js {
-  const sys = typeof system === "string" ? system : "";
-  const body = typeof prompt === "string" ? prompt : "";
-  return sys ? sys + "\n\n" + body : body;
-}
+exe @prependOpencodeSystem(prompt, system) = [
+  let @body = @prompt ? `${@prompt}` : ""
+  if !@system [ => @body ]
+  => `${@system}
+
+${@body}`
+]
 
 >> When mlld provides an explicit tool surface, target a concrete OpenCode
 >> agent so we can bind permission rules to a real agent config.
 >> If the caller did not request an agent explicitly, use a dedicated
 >> invocation-local agent instead of the built-in `build` agent so the
 >> tool surface cannot inherit built-in defaults.
-exe @opencodeToolAgentName(requestedAgent) = js {
-  if (typeof requestedAgent === "string" && requestedAgent.trim()) {
-    return requestedAgent.trim();
-  }
-  return "mlld";
-}
+exe @opencodeToolAgentName(requestedAgent) = [
+  let @name = @requestedAgent && @requestedAgent.isString() ? @requestedAgent.trim() : ""
+  => @name ? @name : "mlld"
+]
 
 >> Build the invocation-local OpenCode `permission` config that denies every
 >> tool by default and then re-enables only the mlld-provided surface: the
@@ -689,4 +693,4 @@ exe @conversationIngest(text) = node {
 
 const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
-export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation }
+export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation, @parseOpencodeJsonl, @prependOpencodeSystem, @normalizeOpencodeSessionId }
