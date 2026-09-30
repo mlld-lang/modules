@@ -11,7 +11,7 @@ exe @detectRepo() = node {
   return { owner, repo };
 } with { description: "Detect owner/repo from git context" }
 
-exe net:r @listIssues(owner, repo) = node {
+exe .net:r @listIssues(owner, repo) = node {
   const { execFileSync } = require('child_process');
   if (!owner || !repo) {
     const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
@@ -21,7 +21,7 @@ exe net:r @listIssues(owner, repo) = node {
   return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues`], { encoding: 'utf8' }).trim();
 } with { description: "List open issues for a GitHub repository" }
 
-exe net:r @getIssue(owner, repo, number) = node {
+exe .net:r @getIssue(owner, repo, number) = node {
   const { execFileSync } = require('child_process');
   if (!owner || !repo) {
     const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
@@ -31,7 +31,7 @@ exe net:r @getIssue(owner, repo, number) = node {
   return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues/${number}`], { encoding: 'utf8' }).trim();
 } with { description: "Get a single GitHub issue by number" }
 
-exe net:rw @createIssue(owner, repo, title, body) = node {
+exe .net:rw @createIssue(owner, repo, title, body) = node {
   const { execFileSync } = require('child_process');
   if (!owner || !repo) {
     const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
@@ -44,7 +44,7 @@ exe net:rw @createIssue(owner, repo, title, body) = node {
   }).trim();
 } with { description: "Create a new GitHub issue" }
 
-exe net:rw @addComment(owner, repo, number, comment) = node {
+exe .net:rw @addComment(owner, repo, number, comment) = node {
   const { execFileSync } = require('child_process');
   if (!owner || !repo) {
     const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
@@ -57,7 +57,7 @@ exe net:rw @addComment(owner, repo, number, comment) = node {
   }).trim();
 } with { description: "Add a comment to a GitHub issue" }
 
-exe net:rw @closeIssue(owner, repo, number) = node {
+exe .net:rw @closeIssue(owner, repo, number) = node {
   const { execFileSync } = require('child_process');
   if (!owner || !repo) {
     const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
@@ -70,7 +70,7 @@ exe net:rw @closeIssue(owner, repo, number) = node {
   }).trim();
 } with { description: "Close a GitHub issue" }
 
-exe net:r @searchIssues(query) = node {
+exe .net:r @searchIssues(query) = node {
   const { execFileSync } = require('child_process');
   return execFileSync('gh', ['api', '-X', 'GET', 'search/issues', '-f', `q=${query}`], { encoding: 'utf8' }).trim();
 } with { description: "Search GitHub issues across repositories" }

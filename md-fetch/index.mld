@@ -35,7 +35,7 @@ exe @htmlToMarkdown(html, url) = node {
 
 >> --- Core fetch ---
 
-exe net:r @mdFetch(url: string) = [
+exe .net:r @mdFetch(url: string) = [
   >> Protocol check
   when !@url.startsWith("https://") => [
     => { error: true, message: "Only HTTPS URLs are allowed" }
