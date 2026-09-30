@@ -48,7 +48,7 @@ Keys only one tool understands pass through and are ignored by the others:
 | claude | `bare`, `resume`, `claudeBin` |
 | codex | `sandbox`, `bypass`, `search`, `resume`, `codexBin` |
 | pi | `provider`, `thinking`, `flags`, `noTools`, `session`, `piBin` |
-| opencode | `agent`, `variant`, `bypass`, `pure`, `dataHome`, `stateHome`, `resume`, `opencodeBin` |
+| opencode | `agent`, `variant`, `bypass`, `pure`, `dataHome`, `stateHome`, `mcpTimeoutMs`, `resume`, `opencodeBin` |
 
 The `…Bin` keys name the program to run instead of the one on your `PATH`; the tests use them to run stand-in programs.
 
