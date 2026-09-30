@@ -1,0 +1,39 @@
+>> Tests that @agent reaches each harness, against stub binaries, with no model call.
+>> Run: mlld test multi-harness/tests/
+
+import { @agent, @conversation } from "../index.mld"
+
+const @r = @root
+
+>> ── @agent dispatch ──
+
+const @claudeOut = @agent("hi claude", { harness: "claude", claudeBin: `${@r}/claude/tests/fixtures/run/claude-stub.sh`, model: "m-claude" })
+const @test_claude_ran = @claudeOut.includes("stdin=hi claude") && @claudeOut.includes("arg=m-claude")
+
+const @codexOut = @agent("hi codex", { harness: "codex", codexBin: `${@r}/codex/tests/fixtures/bin/codex`, model: "m-codex" })
+const @test_codex_ran = @codexOut.startsWith("stub codex: exec") && @codexOut.includes("-m m-codex") && @codexOut.includes("| hi codex")
+
+>> pi saves sessions under .llm/, which the default fence refuses, so saving is off.
+const @piOut = @agent("hi pi", { harness: "pi", piBin: `${@r}/pi/tests/fixtures/run/pi-stub.sh`, model: "m-pi", session: false })
+const @test_pi_ran = @piOut.includes("arg=--no-session") && @piOut.includes("arg=m-pi")
+
+const @opencodeOut = @agent("hi opencode", { harness: "opencode", opencodeBin: `${@r}/opencode/tests/fixtures/bin/opencode`, model: "m-opencode" })
+const @test_opencode_ran = @opencodeOut.startsWith("stub opencode: run") && @opencodeOut.includes("-m m-opencode") && @opencodeOut.includes("hi opencode")
+
+const @test_result_is_llm_output = @codexOut.mx.labels.includes(".src:llm")
+
+const @unknown = try @agent("hi", { harness: "luna" })
+const @test_unknown_harness_raises = !@unknown.ok && @unknown.error.message.includes("multi-harness: unknown harness 'luna' (supported: claude, codex, pi, opencode)")
+const @missing = try @agent("hi", {})
+const @test_missing_harness_raises = !@missing.ok && @missing.error.message.includes("multi-harness: unknown harness")
+
+>> ── @conversation ──
+
+const @codexConv = @conversation("codex")
+const @codexLog = <@r/codex/tests/fixtures/conversation/codex-basic.jsonl>
+const @ingested = @codexConv.ingest(@codexLog.mx.text)
+const @test_conversation_ingests = @ingested.header.harness.name == "codex" && @ingested.events.length > 0
+const @opencodeConv = @conversation("opencode")
+const @test_conversation_per_harness = @opencodeConv.mx.keys.includes("locate") && @opencodeConv.mx.keys.includes("ingest")
+const @unknownConv = try @conversation("luna")
+const @test_unknown_conversation_raises = !@unknownConv.ok

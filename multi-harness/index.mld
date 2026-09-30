@@ -1,0 +1,45 @@
+---
+name: multi-harness
+author: mlld
+version: 0.1.0
+about: One @agent that runs claude, codex, pi or opencode, picked by config.harness
+license: CC0
+---
+
+import @mlld/claude as @claudeHarness
+import @mlld/codex as @codexHarness
+import @mlld/pi as @piHarness
+import @mlld/opencode as @opencodeHarness
+
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @raise(message) = js {
+  throw new Error(message);
+}
+
+exe @unknownHarness(harness) = @raise(`multi-harness: unknown harness '${@harness}' (supported: claude, codex, pi, opencode)`)
+
+>> Runs the prompt on config.harness. The whole config goes to that harness as
+>> is, so its own keys (sandbox, thinking, agent, …) and its own model default
+>> apply. A config value is the caller's own, so a plain match picks the harness.
+llm @agent(prompt, config) = [
+  let @cfg = @config ?? {}
+  => match @cfg.harness [
+    "claude" => @claudeHarness.claude(@prompt, @cfg)
+    "codex" => @codexHarness.codex(@prompt, @cfg)
+    "pi" => @piHarness.pi(@prompt, @cfg)
+    "opencode" => @opencodeHarness.opencode(@prompt, @cfg)
+    * => @unknownHarness(@cfg.harness)
+  ]
+]
+
+>> The harness's own { locate, ingest }. Their signatures differ per harness
+>> (opencode's locate also takes the opencode binary), so they are not merged.
+exe @conversation(harness) = match @harness [
+  "claude" => @claudeHarness.conversation
+  "codex" => @codexHarness.conversation
+  "pi" => @piHarness.conversation
+  "opencode" => @opencodeHarness.conversation
+  * => @unknownHarness(@harness)
+]
+
+export { @agent, @conversation }
