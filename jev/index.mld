@@ -1,0 +1,130 @@
+---
+name: jev
+author: mlld
+version: 0.1.0
+about: TypeSafe jev — typed, calibrated answers over unstructured state
+license: CC0
+---
+
+>> ── Endpoint ──
+
+var @endpoint = "https://api.typesafe.ai/v1/systemone"
+var @modelsEndpoint = "https://api.typesafe.ai/v1/models"
+
+>> ── HTTP with retry ──
+
+exe @pause(attempt) = js {
+  await new Promise((r) => setTimeout(r, Math.min(8000, 500 * Math.pow(2, attempt))));
+  return attempt;
+}
+
+>> 429 and 529 are the two statuses TypeSafe asks you to back off on.
+exe llm @send(body, attempt) = [
+  let @res = @http.post(@endpoint, @body) with { creds: "typesafe" }
+  let @retryable = @res.status == 429 || @res.status == 529
+  => when [
+    @res.ok => { ok: true, value: @res.body }
+    @retryable && @attempt < 3 => [
+      @pause(@attempt)
+      => @send(@body, @attempt + 1)
+    ]
+    * => { ok: false, status: @res.status, value: @res.body }
+  ]
+]
+
+exe @raise(r) = js {
+  throw new Error(`typesafe ${r.status}: ${typeof r.value === "string" ? r.value : JSON.stringify(r.value)}`);
+}
+
+>> ── Core ──
+
+>> Full response envelope: { model, answers, usage }.
+exe @askFull(state, questions, config) = [
+  let @cfg = @config ?? {}
+  let @model = @cfg.model ?? "jev-latest"
+  let @body = { state: @state, model: @model, questions: @questions }
+  let @r = @send(@body, 0)
+  => when [
+    @r.ok => @r.value
+    * => @raise(@r)
+  ]
+]
+
+>> Answers only, keyed the way you keyed the questions.
+exe @ask(state, questions, config) = [
+  let @cfg = @config ?? {}
+  let @res = @askFull(@state, @questions, @cfg)
+  => @res.answers
+]
+
+>> Model names this key may send in `config.model`.
+exe @models() = [
+  let @res = @http.get(@modelsEndpoint) with { creds: "typesafe" }
+  => when [
+    @res.ok => @res.body.models
+    * => @raise({ status: @res.status, value: @res.body })
+  ]
+]
+
+>> ── Question builders ──
+
+>> Pick one option. `criteria` maps each option key to what that option covers.
+exe @choice(instructions, criteria) = { type: "choice", instructions: @instructions, criteria: @criteria }
+
+>> Rate against ordered levels. `criteria` is an array, level 0 upward.
+exe @score(instructions, criteria) = { type: "score", instructions: @instructions, criteria: @criteria }
+
+>> How true is this statement, 0 to 1. `criteria` optionally clarifies { true, false }.
+exe @noul(instructions, criteria) = [
+  let @c = @criteria ?? null
+  => when [
+    @c => { type: "noul", instructions: @instructions, criteria: @c }
+    * => { type: "noul", instructions: @instructions }
+  ]
+]
+
+>> ── One question, one call ──
+
+exe @askChoice(state, instructions, criteria, config) = [
+  let @cfg = @config ?? {}
+  let @answers = @ask(@state, { a: @choice(@instructions, @criteria) }, @cfg)
+  => @answers.a
+]
+
+exe @askScore(state, instructions, criteria, config) = [
+  let @cfg = @config ?? {}
+  let @answers = @ask(@state, { a: @score(@instructions, @criteria) }, @cfg)
+  => @answers.a
+]
+
+exe @askNoul(state, instructions, criteria, config) = [
+  let @cfg = @config ?? {}
+  let @c = @criteria ?? null
+  let @answers = @ask(@state, { a: @noul(@instructions, @c) }, @cfg)
+  => @answers.a
+]
+
+>> ── Many yes/no statements at once ──
+
+exe @toNoulQuestions(statements) = js {
+  const out = {};
+  for (const [k, v] of Object.entries(statements || {})) {
+    out[k] = { type: "noul", instructions: v };
+  }
+  return out;
+}
+
+exe @toNoulValues(answers) = js {
+  const out = {};
+  for (const [k, v] of Object.entries(answers || {})) out[k] = v.noul;
+  return out;
+}
+
+>> Map of name to statement in, map of name to 0..1 out. One call.
+exe @flags(state, statements, config) = [
+  let @cfg = @config ?? {}
+  let @answers = @ask(@state, @toNoulQuestions(@statements), @cfg)
+  => @toNoulValues(@answers)
+]
+
+export { @ask, @askFull, @flags, @models, @choice, @score, @noul, @askChoice, @askScore, @askNoul }
