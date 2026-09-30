@@ -1,0 +1,292 @@
+---
+name: time
+author: mlld
+version: 2.0.0
+about: Time and date operations with structured exports
+license: CC0
+---
+
+>> Dates go in as anything JavaScript's Date accepts (an ISO string, a date-only
+>> string, epoch milliseconds) and come out as ISO 8601 strings in UTC. Formatting,
+>> the day and time extractors, startOf/endOf and business days read the date in
+>> the machine's local timezone.
+
+>> ── Date engine ──
+>>
+>> js because mlld has no date type: parsing, calendar arithmetic and local-time
+>> fields need JavaScript's Date. Everything outside this section is mlld.
+
+>> Epoch milliseconds, or null when the input is not a date. The helpers below
+>> that return a date answer "Invalid Date" for null, like @format and @parse.
+exe @toMs(date) = js {
+  const t = new Date(date).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+exe @isoOf(ms) = js {
+  return new Date(ms).toISOString();
+}
+
+>> Replaces each token in one pass, so a token's output is never re-read as another token.
+exe @formatMs(ms, pattern) = js {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  const tokens = {
+    YYYY: d.getFullYear(), YY: String(d.getFullYear()).slice(-2),
+    MM: pad(d.getMonth() + 1), M: d.getMonth() + 1,
+    DD: pad(d.getDate()), D: d.getDate(),
+    HH: pad(d.getHours()), H: d.getHours(),
+    mm: pad(d.getMinutes()), m: d.getMinutes(),
+    ss: pad(d.getSeconds()), s: d.getSeconds()
+  };
+  return String(pattern).replace(/YYYY|YY|MM|M|DD|D|HH|H|mm|m|ss|s/g, (t) => String(tokens[t]));
+}
+
+>> Calendar-aware shift: sign 1 adds the duration, -1 subtracts it.
+exe @shiftMs(ms, duration, sign) = js {
+  if (ms === null) return "Invalid Date";
+  const d = new Date(ms);
+  const u = duration || {};
+  if (u.years) d.setFullYear(d.getFullYear() + sign * u.years);
+  if (u.months) d.setMonth(d.getMonth() + sign * u.months);
+  if (u.weeks) d.setDate(d.getDate() + sign * u.weeks * 7);
+  if (u.days) d.setDate(d.getDate() + sign * u.days);
+  if (u.hours) d.setHours(d.getHours() + sign * u.hours);
+  if (u.minutes) d.setMinutes(d.getMinutes() + sign * u.minutes);
+  if (u.seconds) d.setSeconds(d.getSeconds() + sign * u.seconds);
+  return d.toISOString();
+}
+
+>> edge "start" or "end" of the local day, month or year; any other unit leaves the date as is.
+exe @boundaryMs(ms, unit, edge) = js {
+  if (ms === null) return "Invalid Date";
+  const d = new Date(ms);
+  const start = edge === "start";
+  if (unit === "month") start ? d.setDate(1) : d.setMonth(d.getMonth() + 1, 0);
+  if (unit === "year") start ? d.setMonth(0, 1) : d.setMonth(11, 31);
+  if (unit === "day" || unit === "month" || unit === "year") {
+    start ? d.setHours(0, 0, 0, 0) : d.setHours(23, 59, 59, 999);
+  }
+  return d.toISOString();
+}
+
+>> 0 is Sunday, 6 is Saturday, in local time.
+exe @weekdayMs(ms) = js {
+  return new Date(ms).getDay();
+}
+
+exe @addBizDaysMs(ms, days) = js {
+  if (ms === null) return "Invalid Date";
+  const d = new Date(ms);
+  let remaining = Math.abs(days);
+  const step = days > 0 ? 1 : -1;
+  while (remaining > 0) {
+    d.setDate(d.getDate() + step);
+    if (d.getDay() !== 0 && d.getDay() !== 6) remaining--;
+  }
+  return d.toISOString();
+}
+
+exe @relativeMs(targetMs, nowMs, precise) = js {
+  const diffMs = targetMs - nowMs;
+  const seconds = Math.floor(Math.abs(diffMs) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30.44);
+  const years = Math.floor(days / 365.25);
+  const unit = (n, name) => (n === 1 ? `1 ${name}` : `${n} ${name}s`);
+  const levels = [
+    [years, "year", months % 12, "month"],
+    [months, "month", days % 30, "day"],
+    [weeks, "week", days % 7, "day"],
+    [days, "day", hours % 24, "hour"],
+    [hours, "hour", minutes % 60, "minute"],
+    [minutes, "minute", seconds % 60, "second"],
+    [seconds, "second", 0, "second"]
+  ];
+  const hit = levels.find(([n]) => n > 0);
+  if (!hit) return "just now";
+  let text = unit(hit[0], hit[1]);
+  if (precise && hit[2] > 0) text += " " + unit(hit[2], hit[3]);
+  return diffMs < 0 ? `${text} ago` : `in ${text}`;
+}
+
+>> node because the js runtime has no Intl.
+exe @getCurrentTimezone() = node {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+exe @getOffset() = js {
+  const offset = -new Date().getTimezoneOffset();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${offset >= 0 ? "+" : "-"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+}
+
+>> ── Core ──
+
+>> pattern tokens: YYYY YY MM M DD D HH H mm m ss s. "Invalid Date" for a bad date.
+exe @format(date, pattern) = [
+  let @ms = @toMs(@date)
+  => match [
+    @ms == null => "Invalid Date"
+    * => @formatMs(@ms, @pattern)
+  ]
+]
+
+>> ISO string, or "Invalid Date". `pattern` is accepted for compatibility and ignored.
+exe @parse(input, pattern) = [
+  let @ms = @toMs(@input)
+  => match [
+    @ms == null => "Invalid Date"
+    * => @isoOf(@ms)
+  ]
+]
+
+>> duration: { years, months, weeks, days, hours, minutes, seconds }, any subset.
+exe @add(date, duration) = @shiftMs(@toMs(@date), @duration, 1)
+
+exe @subtract(date, duration) = @shiftMs(@toMs(@date), @duration, -1)
+
+>> dateTo minus dateFrom in the unit given; milliseconds for any other unit.
+>> Months and years use average lengths (30.44 and 365.25 days).
+exe @diff(dateFrom, dateTo, unit) = [
+  let @ms = @toMs(@dateTo) - @toMs(@dateFrom)
+  let @unitMs = match @unit [
+    "years" => 31557600000
+    "months" => 2630016000
+    "weeks" => 604800000
+    "days" => 86400000
+    "hours" => 3600000
+    "minutes" => 60000
+    "seconds" => 1000
+    * => 1
+  ]
+  => @ms / @unitMs
+]
+
+>> ── Comparisons ──
+
+exe @before(dateA, dateB) = [ => @toMs(@dateA) < @toMs(@dateB) ]
+
+exe @after(dateA, dateB) = [ => @toMs(@dateA) > @toMs(@dateB) ]
+
+exe @equal(dateA, dateB) = [ => @toMs(@dateA) == @toMs(@dateB) ]
+
+>> Inclusive at both ends.
+exe @between(date, start, end) = [
+  let @ms = @toMs(@date)
+  => @ms >= @toMs(@start) && @ms <= @toMs(@end)
+]
+
+>> ── Shortcuts ──
+
+exe @iso(date) = @parse(@date, null)
+
+>> Seconds since the epoch, rounded down.
+exe @unix(date) = [
+  let @ms = @toMs(@date)
+  => (@ms - @ms % 1000) / 1000
+]
+
+exe @dateOnly(date) = @format(@date, "YYYY-MM-DD")
+
+exe @timeOnly(date) = @format(@date, "HH:mm:ss")
+
+>> ── Boundaries ──
+
+>> unit: "day", "month" or "year".
+exe @startOf(date, unit) = @boundaryMs(@toMs(@date), @unit, "start")
+
+exe @endOf(date, unit) = @boundaryMs(@toMs(@date), @unit, "end")
+
+>> ── Business days ──
+
+exe @isBizDay(date) = [
+  let @day = @weekdayMs(@toMs(@date))
+  => @day != 0 && @day != 6
+]
+
+>> Skips Saturdays and Sundays; a negative count moves backwards.
+exe @addBizDays(date, days) = @addBizDaysMs(@toMs(@date), @days)
+
+>> ── Relative time ──
+
+>> "3 hours ago", "in 2 days", "just now". options.precise adds the next unit down;
+>> options.now sets the reference instant, which defaults to the current time.
+exe @relative(date, options) = [
+  let @opts = @options ?? {}
+  let @reference = @opts.now ?? @now
+  => @relativeMs(@toMs(@date), @toMs(@reference), @opts.precise == true)
+]
+
+>> ── Durations ──
+
+exe @durationWeeks(count) = { weeks: @count }
+
+exe @durationDays(count) = { days: @count }
+
+exe @durationHours(count) = { hours: @count }
+
+exe @durationMinutes(count) = { minutes: @count }
+
+exe @durationSeconds(count) = { seconds: @count }
+
+exe @durationCompose(parts) = @parts
+
+>> A `for` yielding { [@k]: … } collects into one object, but yields [] over an empty one.
+exe @durationMultiply(duration, factor) = [
+  let @scaled = for @unit, @n in @duration => { [@unit]: @n * @factor }
+  => @scaled.isObject() ? @scaled : {}
+]
+
+exe @durationDivide(duration, divisor) = [
+  let @scaled = for @unit, @n in @duration => { [@unit]: @n / @divisor }
+  => @scaled.isObject() ? @scaled : {}
+]
+
+const @duration = {
+  weeks: @durationWeeks,
+  days: @durationDays,
+  hours: @durationHours,
+  minutes: @durationMinutes,
+  seconds: @durationSeconds,
+  compose: @durationCompose,
+  multiply: @durationMultiply,
+  divide: @durationDivide
+}
+
+>> ── Namespace ──
+
+const @time = {
+  format: @format,
+  parse: @parse,
+  add: @add,
+  subtract: @subtract,
+  diff: @diff,
+  iso: @iso,
+  unix: @unix,
+  date: @dateOnly,
+  time: @timeOnly,
+  startOf: @startOf,
+  endOf: @endOf,
+  relative: @relative,
+  compare: {
+    before: @before,
+    after: @after,
+    equal: @equal,
+    between: @between
+  },
+  biz: {
+    isBizDay: @isBizDay,
+    addDays: @addBizDays
+  },
+  tz: {
+    current: @getCurrentTimezone,
+    offset: @getOffset
+  },
+  duration: @duration
+}
+
+export { @time, @format, @parse, @add, @subtract, @diff, @before, @after, @equal, @between, @iso, @unix, @dateOnly, @timeOnly, @isBizDay, @addBizDays, @getCurrentTimezone, @getOffset, @startOf, @endOf, @relative, @duration }

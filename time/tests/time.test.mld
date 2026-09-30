@@ -1,0 +1,106 @@
+>> Tests for @mlld/time.
+>> Run: mlld test time/tests/
+>>
+>> Timezone: these pass in any timezone. Inputs written without an offset
+>> ("2025-07-08T10:30:45") are read as local wall-clock time, which is what the
+>> formatting, boundary and business-day functions read too; inputs with Z are
+>> used only where the answer does not depend on the zone (arithmetic, diffs,
+>> comparisons, unix time).
+
+import { @time, @format, @parse, @add, @subtract, @diff, @before, @after, @equal, @between, @iso, @unix, @dateOnly, @timeOnly, @isBizDay, @addBizDays, @getCurrentTimezone, @getOffset, @startOf, @endOf, @relative, @duration } from "../index.mld"
+
+>> ── format / parse ──
+
+const @wallClock = "2025-07-08T10:30:45"
+const @test_format_datetime = @format(@wallClock, "YYYY-MM-DD HH:mm:ss") == "2025-07-08 10:30:45"
+const @test_format_short_tokens = @format("2025-03-04T05:06:07", "YY M D H m s") == "25 3 4 5 6 7"
+const @test_format_one_pass = @format(@wallClock, "MM/DD") == "07/08"
+const @test_format_invalid = @format("not a date", "YYYY") == "Invalid Date"
+const @test_namespace_format = @time.format(@wallClock, "YYYY") == "2025"
+
+const @test_parse_iso = @parse("2025-07-08T10:00:00Z", "ignored") == "2025-07-08T10:00:00.000Z"
+const @test_parse_invalid = @parse("nope", null) == "Invalid Date"
+
+>> ── arithmetic ──
+
+const @base = "2025-07-08T10:00:00Z"
+const @test_add_day = @add(@base, { days: 1 }) == "2025-07-09T10:00:00.000Z"
+const @test_add_week = @time.add(@base, { weeks: 1 }) == "2025-07-15T10:00:00.000Z"
+const @test_add_mixed = @add(@base, { hours: 2, minutes: 30, seconds: 15 }) == "2025-07-08T12:30:15.000Z"
+const @test_subtract_day = @subtract(@base, { days: 1 }) == "2025-07-07T10:00:00.000Z"
+const @test_add_month_local = @format(@add("2025-01-15T12:00:00", { months: 1 }), "YYYY-MM-DD HH:mm") == "2025-02-15 12:00"
+const @test_add_invalid = @add("nope", { days: 1 }) == "Invalid Date"
+
+const @from = "2025-07-08T00:00:00Z"
+const @to = "2025-07-10T12:00:00Z"
+const @test_diff_days = @diff(@from, @to, "days") == 2.5
+const @test_diff_hours = @diff(@from, @to, "hours") == 60
+const @test_diff_negative = @diff(@to, @from, "hours") == -60
+const @test_diff_default_ms = @diff(@from, @to, null) == 216000000
+
+>> ── comparisons ──
+
+const @earlier = "2025-07-08T10:00:00Z"
+const @later = "2025-07-09T10:00:00Z"
+const @test_before = @before(@earlier, @later) && !@before(@later, @earlier)
+const @test_after = @time.compare.after(@later, @earlier) && !@after(@earlier, @later)
+const @test_equal = @equal(@earlier, "2025-07-08T10:00:00.000Z") && !@equal(@earlier, @later)
+const @test_between = @between("2025-07-08T20:00:00Z", @earlier, @later)
+const @test_between_inclusive = @time.compare.between(@later, @earlier, @later)
+const @test_between_outside = !@between("2025-07-10T00:00:00Z", @earlier, @later)
+
+>> ── shortcuts ──
+
+const @test_iso = @iso("2025-07-08T10:30:45Z") == "2025-07-08T10:30:45.000Z"
+const @test_unix = @unix("2025-07-08T10:30:45.900Z") == 1751970645
+const @test_date_only = @dateOnly(@wallClock) == "2025-07-08" && @time.date(@wallClock) == "2025-07-08"
+const @test_time_only = @timeOnly(@wallClock) == "10:30:45" && @time.time(@wallClock) == "10:30:45"
+
+>> @now is the one input not pinned: it only has to be accepted.
+const @nowIso = @iso(@now)
+const @test_now_accepted = @nowIso.includes("T") && @unix(@now) > 1751970645
+
+>> ── boundaries (timezone-sensitive: local midnight is a different UTC instant per zone) ──
+
+const @test_start_of_day = @startOf(@wallClock, "day") == @iso("2025-07-08T00:00:00")
+const @test_end_of_day = @endOf(@wallClock, "day") == @iso("2025-07-08T23:59:59.999")
+const @test_start_of_month = @time.startOf(@wallClock, "month") == @iso("2025-07-01T00:00:00")
+const @test_end_of_february = @endOf("2025-02-10T10:00:00", "month") == @iso("2025-02-28T23:59:59.999")
+const @test_start_of_year = @startOf(@wallClock, "year") == @iso("2025-01-01T00:00:00")
+const @test_end_of_year = @endOf(@wallClock, "year") == @iso("2025-12-31T23:59:59.999")
+
+>> ── business days ──
+
+const @test_monday_is_biz = @isBizDay("2025-07-07T10:00:00")
+const @test_saturday_not_biz = !@time.biz.isBizDay("2025-07-12T10:00:00")
+const @test_friday_plus_one = @dateOnly(@addBizDays("2025-07-11T10:00:00", 1)) == "2025-07-14"
+const @test_monday_minus_one = @dateOnly(@time.biz.addDays("2025-07-14T10:00:00", -1)) == "2025-07-11"
+const @test_friday_plus_six = @dateOnly(@addBizDays("2025-07-11T10:00:00", 6)) == "2025-07-21"
+
+>> ── relative ──
+
+const @ref = { now: "2025-07-08T10:00:00Z" }
+const @test_relative_past = @relative("2025-07-06T10:00:00Z", @ref) == "2 days ago"
+const @test_relative_future = @time.relative("2025-07-15T10:00:00Z", @ref) == "in 1 week"
+const @test_relative_precise = @relative("2025-07-06T07:00:00Z", { now: "2025-07-08T10:00:00Z", precise: true }) == "2 days 3 hours ago"
+const @test_relative_just_now = @relative("2025-07-08T10:00:00Z", @ref) == "just now"
+const @test_relative_months = @relative("2025-03-08T10:00:00Z", @ref) == "4 months ago"
+const @test_relative_default_now = @relative(@now) == "just now"
+
+>> ── timezone ──
+
+const @zone = @getCurrentTimezone()
+const @test_tz_current = @zone.length > 0 && @time.tz.current() == @zone
+const @offset = @getOffset()
+const @test_tz_offset_shape = @offset.match(/^[+-]\d\d:\d\d$/) != null && @time.tz.offset() == @offset
+
+>> ── durations ──
+
+const @test_duration_builders = @duration.weeks(1).weeks == 1 && @time.duration.hours(2).hours == 2 && @duration.seconds(9).seconds == 9
+const @composite = @time.duration.compose({ hours: 1, minutes: 30 })
+const @test_duration_compose = @composite.hours == 1 && @composite.minutes == 30
+const @doubled = @time.duration.multiply({ hours: 2, minutes: 15 }, 2)
+const @test_duration_multiply = @doubled.hours == 4 && @doubled.minutes == 30
+const @test_duration_divide = @duration.divide({ hours: 4 }, 2).hours == 2
+const @test_duration_empty = @duration.multiply({}, 3).mx.keys.length == 0
+const @test_duration_with_add = @add(@base, @duration.days(5)) == "2025-07-13T10:00:00.000Z"
