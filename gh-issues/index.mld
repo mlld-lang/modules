@@ -75,7 +75,7 @@ exe .net:r @searchIssues(query) = node {
   return execFileSync('gh', ['api', '-X', 'GET', 'search/issues', '-f', `q=${query}`], { encoding: 'utf8' }).trim();
 } with { description: "Search GitHub issues across repositories" }
 
-var tools @tools = {
+tools @tools = {
   list_issues: {
     mlld: @listIssues,
     expose: ["owner", "repo"],

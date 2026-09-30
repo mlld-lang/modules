@@ -7,7 +7,7 @@
 
 import { @MLLD_ALLOWED_DOMAINS } from @input
 
-var @allowedDomains = @MLLD_ALLOWED_DOMAINS
+const @allowedDomains = @MLLD_ALLOWED_DOMAINS
 
 >> --- HTML to markdown ---
 
@@ -46,7 +46,7 @@ exe .net:r @mdFetch(url: string) = [
 
   >> Domain allowlist check
   when @allowedDomains != "*" && !@allowedDomains.split(",").includes(@domain) => [
-    => { error: true, message: `Domain not in allowlist: @domain` }
+    => { error: true, message: `Domain not in allowlist: ${@domain}` }
   ]
 
   >> Fetch with Accept: text/markdown (Cloudflare sites return markdown directly)
@@ -60,7 +60,7 @@ exe .net:r @mdFetch(url: string) = [
 
 >> --- Tool collection ---
 
-var tools @tools = {
+tools @tools = {
   mdFetch: {
     mlld: @mdFetch,
     expose: ["url"],

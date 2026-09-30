@@ -9,7 +9,7 @@ exe .net:r @search(query: string, maxResults: number) = py {
   print(json.dumps(results))
 } with { description: "Search DuckDuckGo and return web results" }
 
-var tools @tools = {
+tools @tools = {
   search: {
     mlld: @search,
     expose: ["query", "maxResults"],
