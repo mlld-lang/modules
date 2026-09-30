@@ -208,7 +208,7 @@ llm @pi(prompt, config) with { stream: @config.stream, stream_format: @piStreamF
     * => @extraFlags
   ]
 
-  let @systemArg = @cfg.system ? @cfg.system : ""
+  let @systemArg = @cfg.system.isString() ? @cfg.system : ""
 
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter

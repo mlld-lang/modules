@@ -21,3 +21,16 @@ const @test_empty_prompt = @prependSystemPrompt("", "") == ""
 const @test_session_id_lowercased = @normalizeCodexSessionId("  0199A213-81C0 ") == "0199a213-81c0"
 const @test_blank_session_id_is_null = @normalizeCodexSessionId("   ") == null
 const @test_missing_session_id_is_null = @normalizeCodexSessionId(null) == null
+
+>> mlld reads the strings "0" and "false" as false; none of these may be dropped.
+const @zeroReply = @parseCodexJsonl("{\"type\":\"thread.started\",\"thread_id\":\"\"}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"first\"}}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"0\"}}\n")
+const @test_reply_of_zero_kept = @zeroReply.text.isString() && @zeroReply.text == "0"
+const @test_empty_thread_id_kept = @zeroReply.sessionId.isString() && @zeroReply.sessionId.length == 0
+const @test_reply_of_false_kept = @parseCodexJsonl("{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"false\"}}").text == "false"
+const @emptyLast = @parseCodexJsonl("{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"first\"}}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"\"}}")
+const @test_empty_last_message_wins = @emptyLast.text.isString() && @emptyLast.text.length == 0
+const @test_prompt_of_zero_kept = @prependSystemPrompt("0", "sys") == "sys\n\n0"
+const @test_prompt_of_false_kept = @prependSystemPrompt("false", "sys") == "sys\n\nfalse"
+const @test_system_of_zero_kept = @prependSystemPrompt("do it", "0") == "0\n\ndo it"
+const @test_prompt_of_zero_alone = @prependSystemPrompt("0", "") == "0"
+const @test_session_id_of_zero = @normalizeCodexSessionId("0") == "0"

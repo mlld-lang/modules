@@ -34,45 +34,45 @@ const @codexStreamFormat = {
 >> Normalizes a session id while tolerating missing/non-string inputs.
 >> Codex thread ids are UUIDs; we lowercase them to match codex's own output.
 exe @normalizeCodexSessionId(sessionId) = [
-  if !(@sessionId && @sessionId.isString()) [ => null ]
+  if !@sessionId.isString() [ => null ]
   let @trimmed = @sessionId.trim()
-  => @trimmed ? @trimmed.toLowerCase() : null
-]
-
->> Each line of raw that holds a JSON object, parsed; other lines are skipped.
-exe @jsonLines(raw) = [
-  let @text = @raw ? `${@raw}` : ""
-  let @parsed = for @line in @text.split("\n") if @line.trim() => @tryParse(@line.trim())
-  => for @p in @parsed if @p.ok && @p.value.isObject() => @p.value
-]
-
-exe @tryParse(line) = [
-  let @r = try @line | @parse
-  => @r
+  => @trimmed != "" ? @trimmed.toLowerCase() : null
 ]
 
 >> Parses codex exec --json JSONL output for session id, final message text, and usage.
-exe @parseCodexJsonl(raw) = [
-  let @events = @jsonLines(@raw)
-  let @started = @events.filter(@item.type == "thread.started" && @item.thread_id && @item.thread_id.isString())
-  let @messages = @events.filter(@item.type == "item.completed" && @item.item && @item.item.type == "agent_message" && @item.item.text && @item.item.text.isString())
-  let @turns = @events.filter(@item.type == "turn.completed" && @item.usage && @item.usage.isObject())
-  let @inputs = @turns.filter(@item.usage.input_tokens != null && @item.usage.input_tokens.isNumber())
-  let @outputs = @turns.filter(@item.usage.output_tokens != null && @item.usage.output_tokens.isNumber())
-  => {
-    sessionId: @started.length ? @started.at(-1).thread_id : null,
-    text: @messages.length ? @messages.at(-1).item.text : "",
-    inputTokens: @inputs.length ? @inputs.at(-1).usage.input_tokens : null,
-    outputTokens: @outputs.length ? @outputs.at(-1).usage.output_tokens : null
+>> JS because mlld parses JSONL at ~4 ms a line (13 s for a 3,000-line run); back to mlld with m-28a3.
+exe @parseCodexJsonl(raw) = js {
+  const result = { sessionId: null, text: "", inputTokens: null, outputTokens: null };
+  if (typeof raw !== "string" || !raw) return result;
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let obj;
+    try { obj = JSON.parse(trimmed); } catch { continue; }
+    if (!obj || typeof obj !== "object") continue;
+    if (obj.type === "thread.started" && typeof obj.thread_id === "string") {
+      result.sessionId = obj.thread_id;
+    } else if (
+      obj.type === "item.completed" &&
+      obj.item && obj.item.type === "agent_message" &&
+      typeof obj.item.text === "string"
+    ) {
+      result.text = obj.item.text;
+    } else if (obj.type === "turn.completed" && obj.usage && typeof obj.usage === "object") {
+      if (typeof obj.usage.input_tokens === "number") result.inputTokens = obj.usage.input_tokens;
+      if (typeof obj.usage.output_tokens === "number") result.outputTokens = obj.usage.output_tokens;
+    }
   }
-]
+  return result;
+}
 
 >> Prepends a system prompt to the user prompt.
 >> Codex has no --append-system-prompt; injecting into the prompt is the only
 >> per-invocation hook without clobbering codex's base_instructions.
+>> Tests are on string-ness, not truthiness: mlld reads "0" and "false" as false.
 exe @prependSystemPrompt(prompt, system) = [
-  let @body = @prompt ? `${@prompt}` : ""
-  if !@system [ => @body ]
+  let @body = @prompt.isString() ? @prompt : ""
+  if !(@system.isString() && @system != "") [ => @body ]
   => `${@system}
 
 ${@body}`
@@ -289,7 +289,7 @@ llm @codex(prompt, config) with { stream: @config.stream, stream_format: @codexS
   let @search = @cfg.search ? "1" : ""
   let @bypass = @cfg.bypass ? "1" : ""
   let @mcpArgsFile = @mx.llm && @mx.llm.config ? @codexMcpArgsFile(@mx.llm.config) : ""
-  let @finalPrompt = @cfg.system ? @prependSystemPrompt(@prompt, @cfg.system) : @prompt
+  let @finalPrompt = @cfg.system.isString() && @cfg.system != "" ? @prependSystemPrompt(@prompt, @cfg.system) : @prompt
   let @resume = @codexResume(@cfg)
   let @doResume = @resume.continue && @resume.sessionId ? "1" : ""
   let @resumeId = @resume.sessionId ? @resume.sessionId : ""

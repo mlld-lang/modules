@@ -23,3 +23,12 @@ const @test_blank_session_id_is_null = @normalizeOpencodeSessionId("") == null
 const @test_agent_name_given = @opencodeToolAgentName(" reviewer ") == "reviewer"
 const @test_agent_name_default = @opencodeToolAgentName("") == "mlld"
 const @test_agent_name_missing = @opencodeToolAgentName(null) == "mlld"
+
+>> mlld reads the strings "0" and "false" as false; none of these may be dropped.
+const @test_reply_of_zero_kept = @parseOpencodeJsonl("{\"type\":\"text\",\"part\":{\"text\":\"0\"}}").text == "0"
+const @test_prompt_of_zero_kept = @prependOpencodeSystem("0", "sys") == "sys\n\n0"
+const @test_prompt_of_false_kept = @prependOpencodeSystem("false", "sys") == "sys\n\nfalse"
+const @test_system_of_zero_kept = @prependOpencodeSystem("do it", "0") == "0\n\ndo it"
+const @test_prompt_of_zero_alone = @prependOpencodeSystem("0", null) == "0"
+const @test_session_id_of_zero = @normalizeOpencodeSessionId("0") == "0"
+const @test_agent_name_of_zero = @opencodeToolAgentName("0") == "0"
