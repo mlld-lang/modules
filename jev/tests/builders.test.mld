@@ -24,3 +24,7 @@ const @test_questions_empty = @toNoulQuestions(null).mx.keys.length == 0
 const @v = @toNoulValues({ angry: { noul: 0.8 }, refund: { noul: 0.1 } })
 const @test_values_keyed = @v.angry == 0.8 && @v.refund == 0.1
 const @test_values_empty = @toNoulValues({}).mx.keys.length == 0
+
+exe @manyStatements(n) = js { const o = {}; for (let i = 0; i < n; i++) o["k" + i] = "s" + i; return o; }
+const @big = @toNoulQuestions(@manyStatements(200))
+const @test_questions_many = @big.mx.keys.length == 200 && @big.k199.instructions == "s199"

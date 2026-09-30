@@ -108,21 +108,17 @@ exe @askNoul(state, instructions, criteria, config) = [
 
 >> ── Many yes/no statements at once ──
 
->> Folds [key, value] entries into an object one key at a time, because a `for`
->> over an object returns an array and drops the keys.
-exe @noulQuestionsFrom(entries, acc) = match [
-  @entries.length == 0 => @acc
-  * => @noulQuestionsFrom(@entries.slice(1), { ...@acc, [@entries[0][0]]: { type: "noul", instructions: @entries[0][1] } })
+>> A `for` whose body yields `{ [@key]: … }` collects into one object, but over an
+>> empty object it yields [], so the isObject() check keeps the result an object.
+exe @toNoulQuestions(statements) = [
+  let @q = for @k, @v in (@statements ?? {}) => { [@k]: { type: "noul", instructions: @v } }
+  => @q.isObject() ? @q : {}
 ]
 
-exe @noulValuesFrom(entries, acc) = match [
-  @entries.length == 0 => @acc
-  * => @noulValuesFrom(@entries.slice(1), { ...@acc, [@entries[0][0]]: @entries[0][1].noul })
+exe @toNoulValues(answers) = [
+  let @v = for @k, @a in (@answers ?? {}) => { [@k]: @a.noul }
+  => @v.isObject() ? @v : {}
 ]
-
-exe @toNoulQuestions(statements) = @noulQuestionsFrom((@statements ?? {}).mx.entries, {})
-
-exe @toNoulValues(answers) = @noulValuesFrom((@answers ?? {}).mx.entries, {})
 
 >> Map of name to statement in, map of name to 0..1 out. One call.
 exe @flags(state, statements, config) = [
