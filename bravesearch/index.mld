@@ -1,13 +1,15 @@
 ---
 name: bravesearch
 author: mlld
-version: 1.0.0
+version: 2.0.0
 about: Brave web search results tool
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 license: CC0
 mlld-version: ">=2.2.0"
 ---
+
+needs { js: [], network }
 
 >> Brave Search API tool
 >> The key is looked up in the keychain first, then the BRAVE_API_KEY environment

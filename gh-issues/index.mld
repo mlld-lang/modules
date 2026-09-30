@@ -1,3 +1,5 @@
+needs { node: [] }
+
 >> GitHub issues, pull requests, repos and workflows via the gh CLI
 >> Requires: gh CLI (https://cli.github.com)
 >> Auth: GITHUB_TOKEN env var > gh auth token (from `gh auth login`)
