@@ -1,7 +1,7 @@
 >> Tests for how search results are shaped, with no request to Brave.
 >> Run: mlld test bravesearch/tests/
 
-import { @shapeResults, @tools } from "../index.mld"
+import { @shapeResults, @tools, @braveUrl, @braveResponse } from "../index.mld"
 
 const @response = {
   web: {
@@ -24,3 +24,16 @@ const @failure = { error: true, status: 401, message: "bad key" }
 const @test_error_passes_through = @shapeResults(@failure).status == 401
 
 const @test_tool_is_served = @tools.mx.tools.includes("search")
+
+>> ── request URL and response record ──
+
+const @url = @braveUrl("mlld & rust?", 3)
+const @test_url_encodes_query = @url.includes("q=mlld%20%26%20rust%3F&")
+const @test_url_count = @url.includes("&count=3&")
+const @test_url_default_count = @braveUrl("x", null).includes("&count=5&")
+
+const @ok = @braveResponse({ ok: true, status: 200, body: @response })
+const @test_ok_body_passes = @shapeResults(@ok).length == 2
+const @bad = @braveResponse({ ok: false, status: 429, body: "slow down" })
+const @test_non_2xx_becomes_error = @bad.error && @bad.status == 429 && @bad.message == "slow down"
+const @test_non_2xx_shapes_to_error = @shapeResults(@bad).status == 429

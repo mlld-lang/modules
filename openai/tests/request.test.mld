@@ -1,7 +1,7 @@
->> Tests for the request body @openai sends, with no API call.
+>> Tests for the request body @openai sends and how it reads the reply, with no API call.
 >> Run: mlld test openai/tests/
 
-import { @openaiRequest, @openaiStreamFormat } from "../index.mld"
+import { @openaiRequest, @openaiResult } from "../index.mld"
 
 const @bare = @openaiRequest("hi", {})
 const @test_default_model = @bare.model == "gpt-4o"
@@ -25,7 +25,29 @@ const @test_response_format_renamed = @full.response_format.type == "json_object
 const @test_fn_tools_become_tools = @full.tools[0].function.name == "f"
 const @test_fn_tool_choice_renamed = @full.tool_choice == "auto"
 
-const @streaming = @openaiRequest("x", { stream: true })
-const @test_stream_asks_for_usage = @streaming.stream && @streaming.stream_options.include_usage
+const @asked = @openaiRequest("x", { stream: true })
+const @test_stream_is_not_sent = @asked.stream == null && @asked.stream_options == null
 
-const @test_stream_format_is_ndjson = @openaiStreamFormat.format == "ndjson"
+>> ── reading the reply (the { status, body, ok } record @http returns) ──
+
+const @textReply = { ok: true, status: 200, body: { choices: [{ message: { role: "assistant", content: "hello" } }] } }
+const @test_text_reply = @openaiResult(@textReply) == "hello"
+
+const @callReply = {
+  ok: true,
+  status: 200,
+  body: { choices: [{ message: { content: null, tool_calls: [
+    { id: "c1", type: "function", function: { name: "lookup", arguments: "{\"city\":\"Paris\",\"days\":2}" } },
+    { id: "c2", type: "function", function: { name: "noop", arguments: "{}" } }
+  ] } }] }
+}
+const @calls = @openaiResult(@callReply)
+const @test_tool_calls_type = @calls.type == "tool_calls" && @calls.tool_calls.length == 2
+const @test_tool_call_args_parsed = @calls.tool_calls[0].function == "lookup" && @calls.tool_calls[0].args.city == "Paris" && @calls.tool_calls[0].args.days == 2
+const @test_tool_call_empty_args = @calls.tool_calls[1].function == "noop"
+
+const @emptyCalls = { ok: true, status: 200, body: { choices: [{ message: { content: "plain", tool_calls: [] } }] } }
+const @test_empty_tool_calls_is_text = @openaiResult(@emptyCalls) == "plain"
+
+const @failed = try @openaiResult({ ok: false, status: 401, body: { error: { message: "bad key" } } })
+const @test_non_2xx_raises = !@failed.ok && @failed.error.message.includes("OpenAI API 401")

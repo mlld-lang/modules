@@ -10,23 +10,28 @@ mlld-version: ">=2.2.0"
 ---
 
 >> Brave Search API tool
->> The key is looked up in the keychain first, then the BRAVE_API_KEY environment variable.
+>> The key is looked up in the keychain first, then the BRAVE_API_KEY environment
+>> variable, and goes out as Brave's X-Subscription-Token header.
 
-creds @brave = "BRAVE_API_KEY"
+creds @brave = { from: "keychain", as: "BRAVE_API_KEY", auth_header: "X-Subscription-Token" }
 
->> JS because the request needs a header and a response status check, which a
->> cmd body would push through curl for no gain.
-exe @braveFetch(query, count) using creds:brave = node {
-  const limit = count || 5;
-  const res = await fetch(
-    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${limit}&spellcheck=0`,
-    { headers: { 'X-Subscription-Token': process.env.BRAVE_API_KEY } }
-  );
-  if (!res.ok) {
-    return { error: true, status: res.status, message: await res.text() };
-  }
-  return await res.json();
+>> js because mlld has no URL encoding for a query string.
+exe @encodeQuery(text) = js {
+  return encodeURIComponent(String(text));
 }
+
+exe @braveUrl(query, count) = `https://api.search.brave.com/res/v1/web/search?q=${@encodeQuery(@query)}&count=${@count || 5}&spellcheck=0`
+
+>> A non-2xx answer comes back as { error, status, message } rather than a failure.
+exe @braveResponse(res) = match [
+  @res.ok => @res.body
+  * => { error: true, status: @res.status, message: @res.body }
+]
+
+exe @braveFetch(query, count) = [
+  let @res = @http.get(@braveUrl(@query, @count)) using creds:brave
+  => @braveResponse(@res)
+]
 
 >> Keeps the fields an agent reads from Brave's web results.
 exe @shapeResults(response) = match [
@@ -44,4 +49,4 @@ tools @tools = {
   }
 }
 
-export { @search, @tools, @shapeResults }
+export { @search, @tools, @shapeResults, @braveUrl, @braveResponse }

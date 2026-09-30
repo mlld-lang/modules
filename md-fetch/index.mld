@@ -2,8 +2,9 @@
 >> Fetches markdownified content of websites
 >> Serve: mlld mcp mdfetch.mld --tools-collection @tools
 
->> MLLD_ALLOWED_DOMAINS: comma-separated domains, or "*" for unrestricted
->> Pass via: --env MLLD_ALLOWED_DOMAINS=github.com,docs.python.org
+>> MLLD_ALLOWED_DOMAINS: comma-separated domains, or "*" for unrestricted.
+>> Set it in the process environment, or with `mlld mcp … --env MLLD_ALLOWED_DOMAINS=github.com,docs.python.org`;
+>> `mlld run` has no --env, so there it must come from the environment.
 
 import { @MLLD_ALLOWED_DOMAINS } from @input
 
@@ -44,8 +45,10 @@ exe .op:net:r @mdFetch(url: string) with { description: "Fetch markdownified web
     => @refusal
   ]
 
-  >> Fetch with Accept: text/markdown (Cloudflare sites return markdown directly)
-  let @raw = sh { curl -sL -m 30 --max-filesize 5242880 -H "Accept: text/markdown" "$url" }
+  >> Accept: text/markdown, because Cloudflare sites then return markdown directly.
+  >> @http follows redirects, caps the body at 5 MB and refuses private addresses.
+  let @res = @http.request(@url, { method: "GET", headers: { Accept: "text/markdown" } }) with { timeout: 30000 }
+  let @raw = @res.body.isString() ? @res.body : `${@res.body}`
 
   >> If response is still HTML, extract content with readability
   let @content = @htmlToMarkdown(@raw, @url)
