@@ -75,7 +75,7 @@ exe @lmsImpl(prompt, opts) = js {
 >> config.baseUrl        - API base URL (default: http://localhost:1234/v1)
 >> config.apiKey         - bearer token, if the server requires auth
 >> config.full           - return JSON { content, model, usage, finishReason }
-exe llm @lms(prompt, config) = [
+llm @lms(prompt, config) = [
   let @cfg = @config ? @config : {}
   => @lmsImpl(@prompt, @cfg)
 ]

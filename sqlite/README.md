@@ -7,11 +7,11 @@ SQLite-backed artifact storage.
 ```mlld
 import { @init, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts } from @mlld/sqlite
 
-var @db = { path: "/tmp/artifacts.sqlite" }
+const @db = { path: "/tmp/artifacts.sqlite" }
 run @init(@db)
 
-var @saved = @putArtifact(@db, "runs", "scan-123", { status: "ok" }, { source: "demo" })
-var @event = @appendArtifact(@db, "events", { kind: "done" })
+const @saved = @putArtifact(@db, "runs", "scan-123", { status: "ok" }, { source: "demo" })
+const @event = @appendArtifact(@db, "events", { kind: "done" })
 show @getArtifact(@db, "runs", "scan-123")
 show @listArtifacts(@db, "events", 10)
 ```

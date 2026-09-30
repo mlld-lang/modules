@@ -1,6 +1,6 @@
 needs { node: [better-sqlite3] }
 
-var @defaultLimit = 50
+const @defaultLimit = 50
 
 exe @sqliteStore(action, config, request) = node {
   const fs = require('node:fs');

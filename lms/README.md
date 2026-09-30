@@ -10,7 +10,7 @@ import { @lms } from @mlld/lms
 show @lms("What is REST?")
 
 >> Guaranteed structured output via JSON Schema
-var @result = @lms("Classify: patient SSN 123-45-6789", {
+const @result = @lms("Classify: patient SSN 123-45-6789", {
   model: "google/gemma-4-26b-a4b",
   temperature: 0,
   schema: {
@@ -54,8 +54,8 @@ show @lms("Classify this doc's sensitivity", {
 })
 
 >> Inspect token usage and finish reason
-var @meta = @lms("Summarize the changelog.", { full: true }) | @json
-show `tokens: @meta.usage.total_tokens, finish: @meta.finishReason`
+const @meta = @lms("Summarize the changelog.", { full: true }) | @json
+show `tokens: ${@meta.usage.total_tokens}, finish: ${@meta.finishReason}`
 
 >> Multi-turn conversation
 show @lms("And in one sentence?", {

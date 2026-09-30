@@ -1,6 +1,6 @@
 needs { node: [pg] }
 
-var @defaultLimit = 50
+const @defaultLimit = 50
 
 exe @pgStore(action, config, request) = node {
   const crypto = require('node:crypto');

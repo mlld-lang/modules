@@ -18,15 +18,15 @@ mlld keychain add GITHUB_TOKEN    # mlld keychain (use auth directive in your sc
 import { @listIssues, @getIssue, @createIssue } from @mlld/gh-issues
 
 >> Auto-detects owner/repo from git context
-var @issues = @listIssues() | @parse
-show `Found @issues.length issues`
+const @issues = @listIssues() | @parse
+show `Found ${@issues.length} issues`
 
-var @issue = @getIssue(null, null, 42) | @parse
-show `#@issue.number @issue.title`
+const @issue = @getIssue(null, null, 42) | @parse
+show `#${@issue.number} ${@issue.title}`
 
 >> Or pass explicitly
-var @new = @createIssue("acme", "app", "Bug report", "Details here") | @parse
-show `Created #@new.number`
+const @new = @createIssue("acme", "app", "Bug report", "Details here") | @parse
+show `Created #${@new.number}`
 ```
 
 ## Exports

@@ -20,7 +20,7 @@ export BRAVE_API_KEY=...
 
 ```mlld
 import { @search } from @mlld/bravesearch
-var @results = @search("mlld scripting language", 5)
+const @results = @search("mlld scripting language", 5)
 show @results
 ```
 
