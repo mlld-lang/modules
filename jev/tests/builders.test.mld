@@ -1,0 +1,30 @@
+>> Offline tests for jev's question builders and the @flags reshaping helpers.
+>> Run: mlld test jev/tests/builders.test.mld
+
+import { @choice, @score, @noul, @toNoulQuestions, @toNoulValues } from "../index.mld"
+
+const @billing = { billing: "payment problems", tech: "anything broken" }
+const @c = @choice("Which team?", @billing)
+const @test_choice_shape = @c.type == "choice" && @c.instructions == "Which team?" && @c.criteria.billing == "payment problems"
+
+const @levels = ["none", "some", "severe"]
+const @s = @score("How urgent?", @levels)
+const @test_score_shape = @s.type == "score" && @s.criteria.length == 3 && @s.criteria[2] == "severe"
+
+const @n = @noul("The user is angry", { true: "raised voice", false: "calm" })
+const @test_noul_with_criteria = @n.type == "noul" && @n.criteria.true == "raised voice"
+
+const @bare = @noul("The user is angry", null)
+const @test_noul_without_criteria = @bare.type == "noul" && @bare.instructions == "The user is angry" && !@exists(@bare.criteria)
+
+const @q = @toNoulQuestions({ angry: "The user is angry", refund: "The user wants a refund" })
+const @test_questions_keyed = @q.angry.type == "noul" && @q.angry.instructions == "The user is angry" && @q.refund.instructions == "The user wants a refund"
+const @test_questions_empty = @toNoulQuestions(null).mx.keys.length == 0
+
+const @v = @toNoulValues({ angry: { noul: 0.8 }, refund: { noul: 0.1 } })
+const @test_values_keyed = @v.angry == 0.8 && @v.refund == 0.1
+const @test_values_empty = @toNoulValues({}).mx.keys.length == 0
+
+exe @manyStatements(n) = js { const o = {}; for (let i = 0; i < n; i++) o["k" + i] = "s" + i; return o; }
+const @big = @toNoulQuestions(@manyStatements(200))
+const @test_questions_many = @big.mx.keys.length == 200 && @big.k199.instructions == "s199"

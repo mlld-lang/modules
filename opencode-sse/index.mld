@@ -1,0 +1,620 @@
+needs { sh }
+
+>> ── Stream format: mirrors @mlld/claude's shape so downstream consumers work unchanged. ──
+>>
+>> The node {} block translates opencode-serve's SSE events into these claude-shaped
+>> lines before writing them to stdout. mlld's stream adapter consumes them the same
+>> way it consumes Claude Code's native NDJSON.
+const @opencodeSseStreamFormat = {
+  name: "opencode-sse",
+  format: "ndjson",
+  schemas: [
+    {
+      kind: "message",
+      matchPath: "type",
+      matchValue: "text",
+      extract: { chunk: "content" }
+    },
+    {
+      kind: "thinking",
+      matchPath: "type",
+      matchValue: "thinking",
+      extract: { text: "text" }
+    },
+    {
+      kind: "tool-use",
+      matchPath: "type",
+      matchValue: "tool_use",
+      extract: {
+        name: "name",
+        input: "input",
+        id: "id"
+      }
+    },
+    {
+      kind: "tool-result",
+      matchPath: "type",
+      matchValue: "tool_result",
+      extract: {
+        result: "result",
+        toolUseId: "tool_use_id"
+      }
+    },
+    {
+      kind: "error",
+      matchPath: "type",
+      matchValue: "error",
+      extract: { message: "message" }
+    },
+    {
+      kind: "metadata",
+      matchPath: "type",
+      matchValue: "result",
+      extract: {
+        inputTokens: "input_tokens",
+        outputTokens: "output_tokens",
+        totalTokens: "total_tokens",
+        cost: "cost"
+      }
+    }
+  ]
+}
+
+>> ── Session / resume helpers ──
+
+>> Opencode session ids are `ses_<base36>` and case-sensitive — trim only, don't upcase.
+exe @normalizeOpencodeSseSessionId(sessionId) = match [
+  !@sessionId.isString() => null
+  @sessionId.trim() => @sessionId.trim()
+  * => null
+]
+
+>> Reads the public and runtime-injected resume/session config.
+>>
+>> Public API:
+>>   config.sessionId - explicit conversation tracking id
+>>   config.resume    - explicit resume session id
+>>
+>> Runtime API:
+>>   config._mlld.resume = { sessionId, provider, continue }
+>>
+>> Runtime resume is ignored when the recorded provider is not opencode so a
+>> claude/codex session never leaks across providers.
+exe @opencodeSseResume(config) = [
+  let @cfg = @config ? @config : {}
+  let @runtime = @cfg._mlld ? @cfg._mlld : {}
+  let @resume = @runtime.resume ? @runtime.resume : {}
+  let @runtimeProvider = @resume.provider ? @resume.provider : "opencode"
+  let @runtimeSessionId = @normalizeOpencodeSseSessionId(@resume.sessionId)
+  let @publicSessionId = @normalizeOpencodeSseSessionId(@cfg.sessionId)
+  let @publicResumeId = @normalizeOpencodeSseSessionId(@cfg.resume)
+  => match [
+    @resume.continue && @runtimeSessionId && @runtimeProvider == "opencode" => {
+      continue: true,
+      sessionId: @runtimeSessionId,
+      provider: "opencode",
+      source: "runtime_resume"
+    }
+    @publicResumeId => {
+      continue: true,
+      sessionId: @publicResumeId,
+      provider: "opencode",
+      source: "public_resume"
+    }
+    @runtimeSessionId && @runtimeProvider == "opencode" => {
+      continue: false,
+      sessionId: @runtimeSessionId,
+      provider: "opencode",
+      source: "runtime_tracking"
+    }
+    @publicSessionId => {
+      continue: false,
+      sessionId: @publicSessionId,
+      provider: "opencode",
+      source: "public_session"
+    }
+    * => {
+      continue: false,
+      sessionId: null,
+      provider: "opencode",
+      source: "none"
+    }
+  ]
+]
+
+>> Splits a "provider/model" string into { providerID, modelID }.
+>> Defaults to openrouter / z-ai/glm-5.1 when no slash is present.
+exe @opencodeSseSplitModel(model) = [
+  let @spec = match [
+    @model.isString() && @model.length > 0 => @model
+    * => "openrouter/z-ai/glm-5.1"
+  ]
+  let @idx = @spec.indexOf("/")
+  => match [
+    @idx <= 0 => { providerID: "openrouter", modelID: @spec }
+    * => { providerID: @spec.slice(0, @idx), modelID: @spec.slice(@idx + 1) }
+  ]
+]
+
+>> Wraps the result with a runtime-visible `_mlld` envelope so the interpreter
+>> can harvest the session id and provider across guard-driven resume.
+exe @opencodeSseResult(inputValue, resume) = match [
+  @resume.sessionId => {
+    value: @inputValue,
+    _mlld: {
+      sessionId: @resume.sessionId,
+      provider: @resume.provider
+    }
+  }
+  * => @inputValue
+]
+
+>> ── Core SSE turn driver ──
+>>
+>> Spawns opencode serve on demand (reuses an existing instance if the port
+>> responds), creates or reuses a session, opens an SSE subscription, posts the
+>> prompt, translates opencode bus events into claude-shaped NDJSON lines as
+>> they arrive, and exits when session.idle fires for our session.
+>>
+>> The translated NDJSON is written to this block's stdout; mlld's stream adapter
+>> consumes it live when streaming, and the same text is captured as @raw for
+>> non-stream callers.
+>>
+>> The final line is always `{"type":"result", ...}` carrying the aggregate.
+>>
+>> node because the turn holds a long-lived HTTP event stream open while it
+>> posts the prompt, and spawns `opencode serve`; mlld's @http has no streaming read.
+exe @opencodeSseTurn(prompt, providerID, modelID, dir, system, sessionId, port, mcpConfigPath) = node {
+  const http = require('node:http');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { spawn } = require('node:child_process');
+  const crypto = require('node:crypto');
+
+  const HOST = '127.0.0.1';
+  const SPAWN_TIMEOUT_MS = 20000;
+  const TURN_TIMEOUT_MS = parseInt(process.env.OPENCODE_SSE_TIMEOUT_MS || '', 10) || 600000;
+  const HEARTBEAT_GRACE_MS = 60000;
+
+  // ── MCP bridge: translate claude-format mcpServers → opencode mcp block,
+  // write to a shadow XDG_CONFIG_HOME, and spawn opencode serve against it.
+  // Hash the shadow contents so same-tools across runs reuse the same port.
+  const buildShadowHome = (cfgPath) => {
+    if (!cfgPath || !fs.existsSync(cfgPath)) return null;
+    let parsed;
+    try { parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch { return null; }
+    const servers = parsed && parsed.mcpServers;
+    if (!servers || typeof servers !== 'object' || !Object.keys(servers).length) return null;
+
+    const translated = {};
+    for (const [name, spec] of Object.entries(servers)) {
+      if (!spec || typeof spec !== 'object') continue;
+      if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) continue;
+      if (typeof spec.url === 'string') {
+        const headers = {};
+        if (spec.headers && typeof spec.headers === 'object') {
+          for (const [k, v] of Object.entries(spec.headers)) {
+            if (typeof v === 'string') headers[k] = v;
+          }
+        }
+        translated[name] = { type: 'remote', url: spec.url, headers };
+        continue;
+      }
+      if (typeof spec.command !== 'string') continue;
+      const argv = [spec.command];
+      if (Array.isArray(spec.args)) {
+        for (const a of spec.args) argv.push(String(a));
+      }
+      const environment = {};
+      if (spec.env && typeof spec.env === 'object') {
+        for (const [k, v] of Object.entries(spec.env)) {
+          if (typeof v === 'string') environment[k] = v;
+        }
+      }
+      translated[name] = { type: 'local', command: argv, environment, enabled: true };
+    }
+    if (!Object.keys(translated).length) return null;
+
+    const sourceConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+    const sourceOpencodeDir = path.join(sourceConfigHome, 'opencode');
+
+    let base = {};
+    for (const candidate of ['config.json', 'opencode.json', 'opencode.jsonc']) {
+      const p = path.join(sourceOpencodeDir, candidate);
+      if (!fs.existsSync(p)) continue;
+      try {
+        const raw = fs.readFileSync(p, 'utf8');
+        const stripped = candidate.endsWith('.jsonc')
+          ? raw.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+          : raw;
+        const userCfg = JSON.parse(stripped);
+        if (userCfg && typeof userCfg === 'object') base = { ...base, ...userCfg };
+      } catch { /* ignore */ }
+    }
+    base.mcp = { ...(base.mcp && typeof base.mcp === 'object' ? base.mcp : {}), ...translated };
+    const configJson = JSON.stringify(base, null, 2);
+    const hash = crypto.createHash('sha256').update(configJson).digest('hex').slice(0, 12);
+
+    // Reuse same shadow dir across runs with identical config so sessions persist.
+    const shadowRoot = path.join(os.tmpdir(), `mlld-opencode-sse-home-${hash}`);
+    const shadowOpencodeDir = path.join(shadowRoot, 'opencode');
+    fs.mkdirSync(shadowOpencodeDir, { recursive: true });
+
+    const skipNames = new Set(['opencode.json', 'opencode.jsonc', 'config.json']);
+    if (fs.existsSync(sourceOpencodeDir)) {
+      for (const entry of fs.readdirSync(sourceOpencodeDir)) {
+        if (skipNames.has(entry)) continue;
+        const target = path.join(shadowOpencodeDir, entry);
+        if (fs.existsSync(target)) continue;
+        try {
+          fs.symlinkSync(path.join(sourceOpencodeDir, entry), target);
+        } catch { /* best effort */ }
+      }
+    }
+
+    const configFile = path.join(shadowOpencodeDir, 'opencode.json');
+    const existing = fs.existsSync(configFile) ? fs.readFileSync(configFile, 'utf8') : null;
+    if (existing !== configJson) fs.writeFileSync(configFile, configJson, 'utf8');
+
+    return { shadowRoot, hash };
+  };
+
+  const shadow = buildShadowHome(mcpConfigPath);
+
+  // Port derivation: explicit override > env > hash-derived > default.
+  // Hash-derived keeps same-tools runs on the same port for server reuse.
+  const explicitPort = parseInt(port, 10) || parseInt(process.env.OPENCODE_SSE_PORT || '', 10) || 0;
+  const derivedPort = shadow
+    ? 4100 + (parseInt(shadow.hash.slice(0, 6), 16) % 900)
+    : 4096;
+  const PORT = explicitPort || derivedPort;
+
+  const ndjsonLines = [];
+  const emit = (evt) => {
+    ndjsonLines.push(JSON.stringify(evt));
+  };
+  const emitErr = (msg) => emit({ type: 'error', message: String(msg) });
+
+  const request = (method, pathname, body, timeoutMs) => new Promise((resolve, reject) => {
+    const data = body ? Buffer.from(JSON.stringify(body)) : null;
+    const opts = {
+      host: HOST, port: PORT, method, path: pathname,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(data ? { 'Content-Length': data.length } : {})
+      }
+    };
+    if (typeof timeoutMs === 'number' && timeoutMs > 0) opts.timeout = timeoutMs;
+    const req = http.request(opts, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try { resolve(raw ? JSON.parse(raw) : null); } catch { resolve(raw); }
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 300)}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(new Error('request timeout')); });
+    if (data) req.write(data);
+    req.end();
+  });
+
+  const ping = () => request('GET', '/session', null, 2000).then(() => true).catch(() => false);
+
+  const waitForReady = async (deadline) => {
+    while (Date.now() < deadline) {
+      if (await ping()) return true;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return false;
+  };
+
+  const spawnServer = async () => {
+    const env = { ...process.env };
+    if (shadow && shadow.shadowRoot) env.XDG_CONFIG_HOME = shadow.shadowRoot;
+    const child = spawn('opencode', ['serve', '--port', String(PORT), '--hostname', HOST], {
+      detached: true,
+      stdio: 'ignore',
+      env
+    });
+    child.unref();
+    const ready = await waitForReady(Date.now() + SPAWN_TIMEOUT_MS);
+    if (!ready) throw new Error(`opencode serve on :${PORT} did not become ready within ${SPAWN_TIMEOUT_MS}ms (XDG_CONFIG_HOME=${env.XDG_CONFIG_HOME || '<default>'})`);
+  };
+
+  const ensureServer = async () => {
+    if (await ping()) return;
+    await spawnServer();
+  };
+
+  const resolveSession = async (existingId) => {
+    if (existingId) {
+      try {
+        const info = await request('GET', `/session/${encodeURIComponent(existingId)}`, null, 5000);
+        if (info && info.id) return info.id;
+      } catch { /* fall through to create */ }
+    }
+    const created = await request('POST', '/session', {}, 10000);
+    return created.id;
+  };
+
+  const randId = (prefix) => `${prefix}_${crypto.randomBytes(12).toString('hex')}`;
+
+  const sseSubscribe = (onEvent) => {
+    let lastFrameAt = Date.now();
+    const req = http.request({
+      host: HOST, port: PORT, method: 'GET', path: '/event',
+      headers: { Accept: 'text/event-stream' }
+    });
+    return new Promise((resolve, reject) => {
+      req.on('response', (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`SSE connect failed: HTTP ${res.statusCode}`));
+          res.resume();
+          return;
+        }
+        let buf = '';
+        const heartbeat = setInterval(() => {
+          if (Date.now() - lastFrameAt > HEARTBEAT_GRACE_MS) {
+            clearInterval(heartbeat);
+            req.destroy(new Error('SSE idle — no frames within grace period'));
+          }
+        }, 5000);
+        res.on('data', (chunk) => {
+          lastFrameAt = Date.now();
+          buf += chunk.toString('utf8');
+          let idx;
+          while ((idx = buf.indexOf('\n\n')) !== -1) {
+            const frame = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            const dataLine = frame.split('\n').find((l) => l.startsWith('data: '));
+            if (!dataLine) continue;
+            try {
+              const evt = JSON.parse(dataLine.slice(6));
+              const done = onEvent(evt);
+              if (done) {
+                clearInterval(heartbeat);
+                req.destroy();
+                resolve();
+                return;
+              }
+            } catch { /* ignore malformed */ }
+          }
+        });
+        res.on('end', () => { clearInterval(heartbeat); resolve(); });
+        res.on('error', (err) => { clearInterval(heartbeat); reject(err); });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  };
+
+  const translate = (evt, session) => {
+    if (!evt || typeof evt !== 'object') return null;
+    const props = evt.properties || {};
+    if (props.sessionID && props.sessionID !== session) return null;
+
+    if (evt.type === 'message.part.updated') {
+      const part = props.part || {};
+      if (part.sessionID && part.sessionID !== session) return null;
+      if (part.type === 'text' && typeof part.text === 'string' && part.time && part.time.end) {
+        return { type: 'text', content: part.text };
+      }
+      if (part.type === 'reasoning' && typeof part.text === 'string' && part.time && part.time.end) {
+        return { type: 'thinking', text: part.text };
+      }
+      if (part.type === 'tool') {
+        const state = part.state || {};
+        if (state.status === 'pending') {
+          return {
+            type: 'tool_use',
+            name: part.tool,
+            id: part.callID,
+            input: state.input || {}
+          };
+        }
+        if (state.status === 'completed') {
+          return {
+            type: 'tool_result',
+            tool_use_id: part.callID,
+            result: state.output ?? ''
+          };
+        }
+        if (state.status === 'error') {
+          return {
+            type: 'tool_result',
+            tool_use_id: part.callID,
+            result: state.output ?? (state.error && state.error.message) ?? 'error',
+            is_error: true
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const run = async () => {
+    await ensureServer();
+    const session = await resolveSession(sessionId);
+
+    const accumulated = [];
+    const finalMeta = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
+    let finalText = '';
+
+    const turnId = randId('msg');
+    const userPartId = randId('prt');
+
+    const combinedPrompt = system
+      ? `${system}\n\n${prompt}`
+      : prompt;
+
+    const onEvent = (evt) => {
+      if (evt.type === 'message.updated') {
+        const info = (evt.properties || {}).info || {};
+        if (info.role === 'assistant' && info.tokens) {
+          finalMeta.inputTokens = info.tokens.input || 0;
+          finalMeta.outputTokens = info.tokens.output || 0;
+          finalMeta.totalTokens = info.tokens.total || 0;
+          finalMeta.cost = info.cost || 0;
+        }
+      }
+      if (evt.type === 'session.idle' && (evt.properties || {}).sessionID === session) {
+        return true;
+      }
+      const translated = translate(evt, session);
+      if (translated) {
+        if (translated.type === 'text') {
+          finalText += translated.content;
+        }
+        accumulated.push(translated);
+        emit(translated);
+      }
+      return false;
+    };
+
+    let sseDone = false;
+    let sseError = null;
+    const sseTask = sseSubscribe(onEvent).then(
+      () => { sseDone = true; },
+      (err) => { sseDone = true; sseError = err; }
+    );
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    let postError = null;
+    const postTask = request('POST', `/session/${encodeURIComponent(session)}/message`, {
+      providerID: providerID || 'openrouter',
+      modelID: modelID || 'z-ai/glm-5.1',
+      parts: [{
+        id: userPartId,
+        sessionID: session,
+        messageID: turnId,
+        type: 'text',
+        text: combinedPrompt
+      }]
+    }).catch((err) => {
+      postError = err;
+      return null;
+    });
+
+    const timeoutMs = TURN_TIMEOUT_MS;
+    const timeout = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error(`turn exceeded ${timeoutMs}ms`)), timeoutMs));
+    try {
+      await Promise.race([sseTask, timeout]);
+    } catch (err) {
+      emitErr(err.message);
+    }
+
+    if (sseError) {
+      emitErr(sseError.message);
+      await postTask;
+      if (postError) emitErr(`POST /session/${session}/message failed: ${postError.message}`);
+    }
+
+    emit({
+      type: 'result',
+      text: finalText,
+      session_id: session,
+      input_tokens: finalMeta.inputTokens,
+      output_tokens: finalMeta.outputTokens,
+      total_tokens: finalMeta.totalTokens,
+      cost: finalMeta.cost
+    });
+  };
+
+  return run().then(() => ndjsonLines.join('\n')).catch((err) => {
+    emitErr(err && err.message ? err.message : String(err));
+    return ndjsonLines.join('\n');
+  });
+}
+
+>> ── Public invocation ──
+>>
+>> @opencode(prompt, config) — same shape as @mlld/claude and @mlld/opencode,
+>> but drives opencode through opencode serve + SSE for real-time tool events.
+>>
+>> config.model      - provider/model string, e.g. "anthropic/claude-sonnet-4-5"
+>>                     Split on the first "/" into providerID and modelID.
+>> config.dir        - working directory hint; opencode uses its own project dir
+>>                     derived from where `opencode serve` was launched. Included
+>>                     for interface parity; currently informational.
+>> config.system     - prepended to the prompt (opencode has no per-call system flag)
+>> config.stream     - enables live streaming via @opencodeSseStreamFormat
+>> config.sessionId  - explicit conversation tracking id
+>> config.resume     - explicit resume session id
+>> config.port       - opencode serve port (default 4096, or $OPENCODE_SSE_PORT)
+>>
+>> Not supported in v1 (falls through silently):
+>>   config.tools    - MCP bridge via opencode.json shadow requires controlling
+>>                     server startup; v1 assumes an already-running serve or
+>>                     spawns a fresh one with the user's existing config.
+>>   config.agent    - opencode agent override not plumbed through /message yet.
+>>   config.variant  - reasoning variant not plumbed through /message yet.
+>>   config.bypass   - permissions bypass is a CLI flag, not a /message option.
+llm @opencode(prompt, config) = [
+  let @cfg = @config ? @config : {}
+  let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"
+  let @dir = @cfg.dir ? @cfg.dir : @root
+  let @system = @cfg.system ? @cfg.system : ""
+  let @port = @cfg.port ? @cfg.port : ""
+  let @resume = @opencodeSseResume(@cfg)
+  let @split = @opencodeSseSplitModel(@model)
+  let @mcpConfigPath = @mx.llm && @mx.llm.config ? @mx.llm.config : ""
+  let @raw = @opencodeSseTurn(@prompt, @split.providerID, @split.modelID, @dir, @system, @resume.sessionId, @port, @mcpConfigPath)
+  let @parsed = @raw | @parseOpencodeSseResult
+  let @sessionId = @normalizeOpencodeSseSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
+  let @value = match [
+    @cfg.stream => @raw
+    @parsed.text => @parsed.text
+    * => @raw
+  ]
+  => @opencodeSseResult(@value, {
+    sessionId: @sessionId,
+    provider: "opencode",
+    source: @resume.source
+  })
+] with { stream: @cfg.stream, stream_format: @opencodeSseStreamFormat }
+
+>> Parses the aggregate ndjson emitted by @opencodeSseTurn, returning the
+>> `{type:"result"}` payload. Non-stream callers use this to recover final text
+>> and session id.
+exe @parseOpencodeSseResult(raw) = [
+  let @empty = { text: "", sessionId: null, inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 }
+  if !@raw.isString() || !@raw [ => @empty ]
+  let @events = for @line in @raw.split("\n") => @opencodeSseEvent(@line)
+  let @texts = for @e in @events if @e && @e.type == "text" && @e.content.isString() => @e.content
+  let @text = @texts.join("")
+  let @results = for @e in @events if @e && @e.type == "result" => @e
+  if @results.length == 0 [ => { ...@empty, text: @text } ]
+  let @last = @results.at(-1)
+  => {
+    text: @last["text"] || @text,
+    sessionId: @last.session_id || null,
+    inputTokens: @last.input_tokens || 0,
+    outputTokens: @last.output_tokens || 0,
+    totalTokens: @last.total_tokens || 0,
+    cost: @last.cost || 0
+  }
+]
+
+>> One NDJSON line as an object, or null for a blank, unparseable or non-object line.
+>> trim() also drops the \r of a CRLF line.
+exe @opencodeSseEvent(line) = [
+  let @trimmed = @line.trim()
+  let @parsed = try @trimmed | @parse
+  => match [
+    !@trimmed => null
+    !@parsed.ok => null
+    !@parsed.value.isObject() => null
+    * => @parsed.value
+  ]
+]
+
+>> The helpers are exported so tests can exercise them without a running `opencode serve`.
+export { @opencode, @opencodeSseStreamFormat, @opencodeSseSplitModel, @normalizeOpencodeSseSessionId, @opencodeSseResume, @opencodeSseResult, @parseOpencodeSseResult }

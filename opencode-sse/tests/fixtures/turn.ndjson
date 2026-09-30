@@ -1,0 +1,6 @@
+{"type":"init","session_id":"ses_1"}
+{"type":"text","content":"streamed "}
+garbage line
+[1,2]
+{"type":"text","content":"text"}
+{"type":"result","text":"final text","session_id":"ses_1","input_tokens":3,"output_tokens":5,"total_tokens":8,"cost":0.01}
