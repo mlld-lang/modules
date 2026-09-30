@@ -442,7 +442,7 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >>   consumes `text` events as they arrive; @raw still holds the full NDJSON.
 >> - Uses a `sh { }` block so interpolated values flow as bash env vars and
 >>   survive unescaped (see ticket m-8694 for the `cmd` block escaping bug).
-llm @opencode(prompt, config) = [
+llm @opencode(prompt, config) with { stream: @config.stream, stream_format: @opencodeStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"
@@ -487,7 +487,7 @@ llm @opencode(prompt, config) = [
     provider: "opencode",
     source: @resume.source
   })
-] with { stream: @cfg.stream, stream_format: @opencodeStreamFormat }
+]
 
 >> ── Conversation adapter ──
 >> Finds a stored opencode session and translates it into IFT events (the tape's
@@ -495,13 +495,13 @@ llm @opencode(prompt, config) = [
 >> has no opencode ingester, so the mapping is this module's own; the goldens in
 >> tests/fixtures/conversation pin it.
 
->> @conversation.locate(sessionId, cwd, root?, bin?) → absolute path, or null
+>> @conversation.locate(sessionId, cwd, storeRoot?, bin?) → absolute path, or null
 >> opencode keeps sessions in a private sqlite schema, so this goes through the
 >> public `opencode export <id>` and snapshots its JSON to a temp file the caller
->> owns. root is the XDG_DATA_HOME the session ran under (config.dataHome). cwd is
+>> owns. storeRoot is the XDG_DATA_HOME the session ran under (config.dataHome). cwd is
 >> ignored; it keeps the signature shared with the other harnesses. bin replaces
 >> the opencode binary, for tests.
-exe @conversationLocate(sessionId, cwd, root, bin) = node {
+exe @conversationLocate(sessionId, cwd, storeRoot, bin) = node {
   const fs = require("fs");
   const os = require("os");
   const path = require("path");
@@ -510,7 +510,7 @@ exe @conversationLocate(sessionId, cwd, root, bin) = node {
   // a flag or a path. opencode ids are case-sensitive: no normalising.
   if (typeof sessionId !== "string" || !/^ses_[A-Za-z0-9]+$/.test(sessionId)) return null;
   const env = { ...process.env };
-  if (typeof root === "string" && root) env.XDG_DATA_HOME = root;
+  if (typeof storeRoot === "string" && storeRoot) env.XDG_DATA_HOME = storeRoot;
   const exe = typeof bin === "string" && bin ? bin : "opencode";
   let out;
   try {

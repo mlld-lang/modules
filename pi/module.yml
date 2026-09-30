@@ -6,7 +6,7 @@ version: 1.2.0
 license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"
-mlldVersion: ">=2.0.5"
+mlldVersion: ">=2.2.0"
 
 >> Requires pi-mcp-adapter for MCP tool support
 >> Install with: pi install npm:pi-mcp-adapter

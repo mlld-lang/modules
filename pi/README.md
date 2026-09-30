@@ -15,38 +15,23 @@ This enables Pi to load MCP servers from config files.
 ## Usage
 
 ```mlld
-use { pi }
+import { @pi, @haiku } from @mlld/pi
 
 >> Basic invocation
-@pi("Analyze the code in src/")
+show @pi("Analyze the code in src/", {})
 
->> With custom model
-@pi("Review code" with { model: "claude-sonnet" })
+>> With a model, and the folder pi works in
+show @pi("Review code", { model: "claude-sonnet", dir: "src" })
 
 >> With mlld tools
-exe @myCustomExe(input) = js {
-  return `Processed: ${input}`;
+exe @shout(text) = js { return String(text).toUpperCase(); }
+tools @myTools = {
+  shout: { mlld: @shout, description: "Upper-case text" }
 }
-
-@pi("Process data" with {
-  tools: { 
-    myTool: { 
-      mlld: 'myCustomExe',
-      description: "Process input data"
-    }
-  }
-})
-
->> With pi built-in tools + mlld tools
-@pi("Read and process" with {
-  tools: { process: { mlld: 'processor' } },
-  provider: "anthropic"
-})
+show @pi("Shout hello", { tools: @myTools, provider: "anthropic" })
 
 >> Model shortcuts
-@haiku("Quick task")
-@sonnet("Standard task")
-@opus("Complex task")
+show @haiku("Quick task", {})
 ```
 
 ## How Tools Work
@@ -114,19 +99,19 @@ These can be selectively enabled via the native tools list.
 
 ## Exports
 
-```mlld
-@pi(prompt, config)       >> Main invocation
-@haiku(prompt, config)    >> Claude Haiku
-@sonnet(prompt, config)   >> Claude Sonnet  
-@opus(prompt, config)     >> Claude Opus
-@piStreamFormat           >> Stream format adapter
-@isPiBuiltin(name)        >> Check if tool is built-in
-@piToolAndMcpFlags(llm)  >> Build tool flags from @mx.llm
-@runPiSh(...)             >> Shell wrapper that runs pi (see Sessions)
-@piSession(config, root)  >> Session id and folder for a call
-@piResult(value, session) >> Result with its session id attached
-@conversation             >> Find and read saved pi sessions (below)
-```
+| Export | What it is |
+|---|---|
+| `@pi(prompt, config)` | Main invocation |
+| `@haiku(prompt, config)` | Claude Haiku |
+| `@sonnet(prompt, config)` | Claude Sonnet |
+| `@opus(prompt, config)` | Claude Opus |
+| `@piStreamFormat` | Stream format adapter |
+| `@piBuiltInTools` | pi's built-in tool names, comma-separated |
+| `@isPiBuiltin(name)` | Whether a tool is one of pi's built-ins |
+| `@runPiSh(...)` | Shell wrapper that runs pi (see Sessions) |
+| `@piSession(config, root)` | Session id and folder for a call |
+| `@piResult(value, session)` | Result with its session id attached |
+| `@conversation` | Find and read saved pi sessions (below) |
 
 ## Reading pi sessions: `@conversation`
 

@@ -277,7 +277,7 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
 >>   consumes chunks as they arrive; @raw still holds the full JSONL.
 >> - Uses a `sh { }` block instead of `cmd { }` so interpolated values flow as
 >>   bash env vars and TOML `"` literals in MCP overrides survive unescaped.
-llm @codex(prompt, config) = [
+llm @codex(prompt, config) with { stream: @config.stream, stream_format: @codexStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "gpt-5.4"
@@ -302,7 +302,7 @@ llm @codex(prompt, config) = [
     provider: "codex",
     source: @resume.source
   })
-] with { stream: @cfg.stream, stream_format: @codexStreamFormat }
+]
 
 >> ── Conversation adapter ──
 >> Finds the rollout JSONL codex writes for a session and translates it into IFT
@@ -311,11 +311,11 @@ llm @codex(prompt, config) = [
 >> parsed, so the logic follows fray's, quirks included, rather than reading more
 >> naturally.
 
->> @conversation.locate(sessionId, cwd, root?) → absolute path, or null
->> root is the sessions directory to search; without it, $CODEX_HOME/sessions and
+>> @conversation.locate(sessionId, cwd, storeRoot?) → absolute path, or null
+>> storeRoot is the sessions directory to search; without it, $CODEX_HOME/sessions and
 >> then ~/.codex/sessions. cwd is ignored: codex does not file rollouts by
 >> directory. The parameter keeps the signature shared with the other harnesses.
-exe @conversationLocate(sessionId, cwd, root) = node {
+exe @conversationLocate(sessionId, cwd, storeRoot) = node {
   const fs = require("fs");
   const path = require("path");
   const os = require("os");
@@ -324,13 +324,13 @@ exe @conversationLocate(sessionId, cwd, root) = node {
   // The id is matched against file names, so anything but a UUID is refused outright.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
   const roots = [];
-  if (typeof root === "string" && root) {
-    roots.push(root);
+  if (typeof storeRoot === "string" && storeRoot) {
+    roots.push(storeRoot);
   } else {
     if (process.env.CODEX_HOME) roots.push(path.join(process.env.CODEX_HOME, "sessions"));
     roots.push(path.join(os.homedir(), ".codex", "sessions"));
   }
-  // fray walks the root in lexical order without following symlinked directories
+  // fray walks the storeRoot in lexical order without following symlinked directories
   // and takes the first file whose id matches: rollout-YYYY-MM-DDTHH-MM-SS-<id>.jsonl,
   // or a legacy <id>.jsonl.
   const walk = (dir) => {

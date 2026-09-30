@@ -48,7 +48,7 @@ exe @freshRoot() = node {
   const fs = require("fs"), os = require("os"), path = require("path");
   return fs.mkdtempSync(path.join(os.tmpdir(), "mlld-opencode-test-"));
 }
-exe @ran(root) = node { return require("fs").existsSync(require("path").join(root, "ran")); }
+exe @ran(dataHome) = node { return require("fs").existsSync(require("path").join(dataHome, "ran")); }
 exe @exportId(p) = node {
   if (typeof p !== "string") return null;
   return JSON.parse(require("fs").readFileSync(p, "utf8")).info.id;

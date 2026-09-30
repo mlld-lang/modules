@@ -51,3 +51,13 @@ const @test_header_id = @header.id == @sid
 const @test_header_type = @header.type == "session"
 const @test_header_cwd_is_dir = @header.cwd == @workdir
 const @test_session_dir_ignores_itself = @readFile(`${@sessionDir}/.gitignore`).trim() == "*"
+
+>> ── system prompt ──
+
+>> The text reaches pi through a file, unchanged, backticks and ${…} included.
+const @systemText = "Answer in `code` only, never ${literally}; say \"ok\"."
+const @withSystem = @runPiSh("hi", "", "", "", @systemText, "", "", "", "", "", @stub)
+const @systemArgValue = @argsAfter(@withSystem, "--append-system-prompt")
+const @test_system_passed_as_file = @systemArgValue.includes("pi-system-") && @systemArgValue != @systemText
+const @test_system_file_holds_text = @has(@withSystem, `system=${@systemText}`)
+const @test_no_system_no_flag = !@hasPrefix(@unsaved, "arg=--append-system-prompt")
