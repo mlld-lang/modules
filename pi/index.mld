@@ -70,7 +70,8 @@ exe @isPiBuiltin(name) = js {
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Parameters are passed positionally, not by name, so order matters.
 >> sessionId and sessionDir come last so 8-argument callers keep --no-session.
-exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir) = sh {
+>> piBin is last so tests can point it at a stub; empty runs `pi` from PATH.
+exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir, piBin) = sh {
   set -e
   export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
 
@@ -119,7 +120,7 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
   fi
 
   # Run pi
-  printf '%s' "$prompt" | pi -p "${sessionFlag[@]}" "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
+  printf '%s' "$prompt" | "${piBin:-pi}" -p "${sessionFlag[@]}" "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
 }
 
 >> Picks the session a @pi call saves to: a fresh UUID per call unless
@@ -165,7 +166,6 @@ exe @piResult(inputValue, session) = when [
 >> config.tools    - tool collection (triggers @mx.llm context)
 >> config.noTools  - boolean, disable all tools
 >> config.flags    - extra raw pi flags, word-split (e.g. "--no-context-files")
->> config.sessionId - resumable session id; pi creates it, later calls append
 >> config.thinking - thinking level: off, minimal, low, medium, high, xhigh
 >> config.stream   - boolean, enables JSONL streaming
 >> config.session  - false to save nothing (pi --no-session); default saves to
