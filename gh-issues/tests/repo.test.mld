@@ -1,0 +1,13 @@
+>> Tests for how gh-issues names a repo, with no gh call.
+>> Run: mlld test gh-issues/tests/
+
+import { @repoOf, @repoPath } from "../repo.mld"
+
+const @named = @repoOf("acme", "app")
+const @test_named_owner = @named.owner == "acme"
+const @test_named_repo = @named.repo == "app"
+const @test_missing_owner_is_null = @repoOf(null, "app") == null
+const @test_missing_repo_is_null = @repoOf("acme", "") == null
+
+const @test_issues_path = @repoPath(@named, "/issues") == "repos/acme/app/issues"
+const @test_comment_path = @repoPath(@named, "/issues/42/comments") == "repos/acme/app/issues/42/comments"
