@@ -2,7 +2,7 @@ name: sqlite
 author: mlld
 type: library
 about: "SQLite-backed artifact storage"
-version: 0.1.0
+version: 0.2.0
 license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"
