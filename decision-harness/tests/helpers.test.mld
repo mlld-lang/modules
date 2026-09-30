@@ -1,0 +1,56 @@
+>> Tests for decision-harness's model choice and answer handling, with no model call.
+>> Run: mlld test decision-harness/tests/
+
+import { @resolveModel, @toCriteria, @keyList, @pickKey } from "../helpers.mld"
+
+>> ── @resolveModel ──
+
+const @absent = @resolveModel(null)
+const @test_absent_config_is_jev_latest = @absent.provider == "jev" && @absent.model == "jev-latest"
+const @test_absent_model_is_jev_latest = @resolveModel({}).model == "jev-latest"
+const @named = @resolveModel({ model: "jev" })
+const @test_jev_is_jev_latest = @named.provider == "jev" && @named.model == "jev-latest"
+const @preview = @resolveModel({ model: "jev-preview" })
+const @test_jev_variant_passes_through = @preview.provider == "jev" && @preview.model == "jev-preview"
+const @test_pinned_jev_passes_through = @resolveModel({ model: "jev-1.13.0" }).model == "jev-1.13.0"
+const @unknown = try @resolveModel({ model: "luna" })
+const @test_unknown_model_raises = !@unknown.ok && @unknown.error.message.includes("decision-harness: unknown model 'luna' (supported: jev)")
+
+>> ── @toCriteria / @keyList ──
+
+const @fromArray = @toCriteria(["billing", "infra"])
+const @test_criteria_from_array = @fromArray.billing == "billing" && @fromArray.infra == "infra" && @fromArray.mx.keys.length == 2
+const @described = { billing: "payments and refunds", infra: "outages" }
+const @test_criteria_object_passes_through = @toCriteria(@described).billing == "payments and refunds"
+const @test_criteria_empty_array_is_object = @toCriteria([]).isObject()
+
+const @test_key_list_from_array = @keyList(["billing", "infra"]).join(",") == "billing,infra"
+const @test_key_list_from_object = @keyList(@described).join(",") == "billing,infra"
+
+>> ── @pickKey ──
+
+const @keys = ["billing", "infra"]
+const @test_pick_listed_key = @pickKey({ choice: "infra", confidence: 0.4 }, @keys, null) == "infra"
+const @test_pick_from_object_keys = @pickKey({ choice: "billing", confidence: 0.4 }, @described, null) == "billing"
+const @test_unlisted_key_is_null = @pickKey({ choice: "sales", confidence: 0.99 }, @keys, null) == null
+const @test_null_answer_is_null = @pickKey(null, @keys, null) == null
+const @test_below_min_confidence_is_null = @pickKey({ choice: "infra", confidence: 0.69 }, @keys, 0.7) == null
+const @test_at_min_confidence_is_key = @pickKey({ choice: "infra", confidence: 0.7 }, @keys, 0.7) == "infra"
+
+>> ── labels survive the pick, so match choice can mint .chosen ──
+
+>> A js stub, because its result carries its argument's labels as a real jev answer
+>> does (@http marks it .untrusted). An `llm` stub with an mlld body does not: on
+>> mlld-v2 its result carries only .src:llm, so nothing would reach match choice.
+exe @fake(state) = js { return { choice: "billing", confidence: 0.9 }; }
+const .untrusted @email = "I was charged twice, please refund me"
+const @answer = @fake(@email)
+const @picked = @pickKey(@answer, @keys, null)
+const @routed = match choice @picked [
+  "infra" => "a"
+  "billing" => "b"
+  * => "c"
+]
+const @test_routes_on_pick = @routed == "b"
+const @test_route_is_chosen = @routed.mx.labels.includes(".chosen")
+const @test_route_keeps_untrusted_taint = @routed.mx.taint.includes(".untrusted")

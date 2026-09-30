@@ -1,0 +1,44 @@
+>> Model choice and answer handling for decision-harness, kept apart from
+>> index.mld so they test without importing jev.
+
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @raise(message) = js {
+  throw new Error(message);
+}
+
+>> { provider, model } for config.model. Absent means jev-latest; any "jev…" name
+>> is a jev model id and passes through. A config value is the caller's own, so
+>> a plain match: nothing here is picked by outside input.
+exe @resolveModel(config) = [
+  let @requested = (@config ?? {}).model ?? "jev"
+  => match [
+    @requested == "jev" => { provider: "jev", model: "jev-latest" }
+    @requested.isString() && @requested.startsWith("jev") => { provider: "jev", model: @requested }
+    * => @raise(`decision-harness: unknown model '${@requested}' (supported: jev)`)
+  ]
+]
+
+>> jev's choice criteria: an array of keys becomes { key: key }; an object of
+>> key to description passes through. A keyed `for` over an empty array yields
+>> [], hence the isObject() check.
+exe @toCriteria(keys) = [
+  if !@keys.isArray() [ => @keys ]
+  let @criteria = for @k in @keys => { [@k]: @k }
+  => @criteria.isObject() ? @criteria : {}
+]
+
+>> The keys themselves: an array as is, or an object's keys.
+exe @keyList(keys) = match [
+  @keys.isArray() => @keys
+  * => @keys.mx.keys
+]
+
+>> The model's pick when it is one of the keys and, if minConfidence is set, at
+>> least that confident; otherwise null. Returns the answer's own value rather
+>> than the matching key, because a copy would drop the labels it carries.
+exe @pickKey(answer, keys, minConfidence) = [
+  if !@answer [ => null ]
+  let @picked = @answer.choice
+  let @confident = @minConfidence == null || @answer.confidence >= @minConfidence
+  => @keyList(@keys).includes(@picked) && @confident ? @picked : null
+]
