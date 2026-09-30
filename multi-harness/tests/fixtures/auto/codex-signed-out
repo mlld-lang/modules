@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for a codex that is installed but not signed in.
+echo "Not logged in"
+exit 1

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for an installed opencode; the auto check only looks for it on disk.
+exit 0

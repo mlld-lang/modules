@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stands in for a signed-in codex: `login status` succeeds, and `exec` prints
+# the events @codex parses, with its arguments and prompt in the reply text.
+if [ "$1 $2" = "login status" ]; then echo "Logged in using ChatGPT"; exit 0; fi
+prompt=$(cat)
+printf '{"type":"thread.started","thread_id":"0199a213-81c0-7800-8aa1-bbab2a035a53"}\n'
+printf '{"type":"item.completed","item":{"type":"agent_message","text":"stub codex: %s | %s"}}\n' "$*" "$(printf '%s' "$prompt" | tr -d '"\\\n')"
+printf '{"type":"turn.completed","usage":{"input_tokens":3,"output_tokens":5}}\n'

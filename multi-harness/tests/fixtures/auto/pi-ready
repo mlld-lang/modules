@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for pi with a key for the asked provider: `auth check` says ready.
+[ "$1 $2" = "auth check" ] || exit 2
+printf '{"status":"ready","provider":"%s","authType":"api_key"}\n' "$4"

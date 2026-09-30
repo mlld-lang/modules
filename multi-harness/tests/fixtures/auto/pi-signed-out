@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stands in for pi with no key for the asked provider.
+[ "$1 $2" = "auth check" ] || exit 2
+printf '{"status":"not_ready","provider":"%s"}\n' "$4"
+exit 1

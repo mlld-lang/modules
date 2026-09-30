@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stands in for a claude that is installed but not signed in.
+[ "$1 $2" = "auth status" ] || exit 2
+printf '{"loggedIn": false}\n'
+exit 1

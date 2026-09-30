@@ -1,8 +1,8 @@
 ---
 name: multi-harness
 author: mlld
-version: 0.1.0
-about: One @agent that runs claude, codex, pi or opencode, picked by config.harness
+version: 0.2.0
+about: One @agent that runs claude, codex, pi or opencode, picked by config.harness or the first one ready
 license: CC0
 ---
 
@@ -18,19 +18,106 @@ exe @raise(message) = js {
   throw new Error(message);
 }
 
-exe @unknownHarness(harness) = @raise(`multi-harness: unknown harness '${@harness}' (supported: claude, codex, pi, opencode)`)
+exe @unknownHarness(harness) = @raise(`multi-harness: unknown harness '${@harness}' (supported: auto, claude, codex, pi, opencode)`)
 
->> Runs the prompt on config.harness. The whole config goes to that harness as
->> is, so its own keys (sandbox, thinking, agent, …) and its own model default
->> apply. A config value is the caller's own, so a plain match picks the harness.
+>> Each check prints "ready" or why not, and never calls a model, so auto costs
+>> nothing. A check failing for an unexpected reason only skips to the next tool.
+>> The bin argument is the config's …Bin key; empty means the tool on PATH.
+>> A check runs the tool itself, which may write its own state (pi locks its
+>> auth file), so it gets the same fence profile as that tool's harness; only
+>> `llm` definitions can declare one.
+llm @claudeStatus(bin) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = sh {
+  b="${bin:-claude}"
+  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
+  out=$(env -u CLAUDECODE "$b" auth status --json 2>/dev/null) || { printf 'not signed in'; exit 0; }
+  if printf '%s' "$out" | grep -q '"loggedIn"[[:space:]]*:[[:space:]]*true'; then printf 'ready'; else printf 'not signed in'; fi
+}
+
+llm @codexStatus(bin) using { harness: { write: [".", "~/.codex"], net: "open" } } = sh {
+  b="${bin:-codex}"
+  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
+  if "$b" login status >/dev/null 2>&1; then printf 'ready'; else printf 'not signed in'; fi
+}
+
+>> `pi auth check` needs a provider, so without config.provider this uses the
+>> defaultProvider from pi's own settings, as a pi run would.
+llm @piStatus(bin, provider) using { harness: { write: [".", "~/.pi/agent"], net: "open" } } = sh {
+  b="${bin:-pi}"
+  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
+  p="$provider"
+  if [ -z "$p" ]; then
+    settings="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/settings.json"
+    [ -f "$settings" ] && p=$(sed -n 's/.*"defaultProvider"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$settings" | head -n 1)
+  fi
+  [ -n "$p" ] || { printf 'not signed in (no provider set)'; exit 0; }
+  out=$("$b" auth check --provider "$p" --json 2>/dev/null)
+  if printf '%s' "$out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ready"'; then printf 'ready'; else printf 'not signed in'; fi
+}
+
+>> Reads opencode's auth file instead of running `opencode auth list`, so the
+>> check starts no opencode process. A <PROVIDER>_API_KEY variable also counts,
+>> since opencode reads those too.
+exe @opencodeStatus(bin, model, dataHome) = sh {
+  b="${bin:-opencode}"
+  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
+  p="${model%%/*}"
+  auth="${dataHome:-${XDG_DATA_HOME:-$HOME/.local/share}}/opencode/auth.json"
+  if [ -f "$auth" ] && grep -q "\"$p\"[[:space:]]*:" "$auth"; then printf 'ready'; exit 0; fi
+  key="$(printf '%s' "$p" | tr 'a-z-' 'A-Z_')_API_KEY"
+  if [ -n "$(printenv "$key")" ]; then printf 'ready'; else printf 'not signed in'; fi
+}
+
+>> The tool config.harness names; for "auto" or no harness, the first ready one
+>> in the order claude, codex, pi, opencode, logged to stderr. Checks stop at the
+>> first ready tool.
+exe @pickHarness(config) = [
+  let @cfg = @config ?? {}
+  let @asked = @cfg.harness ?? "auto"
+  if @asked != "auto" [ => @asked ]
+  >> Fallbacks are settled before any check: a `??` evaluated after an `if` on
+  >> a check's output picks up that output's .src label.
+  let @claudeBin = @cfg.claudeBin ?? ""
+  let @codexBin = @cfg.codexBin ?? ""
+  let @piBin = @cfg.piBin ?? ""
+  let @piProvider = @cfg.provider ?? ""
+  let @opencodeBin = @cfg.opencodeBin ?? ""
+  let @opencodeModel = @cfg.model ?? "openrouter/z-ai/glm-5.1"
+  let @opencodeData = @cfg.dataHome ?? ""
+  let @claudeWhy = @claudeStatus(@claudeBin)
+  if @claudeWhy == "ready" [
+    log "multi-harness: auto picked claude"
+    => "claude"
+  ]
+  let @codexWhy = @codexStatus(@codexBin)
+  if @codexWhy == "ready" [
+    log `multi-harness: auto picked codex (claude: ${@claudeWhy})`
+    => "codex"
+  ]
+  let @piWhy = @piStatus(@piBin, @piProvider)
+  if @piWhy == "ready" [
+    log `multi-harness: auto picked pi (claude: ${@claudeWhy}; codex: ${@codexWhy})`
+    => "pi"
+  ]
+  let @opencodeWhy = @opencodeStatus(@opencodeBin, @opencodeModel, @opencodeData)
+  if @opencodeWhy == "ready" [
+    log `multi-harness: auto picked opencode (claude: ${@claudeWhy}; codex: ${@codexWhy}; pi: ${@piWhy})`
+    => "opencode"
+  ]
+  => @raise(`multi-harness: no harness available (claude: ${@claudeWhy}; codex: ${@codexWhy}; pi: ${@piWhy}; opencode: ${@opencodeWhy})`)
+]
+
+>> Runs the prompt on config.harness, or on the tool @pickHarness finds for
+>> "auto". The whole config goes to that harness as is, so its own keys
+>> (sandbox, thinking, agent, …) and its own model default apply.
 llm @agent(prompt, config) = [
   let @cfg = @config ?? {}
-  => match @cfg.harness [
+  let @harness = @pickHarness(@cfg)
+  => match @harness [
     "claude" => @claudeHarness.claude(@prompt, @cfg)
     "codex" => @codexHarness.codex(@prompt, @cfg)
     "pi" => @piHarness.pi(@prompt, @cfg)
     "opencode" => @opencodeHarness.opencode(@prompt, @cfg)
-    * => @unknownHarness(@cfg.harness)
+    * => @unknownHarness(@harness)
   ]
 ]
 
@@ -44,4 +131,4 @@ exe @conversation(harness) = match @harness [
   * => @unknownHarness(@harness)
 ]
 
-export { @agent, @conversation }
+export { @agent, @pickHarness, @conversation }

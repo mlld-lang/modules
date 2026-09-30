@@ -23,9 +23,10 @@ const @test_opencode_ran = @opencodeOut.startsWith("stub opencode: run") && @ope
 const @test_result_is_llm_output = @codexOut.mx.labels.includes(".src:llm")
 
 const @unknown = try @agent("hi", { harness: "luna" })
-const @test_unknown_harness_raises = !@unknown.ok && @unknown.error.message.includes("multi-harness: unknown harness 'luna' (supported: claude, codex, pi, opencode)")
-const @missing = try @agent("hi", {})
-const @test_missing_harness_raises = !@missing.ok && @missing.error.message.includes("multi-harness: unknown harness")
+const @test_unknown_harness_raises = !@unknown.ok && @unknown.error.message.includes("multi-harness: unknown harness 'luna' (supported: auto, claude, codex, pi, opencode)")
+>> No harness means auto; every …Bin points nowhere so the machine's own tools stay out.
+const @missing = try @agent("hi", { claudeBin: "/nonexistent/claude", codexBin: "/nonexistent/codex", piBin: "/nonexistent/pi", opencodeBin: "/nonexistent/opencode" })
+const @test_missing_harness_means_auto = !@missing.ok && @missing.error.message.includes("multi-harness: no harness available")
 
 >> ── @conversation ──
 

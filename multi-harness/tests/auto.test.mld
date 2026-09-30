@@ -1,0 +1,32 @@
+>> Tests that harness "auto" picks the first ready tool, against stub binaries,
+>> with no model call. Every …Bin is always set (absent = a path that does not
+>> exist) so the machine's own tools never take part.
+>> Run: mlld test multi-harness/tests/
+
+import { @agent, @pickHarness } from "../index.mld"
+
+const @f = `${@root}/multi-harness/tests/fixtures/auto`
+const @none = "/nonexistent/bin"
+
+const @allReady = { harness: "auto", claudeBin: `${@f}/claude-ready`, codexBin: `${@f}/codex-ready`, piBin: `${@f}/pi-ready`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "stubprov/x", dataHome: `${@f}/opencode-data` }
+const @test_first_in_order_wins = @pickHarness(@allReady) == "claude"
+
+const @noClaude = { harness: "auto", claudeBin: @none, codexBin: `${@f}/codex-ready`, piBin: `${@f}/pi-ready`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "stubprov/x", dataHome: `${@f}/opencode-data` }
+const @test_skips_not_installed = @pickHarness(@noClaude) == "codex"
+
+const @signedOut = { claudeBin: `${@f}/claude-signed-out`, codexBin: `${@f}/codex-signed-out`, piBin: `${@f}/pi-ready`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "stubprov/x", dataHome: `${@f}/opencode-data` }
+const @test_skips_signed_out = @pickHarness(@signedOut) == "pi"
+
+const @onlyOpencode = { harness: "auto", claudeBin: `${@f}/claude-signed-out`, codexBin: @none, piBin: `${@f}/pi-signed-out`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "stubprov/x", dataHome: `${@f}/opencode-data` }
+const @test_opencode_when_only_ready = @pickHarness(@onlyOpencode) == "opencode"
+
+>> The opencode auth file has a key for stubprov only, so another provider is not signed in.
+const @noneReady = { harness: "auto", claudeBin: @none, codexBin: `${@f}/codex-signed-out`, piBin: `${@f}/pi-signed-out`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "otherprov/x", dataHome: `${@f}/opencode-data` }
+const @nothing = try @pickHarness(@noneReady)
+const @test_none_ready_raises = !@nothing.ok && @nothing.error.message.includes("multi-harness: no harness available (claude: not installed; codex: not signed in; pi: not signed in; opencode: not signed in)")
+
+>> A named harness is used as is: this claude does not exist, and no check notices.
+const @test_explicit_skips_checks = @pickHarness({ harness: "claude", claudeBin: @none }) == "claude"
+
+const @ran = @agent("hi auto", { claudeBin: @none, codexBin: `${@f}/codex-ready`, piBin: @none, opencodeBin: @none, model: "m-codex" })
+const @test_auto_run_reaches_pick = @ran.startsWith("stub codex: exec") && @ran.includes("-m m-codex") && @ran.includes("| hi auto")

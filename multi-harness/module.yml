@@ -1,8 +1,8 @@
 name: multi-harness
 author: mlld
 type: library
-about: "One @agent that runs claude, codex, pi or opencode, picked by config.harness"
-version: 0.1.0
+about: "One @agent that runs claude, codex, pi or opencode, picked by config.harness or the first one ready"
+version: 0.2.0
 license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for a signed-in claude: answers `auth status --json` only.
+[ "$1 $2" = "auth status" ] || exit 2
+printf '{"loggedIn": true, "authMethod": "claude.ai"}\n'
