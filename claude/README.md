@@ -44,6 +44,7 @@ Core invocation. All other exes delegate to this.
 | `bare` | boolean | `false` | Full isolation: skip CLAUDE.md, hooks, plugins. Requires `ANTHROPIC_API_KEY`. |
 | `sessionId` | string | auto-generated | Session UUID for conversation tracking. Every call gets a session (generated if omitted). |
 | `resume` | string | — | Session UUID to resume. Uses `--resume`, no tools. The prompt is appended to the existing conversation. |
+| `claudeBin` | string | `claude` on PATH | The claude executable to run, e.g. a stub in tests. |
 
 ```mlld
 >> Simple call
@@ -169,7 +170,7 @@ const @result = @claudePollEvent("Process ticket m-24a0", {
 
 ### `@claudeStreamFormat`
 
-NDJSON adapter config for Claude Code CLI streaming output. Use with `with { streamFormat: @claudeStreamFormat }` in custom exe definitions.
+NDJSON adapter config for Claude Code CLI streaming output. Use with `with { stream_format: @claudeStreamFormat }` in custom exe definitions.
 
 Handles event types: message, thinking, tool-use, tool-result, error, metadata.
 
@@ -186,13 +187,13 @@ const @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 
-**`@conversation.locate(sessionId, cwd, root?)`** returns the absolute path of the session's log, or `null`.
+**`@conversation.locate(sessionId, cwd, configDir?)`** returns the absolute path of the session's log, or `null`.
 
-- Claude Code keeps each session at `<root>/projects/<slug>/<session-id>.jsonl`, where the slug is `cwd` with every character other than a letter or digit turned into `-`.
-- `root` defaults to `$CLAUDE_CONFIG_DIR`, then `~/.claude`.
+- Claude Code keeps each session at `<configDir>/projects/<slug>/<session-id>.jsonl`, where the slug is `cwd` with every character other than a letter or digit turned into `-`.
+- `configDir` defaults to `$CLAUDE_CONFIG_DIR`, then `~/.claude`.
 - The id is lowercased first, so the uppercase ids `@claude` returns work.
-- If the file is not under the expected slug, any `<root>/projects/*/<session-id>.jsonl` is used instead.
-- It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the path would leave `<root>/projects/`.
+- If the file is not under the expected slug, any `<configDir>/projects/*/<session-id>.jsonl` is used instead.
+- It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the path would leave `<configDir>/projects/`.
 
 **`@conversation.ingest(text)`** returns `{ header, events }`.
 
