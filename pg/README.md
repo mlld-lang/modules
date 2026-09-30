@@ -39,9 +39,9 @@ Upsert one artifact record at `collection/key`.
 Stores:
 - `payload`
 - `meta`
-- `labels` from `@mx.labels`
-- `provenance` from `@mx.taint` and `@mx.sources`
-- full `mx`
+- `labels` the payload carries (`@payload.mx.labels`)
+- `provenance` from the payload's `mx.taint` and `mx.sources`
+- `mx`: those three lists together
 - timestamps
 
 ### `@appendArtifact(config, collection, payload, meta)`

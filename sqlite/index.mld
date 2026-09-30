@@ -1,5 +1,7 @@
 needs { node: [better-sqlite3] }
 
+import { @artifactRecord } from "./record.mld"
+
 const @defaultLimit = 50
 
 exe @sqliteStore(action, config, request) = node {
@@ -29,7 +31,6 @@ exe @sqliteStore(action, config, request) = node {
     return value;
   };
 
-  const toArray = value => Array.isArray(value) ? value : [];
 
   const safeParse = value => {
     if (value === null || value === undefined) {
@@ -105,19 +106,6 @@ exe @sqliteStore(action, config, request) = node {
     };
   };
 
-  const normalizeMeta = (meta, mx) => {
-    const mxObj = toObject(mx);
-    return {
-      meta: toObject(meta),
-      labels: toArray(mxObj.labels),
-      provenance: {
-        taint: toArray(mxObj.taint),
-        sources: toArray(mxObj.sources)
-      },
-      mx: mxObj
-    };
-  };
-
   const cfg = normalizeConfig(config);
   const req = toObject(request);
   const db = openDb(cfg);
@@ -132,7 +120,7 @@ exe @sqliteStore(action, config, request) = node {
     if (action === 'put') {
       const collection = assertNonEmptyString(req.collection, 'collection');
       const key = assertNonEmptyString(req.key, 'key');
-      const record = normalizeMeta(req.meta, req.mx);
+      const record = toObject(req.record);
       const now = new Date().toISOString();
       const pathKey = `${collection}/${key}`;
       const stmt = db.prepare(`
@@ -179,7 +167,7 @@ exe @sqliteStore(action, config, request) = node {
       const key = req.key && String(req.key).trim().length > 0
         ? String(req.key).trim()
         : crypto.randomUUID();
-      const record = normalizeMeta(req.meta, req.mx);
+      const record = toObject(req.record);
       const now = new Date().toISOString();
       const info = db.prepare(`
         INSERT INTO ${quote(cfg.table)} (
@@ -247,24 +235,20 @@ exe @sqliteStore(action, config, request) = node {
 exe @init(config) = @sqliteStore("ensure", @config, {})
 exe @ensureSchema(config) = @sqliteStore("ensure", @config, {})
 
-exe @putArtifact(config, collection, key, payload, meta) = [
-  let @details = @meta ? @meta : {}
+exe @putArtifact(config, collection, key, artifact, meta) = [
   => @sqliteStore("put", @config, {
     collection: @collection,
     key: @key,
-    payload: @payload,
-    meta: @details,
-    mx: @mx
+    payload: @artifact,
+    record: @artifactRecord(@artifact, @meta)
   })
 ]
 
-exe @appendArtifact(config, collection, payload, meta) = [
-  let @details = @meta ? @meta : {}
+exe @appendArtifact(config, collection, artifact, meta) = [
   => @sqliteStore("append", @config, {
     collection: @collection,
-    payload: @payload,
-    meta: @details,
-    mx: @mx
+    payload: @artifact,
+    record: @artifactRecord(@artifact, @meta)
   })
 ]
 
@@ -281,4 +265,4 @@ exe @listArtifacts(config, collection, limit) = [
   })
 ]
 
-export { @init, @ensureSchema, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts }
+export { @artifactRecord, @init, @ensureSchema, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts }
