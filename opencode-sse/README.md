@@ -13,7 +13,7 @@ The module is also smaller in intent: one `node {}` block drives the whole turn,
 ```mlld
 import { @opencode } from @mlld/opencode-sse
 
-var @reply = @opencode("Summarize this doc", {
+const @reply = @opencode("Summarize this doc", {
   model: "openrouter/z-ai/glm-5.1",
   system: "You are concise."
 })
@@ -24,14 +24,17 @@ show @reply
 Interface is the same as `@mlld/claude` and `@mlld/opencode`:
 
 ```mlld
-var @result = @opencode(@prompt, {
-  model: "anthropic/claude-sonnet-4-5",   # provider/model
-  dir: @root,                              # working directory hint
-  system: "...",                           # prepended to prompt
-  stream: true,                            # enable live streaming
-  sessionId: "ses_abc...",                 # track or resume a session
-  resume: "ses_abc...",                    # resume another session
-  port: 4096                               # opencode serve port
+>> model: provider/model; dir: working directory hint; system: prepended to the prompt
+>> stream: live streaming; sessionId: track or resume a session; resume: resume another session
+>> port: opencode serve port
+const @result = @opencode(@prompt, {
+  model: "anthropic/claude-sonnet-4-5",
+  dir: @root,
+  system: "...",
+  stream: true,
+  sessionId: "ses_abc...",
+  resume: "ses_abc...",
+  port: 4096
 })
 ```
 
@@ -42,7 +45,7 @@ Pass `stream: true` and mlld's stream adapter consumes claude-shaped events:
 ```mlld
 import { @opencode, @opencodeSseStreamFormat } from @mlld/opencode-sse
 
-var @out = @opencode("Run ls then summarize", {
+const @out = @opencode("Run ls then summarize", {
   model: "anthropic/claude-sonnet-4-5",
   stream: true
 })
@@ -75,9 +78,9 @@ Opencode sessions persist on the server between turns; just reuse the same `sess
 mlld-defined exes passed via `config.tools` are translated into opencode's `mcp` config and loaded into the server:
 
 ```mlld
-/exe @addNumbers(a, b) = js { return { sum: Number(a) + Number(b) }; }
+exe @addNumbers(a, b) = js { return { sum: Number(a) + Number(b) }; }
 
-/var @reply = @opencode("Use addNumbers to compute 17 + 25.", {
+const @reply = @opencode("Use addNumbers to compute 17 + 25.", {
   model: "openrouter/z-ai/glm-5.1",
   tools: [@addNumbers]
 })
@@ -85,7 +88,7 @@ mlld-defined exes passed via `config.tools` are translated into opencode's `mcp`
 
 Under the hood: the claude-format `@mx.llm.config` is translated into opencode's top-level `mcp` block, written to a shadow `XDG_CONFIG_HOME/opencode/opencode.json`, and `opencode serve` is spawned with that env pointing at the shadow dir. Sibling files (auth, plugins) symlink through; only the config file is rewritten.
 
-**Server-per-call with tools.** mlld's MCP tool bridge is call-scoped — each `exe llm` invocation generates a fresh socket and proxy. Because `opencode serve` reads its MCP config at startup, this module spawns a dedicated server per tool-using call. Side effects:
+**Server-per-call with tools.** mlld's MCP tool bridge is call-scoped — each `llm` invocation generates a fresh socket and proxy. Because `opencode serve` reads its MCP config at startup, this module spawns a dedicated server per tool-using call. Side effects:
 
 - Session continuity *does* work across tool-using calls (opencode's session DB lives outside `XDG_CONFIG_HOME`) if you thread `config.sessionId` explicitly.
 - Orphaned `opencode serve` processes accumulate across runs. Clean up with `pkill -f "opencode serve --port"`.
@@ -112,7 +115,7 @@ A future mlld change making the tool bridge run-scoped would let multiple tool-u
 6. Close SSE and return when `session.idle` arrives for our session.
 7. Emit a final `{ type: "result", text, session_id, input_tokens, output_tokens, cost }` so non-stream callers can recover the aggregate.
 
-The node block writes each translated event to its stdout as it arrives. mlld's stream adapter (`streamFormat: @opencodeSseStreamFormat`) consumes the same stream live when `stream: true`.
+The node block writes each translated event to its stdout as it arrives. mlld's stream adapter (`stream_format: @opencodeSseStreamFormat`) consumes the same stream live when `stream: true`.
 
 ## Requirements
 
@@ -123,4 +126,5 @@ The node block writes each translated event to its stdout as it arrives. mlld's 
 ## Exports
 
 - `@opencode(prompt, config)` — main exe.
-- `@opencodeSseStreamFormat` — claude-shaped stream format for `with { streamFormat: ... }`.
+- `@opencodeSseStreamFormat` — claude-shaped stream format for `with { stream_format: ... }`.
+- `@opencodeSseSplitModel`, `@normalizeOpencodeSseSessionId`, `@opencodeSseResume`, `@opencodeSseResult`, `@parseOpencodeSseResult` — the helpers `@opencode` is built from, exported so they can be tested without a server.

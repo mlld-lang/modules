@@ -8,21 +8,22 @@ license: CC0
 
 >> ── Endpoint ──
 
-var @endpoint = "https://api.typesafe.ai/v1/systemone"
-var @modelsEndpoint = "https://api.typesafe.ai/v1/models"
+const @endpoint = "https://api.typesafe.ai/v1/systemone"
+const @modelsEndpoint = "https://api.typesafe.ai/v1/models"
 
 >> ── HTTP with retry ──
 
+>> js because mlld has no sleep; the backoff needs a real wait between attempts.
 exe @pause(attempt) = js {
   await new Promise((r) => setTimeout(r, Math.min(8000, 500 * Math.pow(2, attempt))));
   return attempt;
 }
 
 >> 429 and 529 are the two statuses TypeSafe asks you to back off on.
-exe llm @send(body, attempt) = [
-  let @res = @http.post(@endpoint, @body) with { creds: "typesafe" }
+llm @send(body, attempt) = [
+  let @res = @http.post(@endpoint, @body) using creds:typesafe
   let @retryable = @res.status == 429 || @res.status == 529
-  => when [
+  => match [
     @res.ok => { ok: true, value: @res.body }
     @retryable && @attempt < 3 => [
       @pause(@attempt)
@@ -32,6 +33,7 @@ exe llm @send(body, attempt) = [
   ]
 ]
 
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
 exe @raise(r) = js {
   throw new Error(`typesafe ${r.status}: ${typeof r.value === "string" ? r.value : JSON.stringify(r.value)}`);
 }
@@ -44,7 +46,7 @@ exe @askFull(state, questions, config) = [
   let @model = @cfg.model ?? "jev-latest"
   let @body = { state: @state, model: @model, questions: @questions }
   let @r = @send(@body, 0)
-  => when [
+  => match [
     @r.ok => @r.value
     * => @raise(@r)
   ]
@@ -59,8 +61,8 @@ exe @ask(state, questions, config) = [
 
 >> Model names this key may send in `config.model`.
 exe @models() = [
-  let @res = @http.get(@modelsEndpoint) with { creds: "typesafe" }
-  => when [
+  let @res = @http.get(@modelsEndpoint) using creds:typesafe
+  => match [
     @res.ok => @res.body.models
     * => @raise({ status: @res.status, value: @res.body })
   ]
@@ -77,7 +79,7 @@ exe @score(instructions, criteria) = { type: "score", instructions: @instruction
 >> How true is this statement, 0 to 1. `criteria` optionally clarifies { true, false }.
 exe @noul(instructions, criteria) = [
   let @c = @criteria ?? null
-  => when [
+  => match [
     @c => { type: "noul", instructions: @instructions, criteria: @c }
     * => { type: "noul", instructions: @instructions }
   ]
@@ -106,19 +108,21 @@ exe @askNoul(state, instructions, criteria, config) = [
 
 >> ── Many yes/no statements at once ──
 
-exe @toNoulQuestions(statements) = js {
-  const out = {};
-  for (const [k, v] of Object.entries(statements || {})) {
-    out[k] = { type: "noul", instructions: v };
-  }
-  return out;
-}
+>> Folds [key, value] entries into an object one key at a time, because a `for`
+>> over an object returns an array and drops the keys.
+exe @noulQuestionsFrom(entries, acc) = match [
+  @entries.length == 0 => @acc
+  * => @noulQuestionsFrom(@entries.slice(1), { ...@acc, [@entries[0][0]]: { type: "noul", instructions: @entries[0][1] } })
+]
 
-exe @toNoulValues(answers) = js {
-  const out = {};
-  for (const [k, v] of Object.entries(answers || {})) out[k] = v.noul;
-  return out;
-}
+exe @noulValuesFrom(entries, acc) = match [
+  @entries.length == 0 => @acc
+  * => @noulValuesFrom(@entries.slice(1), { ...@acc, [@entries[0][0]]: @entries[0][1].noul })
+]
+
+exe @toNoulQuestions(statements) = @noulQuestionsFrom((@statements ?? {}).mx.entries, {})
+
+exe @toNoulValues(answers) = @noulValuesFrom((@answers ?? {}).mx.entries, {})
 
 >> Map of name to statement in, map of name to 0..1 out. One call.
 exe @flags(state, statements, config) = [
@@ -127,4 +131,5 @@ exe @flags(state, statements, config) = [
   => @toNoulValues(@answers)
 ]
 
-export { @ask, @askFull, @flags, @models, @choice, @score, @noul, @askChoice, @askScore, @askNoul }
+>> @toNoulQuestions and @toNoulValues are exported so tests can check the @flags reshaping without a TypeSafe call.
+export { @ask, @askFull, @flags, @models, @choice, @score, @noul, @askChoice, @askScore, @askNoul, @toNoulQuestions, @toNoulValues }

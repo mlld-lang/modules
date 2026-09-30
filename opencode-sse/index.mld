@@ -5,7 +5,7 @@ needs { sh }
 >> The node {} block translates opencode-serve's SSE events into these claude-shaped
 >> lines before writing them to stdout. mlld's stream adapter consumes them the same
 >> way it consumes Claude Code's native NDJSON.
-var @opencodeSseStreamFormat = {
+const @opencodeSseStreamFormat = {
   name: "opencode-sse",
   format: "ndjson",
   schemas: [
@@ -63,11 +63,11 @@ var @opencodeSseStreamFormat = {
 >> ── Session / resume helpers ──
 
 >> Opencode session ids are `ses_<base36>` and case-sensitive — trim only, don't upcase.
-exe @normalizeOpencodeSseSessionId(sessionId) = js {
-  if (typeof sessionId !== "string") return null;
-  const trimmed = sessionId.trim();
-  return trimmed || null;
-}
+exe @normalizeOpencodeSseSessionId(sessionId) = match [
+  !@sessionId.isString() => null
+  @sessionId.trim() => @sessionId.trim()
+  * => null
+]
 
 >> Reads the public and runtime-injected resume/session config.
 >>
@@ -88,7 +88,7 @@ exe @opencodeSseResume(config) = [
   let @runtimeSessionId = @normalizeOpencodeSseSessionId(@resume.sessionId)
   let @publicSessionId = @normalizeOpencodeSseSessionId(@cfg.sessionId)
   let @publicResumeId = @normalizeOpencodeSseSessionId(@cfg.resume)
-  => when [
+  => match [
     @resume.continue && @runtimeSessionId && @runtimeProvider == "opencode" => {
       continue: true,
       sessionId: @runtimeSessionId,
@@ -124,16 +124,21 @@ exe @opencodeSseResume(config) = [
 
 >> Splits a "provider/model" string into { providerID, modelID }.
 >> Defaults to openrouter / z-ai/glm-5.1 when no slash is present.
-exe @opencodeSseSplitModel(model) = js {
-  const raw = typeof model === "string" && model.length ? model : "openrouter/z-ai/glm-5.1";
-  const idx = raw.indexOf("/");
-  if (idx <= 0) return { providerID: "openrouter", modelID: raw };
-  return { providerID: raw.slice(0, idx), modelID: raw.slice(idx + 1) };
-}
+exe @opencodeSseSplitModel(model) = [
+  let @spec = match [
+    @model.isString() && @model.length > 0 => @model
+    * => "openrouter/z-ai/glm-5.1"
+  ]
+  let @idx = @spec.indexOf("/")
+  => match [
+    @idx <= 0 => { providerID: "openrouter", modelID: @spec }
+    * => { providerID: @spec.slice(0, @idx), modelID: @spec.slice(@idx + 1) }
+  ]
+]
 
 >> Wraps the result with a runtime-visible `_mlld` envelope so the interpreter
 >> can harvest the session id and provider across guard-driven resume.
-exe @opencodeSseResult(inputValue, resume) = when [
+exe @opencodeSseResult(inputValue, resume) = match [
   @resume.sessionId => {
     value: @inputValue,
     _mlld: {
@@ -156,6 +161,9 @@ exe @opencodeSseResult(inputValue, resume) = when [
 >> non-stream callers.
 >>
 >> The final line is always `{"type":"result", ...}` carrying the aggregate.
+>>
+>> node because the turn holds a long-lived HTTP event stream open while it
+>> posts the prompt, and spawns `opencode serve`; mlld's @http has no streaming read.
 exe @opencodeSseTurn(prompt, providerID, modelID, dir, system, sessionId, port, mcpConfigPath) = node {
   const http = require('node:http');
   const fs = require('node:fs');
@@ -549,7 +557,7 @@ exe @opencodeSseTurn(prompt, providerID, modelID, dir, system, sessionId, port, 
 >>   config.agent    - opencode agent override not plumbed through /message yet.
 >>   config.variant  - reasoning variant not plumbed through /message yet.
 >>   config.bypass   - permissions bypass is a CLI flag, not a /message option.
-exe llm @opencode(prompt, config) = [
+llm @opencode(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"
   let @dir = @cfg.dir ? @cfg.dir : @root
@@ -561,7 +569,7 @@ exe llm @opencode(prompt, config) = [
   let @raw = @opencodeSseTurn(@prompt, @split.providerID, @split.modelID, @dir, @system, @resume.sessionId, @port, @mcpConfigPath)
   let @parsed = @raw | @parseOpencodeSseResult
   let @sessionId = @normalizeOpencodeSseSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
-  let @value = when [
+  let @value = match [
     @cfg.stream => @raw
     @parsed.text => @parsed.text
     * => @raw
@@ -571,35 +579,42 @@ exe llm @opencode(prompt, config) = [
     provider: "opencode",
     source: @resume.source
   })
-] with { stream: @cfg.stream, streamFormat: @opencodeSseStreamFormat }
+] with { stream: @cfg.stream, stream_format: @opencodeSseStreamFormat }
 
 >> Parses the aggregate ndjson emitted by @opencodeSseTurn, returning the
 >> `{type:"result"}` payload. Non-stream callers use this to recover final text
 >> and session id.
-exe @parseOpencodeSseResult(raw) = js {
-  if (typeof raw !== "string" || !raw) {
-    return { text: "", sessionId: null, inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
+exe @parseOpencodeSseResult(raw) = [
+  let @empty = { text: "", sessionId: null, inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 }
+  if !@raw.isString() || !@raw [ => @empty ]
+  let @events = for @line in @raw.split("\n") => @opencodeSseEvent(@line)
+  let @texts = for @e in @events if @e && @e.type == "text" && @e.content.isString() => @e.content
+  let @text = @texts.join("")
+  let @results = for @e in @events if @e && @e.type == "result" => @e
+  if @results.length == 0 [ => { ...@empty, text: @text } ]
+  let @last = @results.at(-1)
+  => {
+    text: @last["text"] || @text,
+    sessionId: @last.session_id || null,
+    inputTokens: @last.input_tokens || 0,
+    outputTokens: @last.output_tokens || 0,
+    totalTokens: @last.total_tokens || 0,
+    cost: @last.cost || 0
   }
-  let resultLine = null;
-  let text = "";
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let obj;
-    try { obj = JSON.parse(trimmed); } catch { continue; }
-    if (!obj || typeof obj !== "object") continue;
-    if (obj.type === "result") resultLine = obj;
-    else if (obj.type === "text" && typeof obj.content === "string") text += obj.content;
-  }
-  if (!resultLine) return { text, sessionId: null, inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
-  return {
-    text: resultLine.text || text,
-    sessionId: resultLine.session_id || null,
-    inputTokens: resultLine.input_tokens || 0,
-    outputTokens: resultLine.output_tokens || 0,
-    totalTokens: resultLine.total_tokens || 0,
-    cost: resultLine.cost || 0
-  };
-}
+]
 
-export { @opencode, @opencodeSseStreamFormat }
+>> One NDJSON line as an object, or null for a blank, unparseable or non-object line.
+>> trim() also drops the \r of a CRLF line.
+exe @opencodeSseEvent(line) = [
+  let @trimmed = @line.trim()
+  let @parsed = try @trimmed | @parse
+  => match [
+    !@trimmed => null
+    !@parsed.ok => null
+    !@parsed.value.isObject() => null
+    * => @parsed.value
+  ]
+]
+
+>> The helpers are exported so tests can exercise them without a running `opencode serve`.
+export { @opencode, @opencodeSseStreamFormat, @opencodeSseSplitModel, @normalizeOpencodeSseSessionId, @opencodeSseResume, @opencodeSseResult, @parseOpencodeSseResult }

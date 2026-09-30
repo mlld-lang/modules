@@ -1,0 +1,42 @@
+>> Offline tests for opencode-sse's model, session and result helpers.
+>> Run: mlld test opencode-sse/tests/helpers.test.mld
+
+import { @opencodeSseSplitModel, @normalizeOpencodeSseSessionId, @opencodeSseResume, @opencodeSseResult, @parseOpencodeSseResult } from "../index.mld"
+
+const @full = @opencodeSseSplitModel("anthropic/claude-sonnet-4-5")
+const @test_split_provider_model = @full.providerID == "anthropic" && @full.modelID == "claude-sonnet-4-5"
+const @nested = @opencodeSseSplitModel("openrouter/z-ai/glm-5.1")
+const @test_split_first_slash_only = @nested.providerID == "openrouter" && @nested.modelID == "z-ai/glm-5.1"
+const @bareModel = @opencodeSseSplitModel("glm")
+const @test_split_no_slash = @bareModel.providerID == "openrouter" && @bareModel.modelID == "glm"
+const @leading = @opencodeSseSplitModel("/glm")
+const @test_split_leading_slash = @leading.providerID == "openrouter" && @leading.modelID == "/glm"
+const @fallback = @opencodeSseSplitModel(null)
+const @test_split_default = @fallback.providerID == "openrouter" && @fallback.modelID == "z-ai/glm-5.1"
+
+const @test_normalize_trims = @normalizeOpencodeSseSessionId("  ses_AbC1 ") == "ses_AbC1"
+const @test_normalize_blank = @normalizeOpencodeSseSessionId("   ") == null
+const @test_normalize_non_string = @normalizeOpencodeSseSessionId(42) == null && @normalizeOpencodeSseSessionId(null) == null
+
+const @none = @opencodeSseResume(null)
+const @test_resume_none = @none.source == "none" && @none.sessionId == null && !@none.continue
+const @pub = @opencodeSseResume({ resume: "ses_1", sessionId: "ses_2" })
+const @test_resume_public_first = @pub.source == "public_resume" && @pub.sessionId == "ses_1" && @pub.continue
+const @track = @opencodeSseResume({ sessionId: "ses_2" })
+const @test_resume_public_session = @track.source == "public_session" && @track.sessionId == "ses_2" && !@track.continue
+const @rt = @opencodeSseResume({ resume: "ses_1", _mlld: { resume: { sessionId: "ses_9", provider: "opencode", continue: true } } })
+const @test_resume_runtime_wins = @rt.source == "runtime_resume" && @rt.sessionId == "ses_9"
+const @foreign = @opencodeSseResume({ _mlld: { resume: { sessionId: "abc", provider: "claude", continue: true } } })
+const @test_resume_ignores_other_provider = @foreign.source == "none"
+
+const @wrapped = @opencodeSseResult("hi", { sessionId: "ses_1", provider: "opencode" })
+const @test_result_wraps = @wrapped.value == "hi" && @wrapped._mlld.sessionId == "ses_1" && @wrapped._mlld.provider == "opencode"
+const @test_result_passthrough = @opencodeSseResult("hi", { sessionId: null }) == "hi"
+
+const @ndjson = <@root/opencode-sse/tests/fixtures/turn.ndjson>?
+const @parsed = @parseOpencodeSseResult(@ndjson)
+const @test_parse_result_line = @parsed.text == "final text" && @parsed.sessionId == "ses_1" && @parsed.inputTokens == 3 && @parsed.outputTokens == 5 && @parsed.totalTokens == 8 && @parsed.cost == 0.01
+const @noResult = @parseOpencodeSseResult("{\"type\":\"text\",\"content\":\"he\"}\nnot json\n{\"type\":\"text\",\"content\":\"llo\"}\r\n")
+const @test_parse_without_result_joins_text = @noResult.text == "hello" && @noResult.sessionId == null && @noResult.cost == 0
+const @blank = @parseOpencodeSseResult("")
+const @test_parse_empty = @blank.text == "" && @blank.totalTokens == 0
