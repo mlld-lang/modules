@@ -8,7 +8,7 @@ Guardable alternative to built-in WebFetch tool. Fetches web pages and returns m
 
 ```mlld
 import { @mdFetch } from @mlld/md-fetch
-let @page = @mdFetch("https://example.com")
+const @page = @mdFetch("https://example.com")
 show @page.content
 ```
 
@@ -18,7 +18,7 @@ show @page.content
 mlld mcp md-fetch --tools-collection @tools
 ```
 
-Clients see one tool: `md_fetch(url)`.
+Clients see one tool: `mdFetch(url)`.
 
 **Claude Code `.mcp.json`:**
 
@@ -46,8 +46,8 @@ mlld mcp md-fetch --tools-collection @tools --env MLLD_ALLOWED_DOMAINS=github.co
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `@mdFetch` | `exe net:r` | Fetch a URL and return `{ url, domain, content }` |
-| `@tools` | `var tools` | Tool collection with `expose: ["url"]` for MCP serving |
+| `@mdFetch` | `exe .op:net:r` | Fetch a URL and return `{ url, domain, content }` |
+| `@tools` | `tools` | Tool collection for MCP serving |
 
 ## License
 
