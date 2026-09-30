@@ -1,0 +1,34 @@
+>> Tests for @fixRelativeLinks. The old llm/tests/fix-relative-links.test.mld
+>> passed URLs as destDir and expected links joined onto them, which the module
+>> never did; its inputs are kept here with the answers the module gives.
+>> Run: mlld test fix-relative-links/tests/
+
+import { @fixRelativeLinks } from "../index.mld"
+
+>> ── the README examples ──
+const @readme = "- [Array utilities](../core/array.mld.md)\n- [String helpers](../core/string.mld.md)\nSee the [main docs](../../README.md) for more."
+const @moved = @fixRelativeLinks(@readme, "modules/llm", "modules/core")
+const @test_readme_same_folder_gets_dot_slash = @moved.includes("[Array utilities](./array.mld.md)") && @moved.includes("[String helpers](./string.mld.md)")
+const @test_readme_root_link_unchanged = @moved.includes("[main docs](../../README.md)")
+const @test_tldr = @fixRelativeLinks("See the [docs](../docs/guide.md) for details.", "src/modules", "dist") == "See the [docs](../src/docs/guide.md) for details."
+const @test_up_one_level = @fixRelativeLinks("[x](../core/file.md)", "modules/llm", "modules") == "[x](./core/file.md)"
+const @test_src_docs_to_dist = @fixRelativeLinks("[u](../../lib/util.js)", "src/docs", "dist") == "[u](../lib/util.js)"
+
+>> ── links left alone ──
+const @mixed = "- [External](https://google.com)\n- [Plain](http://x.org)\n- [Protocol](ftp://server.com/file)\n- [Mail](mailto:a@b.co)\n- [Anchor](#section)\n- [Absolute](/absolute/path.md)"
+const @test_urls_anchors_absolute_untouched = @fixRelativeLinks(@mixed, "docs", "dist") == @mixed
+
+>> ── the old test inputs ──
+const @subDir = "See [parent file](../README.md) and [sibling](./sibling.md)."
+const @test_subdir_links = @fixRelativeLinks(@subDir, "docs", "site/docs") == "See [parent file](../../README.md) and [sibling](../../docs/sibling.md)."
+const @nested = "Link to [deep file](./sub/folder/file.md) and [up and over](../../other/doc.md)."
+const @test_nested_links = @fixRelativeLinks(@nested, "src/components", "build") == "Link to [deep file](../src/components/sub/folder/file.md) and [up and over](../other/doc.md)."
+const @images = "![Logo](./logo.png)\n![External](https://cdn.example.com/image.jpg)"
+const @test_image_links_rewritten = @fixRelativeLinks(@images, "docs", ".") == "![Logo](./docs/logo.png)\n![External](https://cdn.example.com/image.jpg)"
+
+>> ── edges ──
+const @test_empty = @fixRelativeLinks("", "docs", "dist") == ""
+const @plain = "Just plain text with no links at all."
+const @test_no_links_unchanged = @fixRelativeLinks(@plain, "docs", "dist") == @plain
+const @test_same_dir_unchanged = @fixRelativeLinks("[a](./a.md) [b](../b.md)", "docs", "docs") == "[a](./a.md) [b](../b.md)"
+const @test_missing_dirs_mean_here = @fixRelativeLinks("[a](sub/a.md)", "", "") == "[a](./sub/a.md)"
