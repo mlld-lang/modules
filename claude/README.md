@@ -10,9 +10,9 @@ import { @claude, @haiku, @sonnet, @opus } from @mlld/claude
 show @haiku("What is REST?")
 show @sonnet("Summarize this document")
 
-var @result = @claude("Review code in src/", {
+const @result = @claude("Review code in src/", {
   model: "opus",
-  dir: @base,
+  dir: @root,
   tools: ["Read", "Grep", "Glob"],
   stream: true
 })
@@ -47,24 +47,24 @@ Core invocation. All other exes delegate to this.
 
 ```mlld
 >> Simple call
-var @answer = @claude("Explain TCP/IP", { model: "haiku" })
+const @answer = @claude("Explain TCP/IP", { model: "haiku" })
 
 >> With tools — exe refs create a per-call MCP server
-var @review = @claude("Review the auth module", {
+const @review = @claude("Review the auth module", {
   model: "opus",
-  dir: @base,
+  dir: @root,
   tools: ["Read", "Grep", @summarize]
 })
 
 >> With streaming and system prompt
-var @analysis = @claude("Analyze this architecture", {
+const @analysis = @claude("Analyze this architecture", {
   model: "sonnet",
   stream: true,
   system: "Focus on security implications"
 })
 
 >> Full isolation (requires ANTHROPIC_API_KEY)
-var @result = @claude("Check the project", {
+const @result = @claude("Check the project", {
   model: "sonnet",
   bare: true,
   tools: ["Read", "Grep"]
@@ -72,11 +72,11 @@ var @result = @claude("Check the project", {
 
 >> Session tracking — every call gets a session by default
 >> Pass sessionId to control it, resume to continue a prior session
-var @first = @claude("Write the draft", {
+const @first = @claude("Write the draft", {
   tools: ["Read", "Write"],
   sessionId: "my-session-id"
 })
-var @fixed = @claude("Fix the formatting", {
+const @fixed = @claude("Fix the formatting", {
   resume: "my-session-id"
 })
 ```
@@ -115,9 +115,9 @@ Extends `@claude` config with:
 Returns the marker file contents.
 
 ```mlld
-var @result = @claudePoll("Analyze data and write results to /tmp/out.json", {
+const @result = @claudePoll("Analyze data and write results to /tmp/out.json", {
   model: "opus",
-  dir: @base,
+  dir: @root,
   tools: ["Read", "Write", "Glob"],
   poll: "/tmp/out.json"
 })
@@ -135,9 +135,9 @@ Extends `@claude` config with:
 Returns the matching JSONL line.
 
 ```mlld
-var @result = @claudePollJsonl("Process item and log to events.jsonl", {
+const @result = @claudePollJsonl("Process item and log to events.jsonl", {
   model: "opus",
-  dir: @base,
+  dir: @root,
   tools: ["Read", "Write"],
   poll: "/path/to/events.jsonl",
   pattern: "\"id\":\"m-24a0\".*\"status\":\"done\""
@@ -157,9 +157,9 @@ Extends `@claude` config with:
 Returns the matching JSONL line.
 
 ```mlld
-var @result = @claudePollEvent("Process ticket m-24a0", {
+const @result = @claudePollEvent("Process ticket m-24a0", {
   model: "opus",
-  dir: @base,
+  dir: @root,
   tools: ["Read", "Write"],
   poll: "/path/to/events.jsonl",
   event: "item_done",
@@ -180,9 +180,9 @@ Reads the conversation log Claude Code writes for a session and turns it into IF
 ```mlld
 import { @conversation } from @mlld/claude
 
-var @path = @conversation.locate("3f2a1b4c-0000-4000-8000-abcdef000001", @base)
-var @log = <@path>
-var @tape = @conversation.ingest(@log.mx.text)
+const @path = @conversation.locate("3f2a1b4c-0000-4000-8000-abcdef000001", @root)
+const @log = <@path>
+const @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 
@@ -215,12 +215,12 @@ v2 positional params → v3 config object:
 
 ```mlld
 >> v2
-var @r = @claude("Review code", "opus", @base, "Read,Grep")
-var @r = @claudeWithSystem("Review", "Focus on security", "opus", @base, "Read")
+const @r = @claude("Review code", "opus", @root, "Read,Grep")
+const @r = @claudeWithSystem("Review", "Focus on security", "opus", @root, "Read")
 
 >> v3
-var @r = @claude("Review code", { model: "opus", dir: @base, tools: ["Read", "Grep"] })
-var @r = @claude("Review", { model: "opus", dir: @base, tools: ["Read"], system: "Focus on security" })
+const @r = @claude("Review code", { model: "opus", dir: @root, tools: ["Read", "Grep"] })
+const @r = @claude("Review", { model: "opus", dir: @root, tools: ["Read"], system: "Focus on security" })
 ```
 
 `@claudeWithSystem` is removed — use `config.system` instead.
