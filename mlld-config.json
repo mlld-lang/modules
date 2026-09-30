@@ -2,15 +2,6 @@
   "resolvers": {
     "prefixes": [
       {
-        "prefix": "@local/",
-        "resolver": "LOCAL",
-        "type": "input",
-        "priority": 20,
-        "config": {
-          "basePath": "./llm/modules"
-        }
-      },
-      {
         "prefix": "@mlld/",
         "resolver": "LOCAL",
         "type": "input",
@@ -21,7 +12,6 @@
       }
     ]
   },
-  "scriptDir": "llm/run",
   "security": {
     "trustedDomains": [
       "raw.githubusercontent.com",

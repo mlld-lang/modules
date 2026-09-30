@@ -1,234 +1,38 @@
-
 # mlld core modules
 
-Core modules for the mlld prompt scripting language.
-
-### [@mlld/ai-cli](./llm/modules/ai-cli.mld.md)
-
-Easy AI integration for your mlld scripts:
-
-```mlld
-/import { claude, llm, codex, gemini } from @mlld/ai-cli
-
-/var @response = @claude.ask("What's the capital of France?")
-/show `Claude says: @response`
-
-/var @answer = @llm.ask("You are a helpful assistant", "Explain quantum computing in one sentence")
-/show `LLM says: @answer`
-```
-
-### [@mlld/array](./array)
-
-Array helpers the builtin methods don't cover:
-
-```mlld
-import { @sortBy, @sum, @groupBy } from @mlld/array
-
-const @users = [
-  { name: "alice", age: 30, dept: "engineering" },
-  { name: "bob", age: 25, dept: "design" },
-  { name: "charlie", age: 35, dept: "engineering" }
-]
-
-const @byDept = @groupBy(@users, "dept")
-const @sortedByAge = @sortBy(@users, "age")
-const @totalAge = @sum(@users, "age")
-const @engineers = @users.filter(@item.dept == "engineering")
-```
-
-### [@mlld/conditions](./llm/modules/conditions.mld.md)
-
-Essential utilities for building complex conditional logic in mlld:
-
-```mlld
-/import { equals, contains, gt, and, isEmpty } from @mlld/conditions
-
-/var @users = ["alice", "bob", "charlie"]
-/var @threshold = 10
-/var @count = 15
-
-/when @and(@gt(@count, @threshold), @contains(@users, "alice")) => /show "High count with Alice present"
-/when @isEmpty(@users) => /show "No users found"
-/when @equals(@count, 15) => /show "Exact match!"
-```
-
-### [@mlld/env](./llm/modules/env.mld.md)
-
-Essential environment management:
-
-```mlld
-/import { env } from @mlld/env
-
->> Validate required variables
-/var @valid = @env.validate(["API_KEY", "DATABASE_URL"])
-/when @valid.valid => /show "All environment variables present"
-/when !@valid.valid => /show `Missing: @valid.missing`
-
->> Get with fallback
-/var @port = @env.get("PORT", "3000")
-/show `Server running on port @port`
-
->> Check if in CI
-/when @env.isCI() => /show "Running in CI environment"
-```
-
-### [@mlld/fix-relative-links](./fix-relative-links)
-
-Recalculates relative links when moving content between directories:
-
-```mlld
-import { @fixRelativeLinks } from @mlld/fix-relative-links
-
-const @content = "See the [docs](../docs/guide.md) for details."
-
->> Where the content was written, then where it is going:
->> from dist/, src/modules/../docs/guide.md is ../src/docs/guide.md
-const @fixed = @fixRelativeLinks(@content, "src/modules", "dist")
-```
-
-### [@mlld/fs](./llm/modules/fs.mld.md)
-
-Provides basic file system checks that return truthy/falsy values for use with  conditions:
-
-```mlld
-/import { fileExists, dirExists, pathExists } from @mlld/fs
-
-/when @fileExists("config.json") => /show "Config file found!"
-/when @dirExists("src") => /show "Source directory exists"
-/when @pathExists("README.md") => /show "README is available"
-```
-
-### [@mlld/gh-issues](./gh-issues)
-
-GitHub issues, pull requests, repos and workflows through the `gh` CLI (this replaces `@mlld/github`):
-
-```mlld
-import { @viewPr, @commentPr, @isCollaborator } from @mlld/gh-issues
-
->> Get PR information
-const @pr = @viewPr(123, "owner/repo")
-show `PR Title: ${@pr.title}`
-
->> Post a comment
-@commentPr(123, "owner/repo", "LGTM! 🚀")
-
->> Check if user is a collaborator
-if @isCollaborator("octocat", "owner/repo") => show "User has write access"
-```
-
-### [@mlld/http](./llm/modules/http.mld.md)
-
-Quick HTTP requests with automatic JSON handling:
-
-```mlld
-/import { http } from @mlld/http
-
-/run @http.get("https://api.github.com/users/octocat")
-/run @http.post("https://httpbin.org/post", {"message": "hello"})
-/run @http.auth.get("https://api.github.com/user", @token)
-
-/var @userData = @http.fetch.get("https://api.github.com/users/octocat")
-/show `User: @userData.name`
-```
-
-### [@mlld/pipelog](./llm/modules/pipelog.mld.md)
-
-Debug your pipelines by inserting logging between transformations:
-
-```mlld
-/import { log, logVerbose, logJson } from @mlld/pipelog
-
->> Simple pipeline debugging
-/var @result = @data | @json | @log | @uppercase | @log
-
->> Verbose logging with full context
-/var @processed = @fetchData() | @logVerbose | @transform
-
->> Structured JSON logging for parsing
-/var @output = @input | @logJson | @process
-```
-
-All loggers output to stderr, ensuring your pipeline data flows unchanged to stdout.
-
-### [@mlld/string](./string)
-
-String helpers the builtin methods don't cover:
-
-```mlld
-import { @title, @camelCase, @slugify } from @mlld/string
-
-const @name = "john doe smith"
-const @formatted = @title(@name)
-const @key = @camelCase(@name)
-const @slug = @slugify(@name)
-const @words = @name.split(" ")
-
-if @name.includes("doe") [ show "Contains 'doe'" ]
-show `Formatted: ${@formatted}`
-```
-
-### [@mlld/test](./llm/modules/test.mld.md)
-
-Test your mlld scripts with simple assertions:
-
-```mlld
-/import { eq, deepEq, ok, contains } from @mlld/test
-
-/var @result = @calculateSum(2, 3)
-/when @eq(@result, 5) => /show "✓ Sum calculation correct"
-
-/var @data = { "name": "test", "items": [1, 2, 3] }
-/when @deepEq(@data.items, [1, 2, 3]) => /show "✓ Array matches"
-
-/when @contains(@output, "success") => /show "✓ Output contains success message"
-```
-
-### [@mlld/time](./time)
-
-```mlld
-import { @time } from @mlld/time
-
->> Use the built-in @now
-const @today = @time.format(@now, "YYYY-MM-DD")
-const @tomorrow = @time.add(@now, { days: 1 })
-
->> Compare dates
-if @time.compare.before("2025-07-01", "2025-07-08") [ show "DateA is earlier" ]
-
->> Human-readable relative time
-const @updated = @time.relative("2025-07-07T10:00:00Z", { now: "2025-07-08T10:00:00Z" })    >> "1 day ago"
-
->> Work with durations
-const @workWeek = @time.duration.days(5)
-const @deadline = @time.add(@now, @workWeek)
-```
-
-### [@mlld/production](./llm/modules/production.mld.md)
-
-Policy defaults for production:
-
-```mlld
-/import policy @prod from "@mlld/production"
-/show @mx.policy.activePolicies
-```
-
-### [@mlld/development](./llm/modules/development.mld.md)
-
-Policy defaults for development:
-
-```mlld
-/import policy @dev from "@mlld/development"
-/show @mx.policy.activePolicies
-```
-
-### [@mlld/sandbox](./llm/modules/sandbox.mld.md)
-
-Policy defaults for untrusted code:
-
-```mlld
-/import policy @sandbox from "@mlld/sandbox"
-/show @mx.policy.activePolicies
-```
-
----
-Generated by the [llm/run/build.mld](./llm/run/build.mld) script.
+Core modules for the mlld prompt scripting language. Each module lives in its own folder and is imported as `@mlld/<name>`.
+
+## Modules
+
+- [@mlld/airlock](./airlock/README.md) — Dual-LLM security pattern: tainted input never shares context with the evaluation model.
+- [@mlld/array](./array/README.md) — Array helpers that mlld's builtin methods don't cover.
+- [@mlld/bravesearch](./bravesearch/README.md) — Brave Search API tool; reads its API key from the keychain first, then the environment.
+- [@mlld/claude](./claude/README.md) — Claude invocation primitives with tool use, streaming, and polling.
+- [@mlld/codex](./codex/README.md) — Codex CLI invocation with session resume, streaming, sandboxing, web search, and MCP tool bridging.
+- [@mlld/decision-harness](./decision-harness/README.md) — Typed decisions (choice, score, yes/no, classify) from a model you pick in config.
+- [@mlld/duckduckgo](./duckduckgo/README.md) — DuckDuckGo web search, no API key required.
+- [@mlld/fix-relative-links](./fix-relative-links/README.md) — Adjusts relative paths in markdown links when content moves to a different folder.
+- [@mlld/gh-issues](./gh-issues/README.md) — GitHub issues, pull requests, repos and workflows via the `gh` CLI.
+- [@mlld/jev](./jev/README.md) — Typed, calibrated answers from TypeSafe's jev model.
+- [@mlld/lms](./lms/README.md) — Call a local LM Studio model over its REST API, on-device with no API key.
+- [@mlld/md-fetch](./md-fetch/README.md) — Fetches web pages as markdown, HTTPS-only with domain allowlisting.
+- [@mlld/multi-harness](./multi-harness/README.md) — Run the same prompt on claude, codex, pi or opencode by changing one setting.
+- [@mlld/openai](./openai/README.md) — OpenAI chat completions with auth sealing.
+- [@mlld/opencode](./opencode/README.md) — Opencode CLI invocation with session resume, streaming, and MCP tool bridging.
+- [@mlld/opencode-sse](./opencode-sse/README.md) — Drives opencode through `opencode serve` and Server-Sent Events, emitting `@mlld/claude`'s stream format.
+- [@mlld/pg](./pg/README.md) — Postgres-backed artifact storage.
+- [@mlld/pi](./pi/README.md) — Invoke the Pi coding agent with mlld tool integration.
+- [@mlld/sqlite](./sqlite/README.md) — SQLite-backed artifact storage.
+- [@mlld/string](./string/README.md) — String helpers that mlld's builtin methods don't cover.
+- [@mlld/time](./time/README.md) — Date and time formatting, arithmetic, comparisons, business days, relative time and durations.
+
+## Retired
+
+These published modules are not carried into this major version. Old versions stay installable from the registry.
+
+- `@mlld/ai-cli` — use [@mlld/multi-harness](./multi-harness/README.md), [@mlld/claude](./claude/README.md) or [@mlld/codex](./codex/README.md). Its gemini support has no replacement.
+- `@mlld/claude-poll` — use `@claudePoll`, `@claudePollJsonl` and `@claudePollEvent` from [@mlld/claude](./claude/README.md).
+- `@mlld/env` — use `@input`, `using { env }` and `using creds:`.
+- `@mlld/prose` — use [@mlld/claude](./claude/README.md).
+- `@mlld/stream-claude-agent-sdk` — use the built-in `claude-agent-sdk` stream format.
+- `@mlld/github` — use [@mlld/gh-issues](./gh-issues/README.md).
