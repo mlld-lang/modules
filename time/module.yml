@@ -1,0 +1,16 @@
+name: time
+author: mlld
+type: library
+about: "Time and date operations with structured exports"
+version: 2.0.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: ">=2.2.0"
+keywords:
+  - time
+  - date
+  - format
+  - parse
+  - timezone
+  - duration

@@ -186,24 +186,24 @@ Test your mlld scripts with simple assertions:
 /when @contains(@output, "success") => /show "✓ Output contains success message"
 ```
 
-### [@mlld/time](./llm/modules/time.mld.md)
+### [@mlld/time](./time)
 
 ```mlld
-/import { time } from @mlld/time
+import { @time } from @mlld/time
 
 >> Use the built-in @now
-/var @today = @time.format(@now, "YYYY-MM-DD")
-/var @tomorrow = @time.add(@now, { days: 1 })
+const @today = @time.format(@now, "YYYY-MM-DD")
+const @tomorrow = @time.add(@now, { days: 1 })
 
 >> Compare dates
-/when @time.compare.before(@dateA, @dateB) => /show "DateA is earlier"
+if @time.compare.before("2025-07-01", "2025-07-08") [ show "DateA is earlier" ]
 
 >> Human-readable relative time
-/var @updated = @time.relative(@lastModified)  >> "2 hours ago"
+const @updated = @time.relative("2025-07-07T10:00:00Z", { now: "2025-07-08T10:00:00Z" })    >> "1 day ago"
 
 >> Work with durations
-/var @workWeek = @time.duration.days(5)
-/var @deadline = @time.add(@now, @workWeek)
+const @workWeek = @time.duration.days(5)
+const @deadline = @time.add(@now, @workWeek)
 ```
 
 ### [@mlld/production](./llm/modules/production.mld.md)
