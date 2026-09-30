@@ -6,38 +6,42 @@ about: Brave web search results tool
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
 license: CC0
-mlld-version: "2.0.0-rc82"
+mlld-version: ">=2.2.0"
 ---
 
 >> Brave Search API tool
->> Uses standalone auth directive with keychain+env fallback
+>> The key is looked up in the keychain first, then the BRAVE_API_KEY environment variable.
 
-auth @brave = "BRAVE_API_KEY"
+creds @brave = "BRAVE_API_KEY"
 
-exe net:r @search(query: string, count: number) = node {
+>> JS because the request needs a header and a response status check, which a
+>> cmd body would push through curl for no gain.
+exe @braveFetch(query, count) using creds:brave = node {
   const limit = count || 5;
   const res = await fetch(
     `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${limit}&spellcheck=0`,
     { headers: { 'X-Subscription-Token': process.env.BRAVE_API_KEY } }
   );
   if (!res.ok) {
-    return JSON.stringify({ error: true, status: res.status, message: await res.text() });
+    return { error: true, status: res.status, message: await res.text() };
   }
-  const data = await res.json();
-  return JSON.stringify(data.web?.results?.map(r => ({
-    title: r.title,
-    url: r.url,
-    snippet: r.description
-  })) || []);
-} using auth:brave with { description: "Search the web using Brave Search API" }
+  return await res.json();
+}
 
-var tools @tools = {
+>> Keeps the fields an agent reads from Brave's web results.
+exe @shapeResults(response) = match [
+  @response.error => @response
+  * => for @r in (@response.web.results ?? []) => { title: @r.title, url: @r.url, snippet: @r.description }
+]
+
+exe .op:net:r @search(query: string, count: number) with { description: "Search the web using Brave Search API" } = @shapeResults(@braveFetch(@query, @count))
+
+tools @tools = {
   search: {
     mlld: @search,
-    expose: ["query", "count"],
-    labels: ["net:r"],
+    labels: [.op:net:r],
     description: "Search the web using Brave Search API"
   }
 }
 
-export { @search, @tools }
+export { @search, @tools, @shapeResults }

@@ -59,7 +59,7 @@ const @followup = @openai("What about error handling?", {
 })
 
 >> Custom endpoint (Azure, local models, etc.)
-const @local = @openai("Hello", {
+const @selfHosted = @openai("Hello", {
   model: "llama-3",
   baseUrl: "http://localhost:8080/v1"
 })
@@ -79,11 +79,11 @@ o3-mini — reasoning model.
 
 ### `@openaiStreamFormat`
 
-NDJSON adapter for OpenAI streaming output. Use with `with { streamFormat: @openaiStreamFormat }` in custom exe definitions.
+NDJSON adapter for OpenAI streaming output. Use with `with { stream_format: @openaiStreamFormat }` in custom exe definitions.
 
 ## Auth
 
-Credentials resolve via mlld's auth sealing:
+The key reaches the request through `using creds:openai`, never through the script text:
 
 ```mlld
 >> Option 1: Set env var
@@ -96,9 +96,11 @@ Credentials resolve via mlld's auth sealing:
 For policy-controlled auth:
 
 ```mlld
-policy @p = {
-  auth: {
-    openai: { from: "keychain", as: "OPENAI_API_KEY" }
+policy @keys = {
+  * {
+    credentials: {
+      openai: { from: "keychain", as: "OPENAI_API_KEY" }
+    }
   }
 }
 ```

@@ -1,62 +1,57 @@
 needs { network }
 
->> ── Internal call helper ──
->> Calls LM Studio's OpenAI-compatible /v1/chat/completions endpoint.
->> The endpoint returns the model's final answer in choices[0].message.content
->> with reasoning split out separately, so no <think> stripping is needed.
-exe @lmsImpl(prompt, opts) = js {
-  const cfg = opts || {};
-  const baseUrl = (cfg.baseUrl || "http://localhost:1234/v1").replace(/\/$/, "");
-
-  const messages = [];
-  if (cfg.system) messages.push({ role: "system", content: cfg.system });
-  if (Array.isArray(cfg.messages)) {
-    for (const m of cfg.messages) messages.push(m);
+>> ── Request ──
+>> The chat/completions body, built in mlld so it can be read and tested apart
+>> from the network call.
+exe @lmsRequest(prompt, cfg) = [
+  let @sys = @cfg.system ? [{ role: "system", content: @cfg.system }] : []
+  let @prior = @cfg.messages && @cfg.messages.isArray() ? @cfg.messages : []
+  let @temperature = @cfg.temperature != null ? { temperature: @cfg.temperature } : {}
+  let @maxTokens = @cfg.maxTokens != null ? { max_tokens: @cfg.maxTokens } : {}
+  let @ttl = @cfg.ttl != null ? { ttl: @cfg.ttl } : {}
+  let @format = match [
+    @cfg.responseFormat => { response_format: @cfg.responseFormat }
+    @cfg.schema => {
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: @cfg.schemaName ?? "response", strict: true, schema: @cfg.schema }
+      }
+    }
+    * => {}
+  ]
+  => {
+    model: @cfg.model ?? "",
+    messages: [...@sys, ...@prior, { role: "user", content: @prompt }],
+    ...@temperature,
+    ...@maxTokens,
+    ...@ttl,
+    ...@format
   }
-  messages.push({ role: "user", content: prompt });
+]
 
-  // Normalize to plain JS — values arriving from mlld vars can carry wrappers
-  // that serialize into an invalid request body.
-  const plain = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
-
-  const body = { model: cfg.model || "", messages: plain(messages) };
-  if (cfg.temperature != null) body.temperature = cfg.temperature;
-  if (cfg.maxTokens != null) body.max_tokens = cfg.maxTokens;
-  if (cfg.ttl != null) body.ttl = cfg.ttl;
-  if (cfg.responseFormat) {
-    body.response_format = plain(cfg.responseFormat);
-  } else if (cfg.schema) {
-    body.response_format = {
-      type: "json_schema",
-      json_schema: { name: cfg.schemaName || "response", strict: true, schema: plain(cfg.schema) }
-    };
-  }
-
+>> ── Network call ──
+>> Node because it needs fetch. LM Studio returns the model's final answer in
+>> choices[0].message.content with reasoning split out, so no <think> stripping.
+exe @lmsPost(body, baseUrl, apiKey, full) = node {
+  const url = String(baseUrl || "http://localhost:1234/v1").replace(/\/$/, "") + "/chat/completions";
   const headers = { "Content-Type": "application/json" };
-  if (cfg.apiKey) headers["Authorization"] = "Bearer " + cfg.apiKey;
+  if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
 
-  const resp = await fetch(baseUrl + "/chat/completions", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body)
-  });
-
+  const resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
   if (!resp.ok) {
-    const errBody = await resp.text();
-    throw new Error("LM Studio REST " + resp.status + ": " + errBody);
+    throw new Error("LM Studio REST " + resp.status + ": " + await resp.text());
   }
 
   const json = await resp.json();
   const choice = json.choices && json.choices[0];
   const content = choice && choice.message ? (choice.message.content || "") : "";
-
-  if (cfg.full) {
-    return JSON.stringify({
+  if (full) {
+    return {
       content,
-      model: json.model || cfg.model || "",
+      model: json.model || body.model || "",
       usage: json.usage || null,
       finishReason: choice ? choice.finish_reason : null
-    });
+    };
   }
   return content;
 }
@@ -74,10 +69,10 @@ exe @lmsImpl(prompt, opts) = js {
 >> config.ttl            - seconds to keep the model loaded after the call
 >> config.baseUrl        - API base URL (default: http://localhost:1234/v1)
 >> config.apiKey         - bearer token, if the server requires auth
->> config.full           - return JSON { content, model, usage, finishReason }
+>> config.full           - return { content, model, usage, finishReason }
 llm @lms(prompt, config) = [
   let @cfg = @config ? @config : {}
-  => @lmsImpl(@prompt, @cfg)
+  => @lmsPost(@lmsRequest(@prompt, @cfg), @cfg.baseUrl, @cfg.apiKey, @cfg.full)
 ]
 
-export { @lms }
+export { @lms, @lmsRequest }

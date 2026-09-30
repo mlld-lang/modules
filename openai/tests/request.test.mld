@@ -1,0 +1,31 @@
+>> Tests for the request body @openai sends, with no API call.
+>> Run: mlld test openai/tests/
+
+import { @openaiRequest, @openaiStreamFormat } from "../index.mld"
+
+const @bare = @openaiRequest("hi", {})
+const @test_default_model = @bare.model == "gpt-4o"
+const @test_bare_has_only_user_turn = @bare.messages.length == 1 && @bare.messages[0].role == "user"
+const @test_bare_not_streaming = @bare.stream == null && @bare.stream_options == null
+
+const @full = @openaiRequest("next", {
+  model: "gpt-4o-mini",
+  system: "be brief",
+  messages: [{ role: "user", content: "a" }],
+  temperature: 0,
+  maxTokens: 100,
+  responseFormat: { type: "json_object" },
+  fnTools: [{ type: "function", function: { name: "f" } }],
+  fnToolChoice: "auto"
+})
+const @test_system_then_history_then_prompt = @full.messages[0].role == "system" && @full.messages[1].content == "a" && @full.messages[2].content == "next"
+const @test_zero_temperature_kept = @full.temperature == 0
+const @test_max_tokens_renamed = @full.max_tokens == 100
+const @test_response_format_renamed = @full.response_format.type == "json_object"
+const @test_fn_tools_become_tools = @full.tools[0].function.name == "f"
+const @test_fn_tool_choice_renamed = @full.tool_choice == "auto"
+
+const @streaming = @openaiRequest("x", { stream: true })
+const @test_stream_asks_for_usage = @streaming.stream && @streaming.stream_options.include_usage
+
+const @test_stream_format_is_ndjson = @openaiStreamFormat.format == "ndjson"

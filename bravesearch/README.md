@@ -1,6 +1,6 @@
 # bravesearch
 
-Brave Search API tool. Uses standalone `auth` with keychain-first, env fallback.
+Brave Search API tool. Declares its key with `creds`: keychain first, then the environment.
 
 ## Setup
 
