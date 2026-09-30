@@ -1,0 +1,115 @@
+>> The gh arguments, request bodies and response shaping behind the pull
+>> request, repo, collaborator and workflow calls, kept apart from index.mld so
+>> they test without gh.
+
+import { @repoPath } from "./repo.mld"
+
+>> Every call goes through `gh api`, so each one is a REST path plus flags.
+exe @prPath(target, number, suffix) = @repoPath(@target, `/pulls/${@number}${@suffix}`)
+exe @issuePath(target, number, suffix) = @repoPath(@target, `/issues/${@number}${@suffix}`)
+
+>> ── Pull requests ──
+
+exe @prViewArgs(target, number) = [ => ["api", @prPath(@target, @number, "")] ]
+
+exe @prFilesArgs(target, number) = [ => ["api", @prPath(@target, @number, "/files")] ]
+
+>> The diff media type makes GitHub answer with plain unified diff text.
+exe @prDiffArgs(target, number) = [ => ["api", "-H", "Accept: application/vnd.github.v3.diff", @prPath(@target, @number, "")] ]
+
+>> `-f` makes gh send a POST unless the method is named, so a filtered list
+>> needs `-X GET`. GitHub filters pulls by head branch, not author, and
+>> "author:" as the head matches every branch that author pushed.
+exe @prListArgs(target, options) = [
+  let @opts = @options ?? {}
+  let @head = @opts.author ? `${@opts.author}:` : null
+  let @pairs = [["state", @opts.state ?? null], ["head", @head], ["labels", @opts.label ?? null]]
+  let @flags = for @p in @pairs if @p[1] != null => ["-f", `${@p[0]}=${@p[1]}`]
+  => ["api", "-X", "GET", @repoPath(@target, "/pulls")].concat(@flags.flat())
+]
+
+>> A pull request's conversation comments live on its issue.
+exe @prCommentArgs(target, number) = [ => ["api", @issuePath(@target, @number, "/comments"), "--input", "-"] ]
+
+exe @prReviewArgs(target, number) = [ => ["api", @prPath(@target, @number, "/reviews"), "--input", "-"] ]
+
+exe @reviewEvent(event) = match @event [
+  "approve" => "APPROVE"
+  "request-changes" => "REQUEST_CHANGES"
+  "comment" => "COMMENT"
+  * => @event.toUpperCase()
+]
+
+exe @reviewBody(event, body) = { event: @reviewEvent(@event), body: @body }
+
+exe @prEditArgs(target, number) = [ => ["api", @prPath(@target, @number, ""), "-X", "PATCH", "--input", "-"] ]
+
+>> Only the fields the caller set, so an edit never blanks the others.
+exe @prEditBody(options) = [
+  let @opts = @options ?? {}
+  let @set = ["title", "body"].filter(@opts[@item] != null)
+  let @body = for @k in @set => { [@k]: @opts[@k] }
+  => @body.isObject() ? @body : {}
+]
+
+>> The pulls endpoint ignores labels; they are added through the PR's issue.
+exe @prLabelArgs(target, number) = [ => ["api", @issuePath(@target, @number, "/labels"), "--input", "-"] ]
+
+>> ── Repos and collaborators ──
+
+exe @repoViewArgs(target) = [ => ["api", @repoPath(@target, "")] ]
+
+exe @repoCloneArgs(target, dir) = [
+  let @base = ["repo", "clone", `${@target.owner}/${@target.repo}`]
+  => @dir ? @base.concat([@dir]) : @base
+]
+
+exe @collabArgs(target, user) = [ => ["api", @repoPath(@target, `/collaborators/${@user}`)] ]
+
+>> ── Workflows ──
+
+exe @workflowsArgs(target) = [ => ["api", @repoPath(@target, "/actions/workflows")] ]
+
+exe @dispatchArgs(target, workflow) = [ => ["api", @repoPath(@target, `/actions/workflows/${@workflow}/dispatches`), "--input", "-"] ]
+
+exe @dispatchBody(options) = [
+  let @opts = @options ?? {}
+  => { ref: @opts.ref ?? "main" }
+]
+
+exe @runsArgs(target) = [ => ["api", @repoPath(@target, "/actions/runs")] ]
+
+>> The id of the workflow whose display name is `workflow` or whose file path
+>> contains it. A numeric id, or a name nothing matches, passes through as
+>> given, since the dispatch endpoint also takes a workflow's file name.
+exe @workflowId(workflows, workflow) = [
+  let @w = `${@workflow}`
+  let @found = match [
+    @w.match(/^\d+$/) => null
+    * => @workflows.find(@item.name == @w || @item.path.includes(@w))
+  ]
+  => @found ? @found.id : @w
+]
+
+>> ── Shaping responses ──
+
+>> Only the keys named in `fields` (a comma list) that the response has.
+exe @pickFields(obj, fields) = [
+  let @names = for @f in @fields.split(",") => @f.trim()
+  let @keys = @obj.mx.keys
+  let @present = @names.filter(@keys.includes(@item))
+  let @picked = for @k in @present => { [@k]: @obj[@k] }
+  => @picked.isObject() ? @picked : {}
+]
+
+>> The file sections of a diff whose `diff --git` line mentions one of `paths`
+>> (a comma list).
+exe @diffFor(diff, paths) = [
+  let @wanted = for @p in @paths.split(",") => @p.trim()
+  let @text = `\n${@diff}`
+  let @sections = @text.split("\ndiff --git ").slice(1)
+  let @kept = for @s in @sections if @wanted.some(@s.split("\n")[0].includes(@item)) => `diff --git ${@s}`
+  => @kept.join("\n")
+]
+
+export { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewEvent, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor }

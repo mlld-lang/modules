@@ -98,23 +98,22 @@ Provides basic file system checks that return truthy/falsy values for use with  
 /when @pathExists("README.md") => /show "README is available"
 ```
 
-### [@mlld/github](./llm/modules/github.mld.md)
+### [@mlld/gh-issues](./gh-issues)
 
-Common GitHub operations made easy:
+GitHub issues, pull requests, repos and workflows through the `gh` CLI (this replaces `@mlld/github`):
 
 ```mlld
-/import { github } from @mlld/github
+import { @viewPr, @commentPr, @isCollaborator } from @mlld/gh-issues
 
 >> Get PR information
-/var @prData = @github.pr.view(123, "owner/repo")
-/show `PR Title: @prData.title`
+const @pr = @viewPr(123, "owner/repo")
+show `PR Title: ${@pr.title}`
 
 >> Post a comment
-/run @github.pr.comment(123, "owner/repo", "LGTM! 🚀")
+@commentPr(123, "owner/repo", "LGTM! 🚀")
 
 >> Check if user is a collaborator
-/var @isCollab = @github.collab.check("octocat", "owner/repo")
-/when @isCollab => /show "User has write access"
+if @isCollaborator("octocat", "owner/repo") => show "User has write access"
 ```
 
 ### [@mlld/http](./llm/modules/http.mld.md)

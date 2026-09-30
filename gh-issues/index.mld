@@ -1,9 +1,10 @@
->> GitHub Issues API tools
+>> GitHub issues, pull requests, repos and workflows via the gh CLI
 >> Requires: gh CLI (https://cli.github.com)
 >> Auth: GITHUB_TOKEN env var > gh auth token (from `gh auth login`)
 >> Repo: auto-detected from git context, or pass owner/repo explicitly
 
-import { @repoOf, @repoPath } from "./repo.mld"
+import { @repoOf, @repoFrom, @repoPath } from "./repo.mld"
+import { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor } from "./args.mld"
 
 >> Node because execFileSync hands each value to gh as its own argument; a cmd
 >> body pastes values in as text, so a title with spaces would split.
@@ -13,6 +14,17 @@ exe @gh(args, input) = node {
   const opts = { encoding: 'utf8' };
   if (input !== null && input !== undefined) opts.input = JSON.stringify(input);
   return JSON.parse(execFileSync('gh', args, opts));
+}
+
+>> Node for the same reason as @gh. Kept apart from @gh because a diff is plain
+>> text and some calls answer 204 with no body, neither of which parses as JSON.
+>> stderr is captured so an expected 404 (the collaborator check) prints
+>> nothing; node puts it in the thrown error's message instead.
+exe @ghText(args, input) = node {
+  const { execFileSync } = require('child_process');
+  const opts = { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] };
+  if (input !== null && input !== undefined) opts.input = JSON.stringify(input);
+  return execFileSync('gh', args, opts);
 }
 
 exe @detectRepo() with { description: "Detect owner/repo from git context" } = [
@@ -26,6 +38,11 @@ exe @targetRepo(owner, repo) = [
   => @repoOf(@owner, @repo) ?? @detectRepo()
 ]
 
+>> The repo named as "owner/name", else the one git context names.
+exe @repoTarget(repo) = [
+  => @repoFrom(@repo) ?? @detectRepo()
+]
+
 exe .op:net:r @listIssues(owner = null, repo = null) with { description: "List open issues for a GitHub repository" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), "/issues")], null)
 
 exe .op:net:r @getIssue(owner, repo, number) with { description: "Get a single GitHub issue by number" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), `/issues/${@number}`)], null)
@@ -37,6 +54,73 @@ exe .op:net:rw @addComment(owner, repo, number, comment) with { description: "Ad
 exe .op:net:rw @closeIssue(owner, repo, number) with { description: "Close a GitHub issue" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), `/issues/${@number}`), "-X", "PATCH", "--input", "-"], { state: "closed" })
 
 exe .op:net:r @searchIssues(query) with { description: "Search GitHub issues across repositories" } = @gh(["api", "-X", "GET", "search/issues", "-f", `q=${@query}`], null)
+
+>> ── Pull requests ──
+
+>> `fields` is a comma list of keys to keep. `files` is always an array, since
+>> callers read it without checking.
+exe .op:net:r @viewPr(number, repo = null, fields = null) with { description: "Get a pull request by number" } = [
+  let @raw = @gh(@prViewArgs(@repoTarget(@repo), @number), null)
+  let @pr = { ...@raw, files: @raw.files ?? [] }
+  => @fields ? @pickFields(@pr, @fields) : @pr
+]
+
+exe .op:net:r @listPrFiles(number, repo = null) with { description: "List the files a pull request changes" } = @gh(@prFilesArgs(@repoTarget(@repo), @number), null)
+
+>> `paths` is a comma list; only the files whose diff header mentions one are kept.
+exe .op:net:r @prDiff(number, repo = null, paths = null) with { description: "Get a pull request's unified diff" } = [
+  let @diff = @ghText(@prDiffArgs(@repoTarget(@repo), @number), null)
+  => @paths ? @diffFor(@diff, @paths) : @diff
+]
+
+exe .op:net:r @listPrs(repo = null, options = null) with { description: "List pull requests, filtered by state, author or label" } = @gh(@prListArgs(@repoTarget(@repo), @options), null)
+
+exe .op:net:rw @commentPr(number, repo, body) with { description: "Comment on a pull request" } = @gh(@prCommentArgs(@repoTarget(@repo), @number), { body: @body })
+
+exe .op:net:rw @reviewPr(number, repo, event, body = "") with { description: "Review a pull request: approve, request-changes or comment" } = @gh(@prReviewArgs(@repoTarget(@repo), @number), @reviewBody(@event, @body ?? ""))
+
+>> `options` is { title, body, labels }; labels are added, not replaced.
+exe .op:net:rw @editPr(number, repo, options) with { description: "Edit a pull request's title or body, or add labels" } = [
+  let @target = @repoTarget(@repo)
+  let @labels = @options.labels ?? null
+  if @labels [ @gh(@prLabelArgs(@target, @number), { labels: @labels }) ]
+  => @gh(@prEditArgs(@target, @number), @prEditBody(@options))
+]
+
+>> ── Repos and collaborators ──
+
+exe .op:net:r @viewRepo(repo = null, fields = null) with { description: "Get a repository's details" } = [
+  let @info = @gh(@repoViewArgs(@repoTarget(@repo)), null)
+  => @fields ? @pickFields(@info, @fields) : @info
+]
+
+exe .op:net:r,.op:fs:w @cloneRepo(repo, dir = null) with { description: "Clone a repository to local disk" } = [
+  let @target = @repoTarget(@repo)
+  @ghText(@repoCloneArgs(@target, @dir), null)
+  => { repo: `${@target.owner}/${@target.repo}`, directory: @dir ?? @target.repo }
+]
+
+>> GitHub answers 204 for a collaborator and 404 otherwise, and gh exits
+>> nonzero on the 404.
+exe .op:net:r @isCollaborator(user, repo = null) with { description: "Check whether a user is a collaborator on a repository" } = [
+  let @check = try @ghText(@collabArgs(@repoTarget(@repo), @user), null)
+  => @check.ok
+]
+
+>> ── Workflows ──
+
+>> `workflow` is a display name, a file name or an id; `options` is { ref },
+>> with ref defaulting to "main".
+exe .op:net:rw @runWorkflow(repo, workflow, options = null) with { description: "Trigger a GitHub Actions workflow" } = [
+  let @target = @repoTarget(@repo)
+  let @flows = @gh(@workflowsArgs(@target), null)
+  let @id = @workflowId(@flows.workflows, @workflow)
+  let @body = @dispatchBody(@options)
+  @ghText(@dispatchArgs(@target, @id), @body)
+  => { success: true, workflow: @id, ref: @body.ref }
+]
+
+exe .op:net:r @listWorkflowRuns(repo = null) with { description: "List a repository's recent GitHub Actions runs" } = @gh(@runsArgs(@repoTarget(@repo)), null)
 
 tools @tools = {
   list_issues: {
@@ -68,7 +152,67 @@ tools @tools = {
     mlld: @searchIssues,
     labels: [.op:net:r],
     description: "Search GitHub issues across repositories"
+  },
+  view_pr: {
+    mlld: @viewPr,
+    labels: [.op:net:r],
+    description: "Get a pull request by number"
+  },
+  list_pr_files: {
+    mlld: @listPrFiles,
+    labels: [.op:net:r],
+    description: "List the files a pull request changes"
+  },
+  pr_diff: {
+    mlld: @prDiff,
+    labels: [.op:net:r],
+    description: "Get a pull request's unified diff"
+  },
+  list_prs: {
+    mlld: @listPrs,
+    labels: [.op:net:r],
+    description: "List pull requests, filtered by state, author or label"
+  },
+  comment_pr: {
+    mlld: @commentPr,
+    labels: [.op:net:rw],
+    description: "Comment on a pull request"
+  },
+  review_pr: {
+    mlld: @reviewPr,
+    labels: [.op:net:rw],
+    description: "Review a pull request: approve, request-changes or comment"
+  },
+  edit_pr: {
+    mlld: @editPr,
+    labels: [.op:net:rw],
+    description: "Edit a pull request's title or body, or add labels"
+  },
+  view_repo: {
+    mlld: @viewRepo,
+    labels: [.op:net:r],
+    description: "Get a repository's details"
+  },
+  clone_repo: {
+    mlld: @cloneRepo,
+    labels: [.op:net:r, .op:fs:w],
+    description: "Clone a repository to local disk"
+  },
+  is_collaborator: {
+    mlld: @isCollaborator,
+    labels: [.op:net:r],
+    description: "Check whether a user is a collaborator on a repository"
+  },
+  run_workflow: {
+    mlld: @runWorkflow,
+    labels: [.op:net:rw],
+    description: "Trigger a GitHub Actions workflow"
+  },
+  list_workflow_runs: {
+    mlld: @listWorkflowRuns,
+    labels: [.op:net:r],
+    description: "List a repository's recent GitHub Actions runs"
   }
 }
 
-export { @listIssues, @getIssue, @createIssue, @addComment, @closeIssue, @searchIssues, @tools }
+export { @listIssues, @getIssue, @createIssue, @addComment, @closeIssue, @searchIssues, @viewPr, @listPrFiles, @prDiff, @listPrs, @commentPr, @reviewPr, @editPr, @viewRepo, @cloneRepo, @isCollaborator, @runWorkflow, @listWorkflowRuns, @tools }

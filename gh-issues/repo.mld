@@ -7,7 +7,15 @@ exe @repoOf(owner, repo) = match [
   * => null
 ]
 
+>> "owner/name" as { owner, repo }, or null for anything else (null, "", no
+>> slash), so the caller falls back to the repo git context names.
+exe @repoFrom(repo) = [
+  let @text = `${@repo ?? ""}`
+  let @parts = @text.split("/")
+  => @repoOf(@parts.length == 2 ? @parts[0] : null, @parts.length == 2 ? @parts[1] : null)
+]
+
 >> The gh api path for a repo, with a suffix such as "/issues".
 exe @repoPath(target, suffix) = `repos/${@target.owner}/${@target.repo}${@suffix}`
 
-export { @repoOf, @repoPath }
+export { @repoOf, @repoFrom, @repoPath }

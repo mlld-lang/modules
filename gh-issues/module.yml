@@ -1,8 +1,8 @@
 name: gh-issues
 author: mlld
 type: library
-about: "GitHub Issues API tools via gh CLI"
-version: 1.1.0
+about: "GitHub issues, pull requests, repos and workflows via gh CLI"
+version: 1.2.0
 license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"

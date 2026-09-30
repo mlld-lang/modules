@@ -1,0 +1,88 @@
+>> Tests for the gh arguments, bodies and response shaping behind the pull
+>> request, repo, collaborator and workflow calls, with no gh call.
+>> Run: mlld test gh-issues/tests/
+
+import { @repoFrom } from "../repo.mld"
+import { @prViewArgs, @prFilesArgs, @prDiffArgs, @prListArgs, @prCommentArgs, @prReviewArgs, @reviewEvent, @reviewBody, @prEditArgs, @prEditBody, @prLabelArgs, @repoViewArgs, @repoCloneArgs, @collabArgs, @workflowsArgs, @dispatchArgs, @dispatchBody, @runsArgs, @workflowId, @pickFields, @diffFor } from "../args.mld"
+
+const @t = { owner: "acme", repo: "app" }
+
+>> ── Repo argument ──
+
+const @from = @repoFrom("acme/app")
+const @test_repo_from_owner = @from.owner == "acme"
+const @test_repo_from_name = @from.repo == "app"
+const @test_repo_from_null = @repoFrom(null) == null
+const @test_repo_from_empty = @repoFrom("") == null
+const @test_repo_from_no_slash = @repoFrom("app") == null
+const @test_repo_from_too_many = @repoFrom("a/b/c") == null
+
+>> ── Pull requests ──
+
+const @test_view = @prViewArgs(@t, 7).join(" ") == "api repos/acme/app/pulls/7"
+const @test_files = @prFilesArgs(@t, 7).join(" ") == "api repos/acme/app/pulls/7/files"
+
+const @diffArgs = @prDiffArgs(@t, 7)
+const @test_diff_header = @diffArgs[2] == "Accept: application/vnd.github.v3.diff"
+const @test_diff_path = @diffArgs[3] == "repos/acme/app/pulls/7"
+
+const @test_list_plain = @prListArgs(@t, null).join(" ") == "api -X GET repos/acme/app/pulls"
+const @list = @prListArgs(@t, { state: "closed", author: "octocat", label: "bug" }).join(" ")
+const @test_list_filters = @list == "api -X GET repos/acme/app/pulls -f state=closed -f head=octocat: -f labels=bug"
+const @test_list_one_filter = @prListArgs(@t, { label: "bug" }).join(" ") == "api -X GET repos/acme/app/pulls -f labels=bug"
+
+const @test_comment = @prCommentArgs(@t, 7).join(" ") == "api repos/acme/app/issues/7/comments --input -"
+const @test_review = @prReviewArgs(@t, 7).join(" ") == "api repos/acme/app/pulls/7/reviews --input -"
+
+const @test_event_approve = @reviewEvent("approve") == "APPROVE"
+const @test_event_changes = @reviewEvent("request-changes") == "REQUEST_CHANGES"
+const @test_event_comment = @reviewEvent("comment") == "COMMENT"
+const @test_event_other = @reviewEvent("pending") == "PENDING"
+const @review = @reviewBody("approve", "LGTM")
+const @test_review_body = @review.event == "APPROVE" && @review.body == "LGTM"
+
+const @test_edit = @prEditArgs(@t, 7).join(" ") == "api repos/acme/app/pulls/7 -X PATCH --input -"
+const @edit = @prEditBody({ title: "fix: leak", labels: ["bug"] })
+const @test_edit_body_title = @edit.title == "fix: leak"
+const @test_edit_body_keys = @edit.mx.keys.join(",") == "title"
+const @test_edit_body_empty = @prEditBody(null).mx.keys.length == 0
+const @test_labels = @prLabelArgs(@t, 7).join(" ") == "api repos/acme/app/issues/7/labels --input -"
+
+>> ── Repos and collaborators ──
+
+const @test_repo_view = @repoViewArgs(@t).join(" ") == "api repos/acme/app"
+const @test_clone = @repoCloneArgs(@t, null).join(" ") == "repo clone acme/app"
+const @test_clone_dir = @repoCloneArgs(@t, "./copy").join(" ") == "repo clone acme/app ./copy"
+const @test_collab = @collabArgs(@t, "octocat").join(" ") == "api repos/acme/app/collaborators/octocat"
+
+>> ── Workflows ──
+
+const @test_workflows = @workflowsArgs(@t).join(" ") == "api repos/acme/app/actions/workflows"
+const @test_dispatch = @dispatchArgs(@t, 42).join(" ") == "api repos/acme/app/actions/workflows/42/dispatches --input -"
+const @test_dispatch_ref_default = @dispatchBody(null).ref == "main"
+const @test_dispatch_ref = @dispatchBody({ ref: "dev" }).ref == "dev"
+const @test_runs = @runsArgs(@t).join(" ") == "api repos/acme/app/actions/runs"
+
+const @flows = [
+  { id: 11, name: "CI", path: ".github/workflows/ci.yml" },
+  { id: 22, name: "Deploy", path: ".github/workflows/deploy.yml" }
+]
+const @test_workflow_by_name = @workflowId(@flows, "Deploy") == 22
+const @test_workflow_by_path = @workflowId(@flows, "ci.yml") == 11
+const @test_workflow_numeric = @workflowId(@flows, 22) == "22"
+const @test_workflow_unknown = @workflowId(@flows, "release.yml") == "release.yml"
+
+>> ── Shaping responses ──
+
+const @pr = { number: 7, title: "Fix", body: null, state: "open" }
+const @picked = @pickFields(@pr, "number, title,missing")
+const @test_pick_keys = @picked.mx.keys.join(",") == "number,title"
+const @test_pick_value = @picked.title == "Fix"
+const @test_pick_null_kept = @pickFields(@pr, "body").mx.keys.join(",") == "body"
+const @test_pick_none = @pickFields(@pr, "missing").mx.keys.length == 0
+
+const @diff = "diff --git a/src/x.js b/src/x.js\n+one\ndiff --git a/docs/y.md b/docs/y.md\n+two\ndiff --git a/src/z.js b/src/z.js\n+three\n"
+const @test_diff_one = @diffFor(@diff, "docs/") == "diff --git a/docs/y.md b/docs/y.md\n+two"
+const @both = @diffFor(@diff, "x.js, z.js")
+const @test_diff_many = @both == "diff --git a/src/x.js b/src/x.js\n+one\ndiff --git a/src/z.js b/src/z.js\n+three\n"
+const @test_diff_none = @diffFor(@diff, "nothing") == ""
