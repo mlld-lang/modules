@@ -6,6 +6,8 @@
 >> formatting, boundary and business-day functions read too; inputs with Z are
 >> used only where the answer does not depend on the zone (arithmetic, diffs,
 >> comparisons, unix time).
+>> The boundary tests only catch a UTC-for-local mistake when run off UTC, so run
+>> them at least once with TZ set to a zone with an offset.
 
 import { @time, @format, @parse, @add, @subtract, @diff, @before, @after, @equal, @between, @iso, @unix, @dateOnly, @timeOnly, @isBizDay, @addBizDays, @getCurrentTimezone, @getOffset, @startOf, @endOf, @relative, @duration } from "../index.mld"
 
@@ -49,10 +51,19 @@ const @test_between = @between("2025-07-08T20:00:00Z", @earlier, @later)
 const @test_between_inclusive = @time.compare.between(@later, @earlier, @later)
 const @test_between_outside = !@between("2025-07-10T00:00:00Z", @earlier, @later)
 
+>> An invalid date compares as nothing, as with JavaScript's Date.
+const @test_invalid_never_equal = !@equal("nope", "zzz") && !@equal("nope", @earlier)
+const @test_invalid_never_before = !@before("nope", @later) && !@before(@earlier, "nope")
+const @test_invalid_never_after = !@after(@later, "nope") && !@after("nope", @earlier)
+const @test_invalid_never_between = !@between("nope", "1960-01-01T00:00:00Z", @later) && !@between(@earlier, "nope", @later) && !@between(@earlier, @earlier, "nope")
+const @test_diff_invalid_is_null = @diff("nope", @later, "days") == null && @diff(@earlier, "nope", null) == null
+
 >> ── shortcuts ──
 
 const @test_iso = @iso("2025-07-08T10:30:45Z") == "2025-07-08T10:30:45.000Z"
 const @test_unix = @unix("2025-07-08T10:30:45.900Z") == 1751970645
+const @test_unix_before_1970_rounds_down = @unix("1969-12-31T23:59:58.500Z") == -2 && @unix("1969-12-31T23:59:58.000Z") == -2
+const @test_unix_invalid_is_null = @unix("nope") == null
 const @test_date_only = @dateOnly(@wallClock) == "2025-07-08" && @time.date(@wallClock) == "2025-07-08"
 const @test_time_only = @timeOnly(@wallClock) == "10:30:45" && @time.time(@wallClock) == "10:30:45"
 
@@ -73,6 +84,7 @@ const @test_end_of_year = @endOf(@wallClock, "year") == @iso("2025-12-31T23:59:5
 
 const @test_monday_is_biz = @isBizDay("2025-07-07T10:00:00")
 const @test_saturday_not_biz = !@time.biz.isBizDay("2025-07-12T10:00:00")
+const @test_invalid_not_biz = !@isBizDay("nope")
 const @test_friday_plus_one = @dateOnly(@addBizDays("2025-07-11T10:00:00", 1)) == "2025-07-14"
 const @test_monday_minus_one = @dateOnly(@time.biz.addDays("2025-07-14T10:00:00", -1)) == "2025-07-11"
 const @test_friday_plus_six = @dateOnly(@addBizDays("2025-07-11T10:00:00", 6)) == "2025-07-21"
@@ -85,7 +97,10 @@ const @test_relative_future = @time.relative("2025-07-15T10:00:00Z", @ref) == "i
 const @test_relative_precise = @relative("2025-07-06T07:00:00Z", { now: "2025-07-08T10:00:00Z", precise: true }) == "2 days 3 hours ago"
 const @test_relative_just_now = @relative("2025-07-08T10:00:00Z", @ref) == "just now"
 const @test_relative_months = @relative("2025-03-08T10:00:00Z", @ref) == "4 months ago"
-const @test_relative_default_now = @relative(@now) == "just now"
+const @test_relative_invalid = @relative("nope", @ref) == "Invalid Date" && @relative(@base, { now: "nope" }) == "Invalid Date"
+>> A second may pass between reading @now and the call.
+const @sinceNow = @relative(@now)
+const @test_relative_default_now = @sinceNow == "just now" || @sinceNow == "1 second ago"
 
 >> ── timezone ──
 
