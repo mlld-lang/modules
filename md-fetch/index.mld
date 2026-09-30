@@ -7,10 +7,13 @@
 
 import { @MLLD_ALLOWED_DOMAINS } from @input
 
-var @allowedDomains = @MLLD_ALLOWED_DOMAINS
+import { @domainOf, @urlRefusal } from "./check.mld"
+
+const @allowedDomains = @MLLD_ALLOWED_DOMAINS
 
 >> --- HTML to markdown ---
 
+>> Node because readability and jsdom are npm packages.
 exe @htmlToMarkdown(html, url) = node {
   const raw = String(html);
   const trimmed = raw.trimStart();
@@ -35,18 +38,10 @@ exe @htmlToMarkdown(html, url) = node {
 
 >> --- Core fetch ---
 
-exe net:r @mdFetch(url: string) = [
-  >> Protocol check
-  when !@url.startsWith("https://") => [
-    => { error: true, message: "Only HTTPS URLs are allowed" }
-  ]
-
-  >> Domain extraction (pure string methods, no js dependency)
-  let @domain = @url.replace("https://", "").split("/")[0].split("?")[0].split(":")[0]
-
-  >> Domain allowlist check
-  when @allowedDomains != "*" && !@allowedDomains.split(",").includes(@domain) => [
-    => { error: true, message: `Domain not in allowlist: @domain` }
+exe .op:net:r @mdFetch(url: string) with { description: "Fetch markdownified web content from a provided HTTPS url" } = [
+  let @refusal = @urlRefusal(@url, @allowedDomains)
+  if @refusal [
+    => @refusal
   ]
 
   >> Fetch with Accept: text/markdown (Cloudflare sites return markdown directly)
@@ -55,16 +50,15 @@ exe net:r @mdFetch(url: string) = [
   >> If response is still HTML, extract content with readability
   let @content = @htmlToMarkdown(@raw, @url)
 
-  => { url: @url, domain: @domain, content: @content }
-] with { description: "Fetch markdownified web content from a provided HTTPS url" }
+  => { url: @url, domain: @domainOf(@url), content: @content }
+]
 
 >> --- Tool collection ---
 
-var tools @tools = {
+tools @tools = {
   mdFetch: {
     mlld: @mdFetch,
-    expose: ["url"],
-    labels: ["net:r"],
+    labels: [.op:net:r],
     description: "Fetch markdownified web content from provided HTTPS url"
   }
 }

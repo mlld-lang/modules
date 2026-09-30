@@ -1,0 +1,17 @@
+>> Tests for what is stored beside a payload, with no database.
+>> Run: mlld test pg/tests/
+
+import { @artifactRecord } from "../record.mld"
+
+const .secret @token = "t-1"
+const @labelled = { key: @token }
+const @rec = @artifactRecord(@labelled, { source: "demo" })
+const @test_keeps_meta = @rec.meta.source == "demo"
+const @test_labels_come_from_payload = @rec.labels.includes(".secret")
+const @test_taint_recorded = @rec.provenance.taint.includes(".secret")
+const @test_mx_mirrors_labels = @rec.mx.labels.includes(".secret")
+
+const @plain = @artifactRecord({ status: "ok" }, null)
+const @test_missing_meta_is_empty_object = @plain.meta.isObject()
+const @test_unlabelled_has_no_labels = @plain.labels.length == 0
+const @test_list_meta_is_replaced = @artifactRecord("x", ["not", "an", "object"]).meta.isObject()

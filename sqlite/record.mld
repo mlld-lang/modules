@@ -1,0 +1,15 @@
+>> Kept apart from index.mld so it loads, and tests, without the database driver.
+
+>> What is stored beside a payload: its caller-given meta and the labels the
+>> payload carries, read from the payload itself so they travel with the data.
+exe @artifactRecord(artifact, meta) = [
+  let @m = @artifact.mx
+  => {
+    meta: @meta && @meta.isObject() ? @meta : {},
+    labels: @m.labels,
+    provenance: { taint: @m.taint, sources: @m.sources },
+    mx: { labels: @m.labels, taint: @m.taint, sources: @m.sources }
+  }
+]
+
+export { @artifactRecord }

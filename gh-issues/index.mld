@@ -3,113 +3,70 @@
 >> Auth: GITHUB_TOKEN env var > gh auth token (from `gh auth login`)
 >> Repo: auto-detected from git context, or pass owner/repo explicitly
 
-exe @detectRepo() = node {
-  const { execFileSync } = require('child_process');
-  const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
-  const { nameWithOwner } = JSON.parse(json);
-  const [owner, repo] = nameWithOwner.split('/');
-  return { owner, repo };
-} with { description: "Detect owner/repo from git context" }
+import { @repoOf, @repoPath } from "./repo.mld"
 
-exe net:r @listIssues(owner, repo) = node {
+>> Node because execFileSync hands each value to gh as its own argument; a cmd
+>> body pastes values in as text, so a title with spaces would split.
+>> input, when given, goes to gh as JSON on stdin (for `gh api --input -`).
+exe @gh(args, input) = node {
   const { execFileSync } = require('child_process');
-  if (!owner || !repo) {
-    const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
-    const { nameWithOwner } = JSON.parse(json);
-    [owner, repo] = nameWithOwner.split('/');
-  }
-  return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues`], { encoding: 'utf8' }).trim();
-} with { description: "List open issues for a GitHub repository" }
+  const opts = { encoding: 'utf8' };
+  if (input !== null && input !== undefined) opts.input = JSON.stringify(input);
+  return JSON.parse(execFileSync('gh', args, opts));
+}
 
-exe net:r @getIssue(owner, repo, number) = node {
-  const { execFileSync } = require('child_process');
-  if (!owner || !repo) {
-    const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
-    const { nameWithOwner } = JSON.parse(json);
-    [owner, repo] = nameWithOwner.split('/');
-  }
-  return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues/${number}`], { encoding: 'utf8' }).trim();
-} with { description: "Get a single GitHub issue by number" }
+exe @detectRepo() with { description: "Detect owner/repo from git context" } = [
+  let @info = @gh(["repo", "view", "--json", "nameWithOwner"], null)
+  let @parts = @info.nameWithOwner.split("/")
+  => { owner: @parts[0], repo: @parts[1] }
+]
 
-exe net:rw @createIssue(owner, repo, title, body) = node {
-  const { execFileSync } = require('child_process');
-  if (!owner || !repo) {
-    const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
-    const { nameWithOwner } = JSON.parse(json);
-    [owner, repo] = nameWithOwner.split('/');
-  }
-  return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues`, '--input', '-'], {
-    input: JSON.stringify({ title, body: body || '' }),
-    encoding: 'utf8'
-  }).trim();
-} with { description: "Create a new GitHub issue" }
+>> The repo to act on: the one given, else the one git context names.
+exe @targetRepo(owner, repo) = [
+  => @repoOf(@owner, @repo) ?? @detectRepo()
+]
 
-exe net:rw @addComment(owner, repo, number, comment) = node {
-  const { execFileSync } = require('child_process');
-  if (!owner || !repo) {
-    const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
-    const { nameWithOwner } = JSON.parse(json);
-    [owner, repo] = nameWithOwner.split('/');
-  }
-  return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues/${number}/comments`, '--input', '-'], {
-    input: JSON.stringify({ body: comment }),
-    encoding: 'utf8'
-  }).trim();
-} with { description: "Add a comment to a GitHub issue" }
+exe .op:net:r @listIssues(owner = null, repo = null) with { description: "List open issues for a GitHub repository" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), "/issues")], null)
 
-exe net:rw @closeIssue(owner, repo, number) = node {
-  const { execFileSync } = require('child_process');
-  if (!owner || !repo) {
-    const json = execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' }).trim();
-    const { nameWithOwner } = JSON.parse(json);
-    [owner, repo] = nameWithOwner.split('/');
-  }
-  return execFileSync('gh', ['api', `repos/${owner}/${repo}/issues/${number}`, '-X', 'PATCH', '--input', '-'], {
-    input: JSON.stringify({ state: 'closed' }),
-    encoding: 'utf8'
-  }).trim();
-} with { description: "Close a GitHub issue" }
+exe .op:net:r @getIssue(owner, repo, number) with { description: "Get a single GitHub issue by number" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), `/issues/${@number}`)], null)
 
-exe net:r @searchIssues(query) = node {
-  const { execFileSync } = require('child_process');
-  return execFileSync('gh', ['api', '-X', 'GET', 'search/issues', '-f', `q=${query}`], { encoding: 'utf8' }).trim();
-} with { description: "Search GitHub issues across repositories" }
+exe .op:net:rw @createIssue(owner, repo, title, body = "") with { description: "Create a new GitHub issue" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), "/issues"), "--input", "-"], { title: @title, body: @body ?? "" })
 
-var tools @tools = {
+exe .op:net:rw @addComment(owner, repo, number, comment) with { description: "Add a comment to a GitHub issue" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), `/issues/${@number}/comments`), "--input", "-"], { body: @comment })
+
+exe .op:net:rw @closeIssue(owner, repo, number) with { description: "Close a GitHub issue" } = @gh(["api", @repoPath(@targetRepo(@owner, @repo), `/issues/${@number}`), "-X", "PATCH", "--input", "-"], { state: "closed" })
+
+exe .op:net:r @searchIssues(query) with { description: "Search GitHub issues across repositories" } = @gh(["api", "-X", "GET", "search/issues", "-f", `q=${@query}`], null)
+
+tools @tools = {
   list_issues: {
     mlld: @listIssues,
-    expose: ["owner", "repo"],
-    labels: ["net:r"],
+    labels: [.op:net:r],
     description: "List open issues for a GitHub repository"
   },
   get_issue: {
     mlld: @getIssue,
-    expose: ["owner", "repo", "number"],
-    labels: ["net:r"],
+    labels: [.op:net:r],
     description: "Get a single GitHub issue by number"
   },
   create_issue: {
     mlld: @createIssue,
-    expose: ["owner", "repo", "title", "body"],
-    labels: ["net:rw"],
+    labels: [.op:net:rw],
     description: "Create a new GitHub issue"
   },
   add_comment: {
     mlld: @addComment,
-    expose: ["owner", "repo", "number", "comment"],
-    labels: ["net:rw"],
+    labels: [.op:net:rw],
     description: "Add a comment to a GitHub issue"
   },
   close_issue: {
     mlld: @closeIssue,
-    expose: ["owner", "repo", "number"],
-    labels: ["net:rw"],
+    labels: [.op:net:rw],
     description: "Close a GitHub issue"
   },
   search_issues: {
     mlld: @searchIssues,
-    expose: ["query"],
-    labels: ["net:r"],
+    labels: [.op:net:r],
     description: "Search GitHub issues across repositories"
   }
 }

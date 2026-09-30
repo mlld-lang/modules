@@ -1,6 +1,8 @@
 needs { node: [pg] }
 
-var @defaultLimit = 50
+import { @artifactRecord } from "./record.mld"
+
+const @defaultLimit = 50
 
 exe @pgStore(action, config, request) = node {
   const crypto = require('node:crypto');
@@ -27,7 +29,6 @@ exe @pgStore(action, config, request) = node {
     return value;
   };
 
-  const toArray = value => Array.isArray(value) ? value : [];
 
   const normalizeConfig = value => {
     const cfg = toObject(value);
@@ -94,19 +95,6 @@ exe @pgStore(action, config, request) = node {
     };
   };
 
-  const normalizeMeta = (meta, mx) => {
-    const mxObj = toObject(mx);
-    return {
-      meta: toObject(meta),
-      labels: toArray(mxObj.labels),
-      provenance: {
-        taint: toArray(mxObj.taint),
-        sources: toArray(mxObj.sources)
-      },
-      mx: mxObj
-    };
-  };
-
   const cfg = normalizeConfig(config);
   const req = toObject(request);
   const schemaTable = `${quote(cfg.schema)}.${quote(cfg.table)}`;
@@ -142,7 +130,7 @@ exe @pgStore(action, config, request) = node {
     if (action === 'put') {
       const collection = assertNonEmptyString(req.collection, 'collection');
       const key = assertNonEmptyString(req.key, 'key');
-      const record = normalizeMeta(req.meta, req.mx);
+      const record = toObject(req.record);
       const result = await pool.query(`
         INSERT INTO ${schemaTable} (
           collection,
@@ -180,7 +168,7 @@ exe @pgStore(action, config, request) = node {
       const key = req.key && String(req.key).trim().length > 0
         ? String(req.key).trim()
         : crypto.randomUUID();
-      const record = normalizeMeta(req.meta, req.mx);
+      const record = toObject(req.record);
       const result = await pool.query(`
         INSERT INTO ${schemaTable} (
           collection,
@@ -241,24 +229,20 @@ exe @pgStore(action, config, request) = node {
 exe @init(config) = @pgStore("ensure", @config, {})
 exe @ensureSchema(config) = @pgStore("ensure", @config, {})
 
-exe @putArtifact(config, collection, key, payload, meta) = [
-  let @details = @meta ? @meta : {}
+exe @putArtifact(config, collection, key, artifact, meta) = [
   => @pgStore("put", @config, {
     collection: @collection,
     key: @key,
-    payload: @payload,
-    meta: @details,
-    mx: @mx
+    payload: @artifact,
+    record: @artifactRecord(@artifact, @meta)
   })
 ]
 
-exe @appendArtifact(config, collection, payload, meta) = [
-  let @details = @meta ? @meta : {}
+exe @appendArtifact(config, collection, artifact, meta) = [
   => @pgStore("append", @config, {
     collection: @collection,
-    payload: @payload,
-    meta: @details,
-    mx: @mx
+    payload: @artifact,
+    record: @artifactRecord(@artifact, @meta)
   })
 ]
 
@@ -275,4 +259,4 @@ exe @listArtifacts(config, collection, limit) = [
   })
 ]
 
-export { @init, @ensureSchema, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts }
+export { @artifactRecord, @init, @ensureSchema, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts }

@@ -7,10 +7,10 @@ Dual-LLM security pattern. Tainted input never shares context with the evaluatio
 ```mlld
 import { @airlock } from @mlld/airlock
 
-var @data = <untrusted-input.txt>
-var @verdict = @airlock(@data, "No destructive actions. No secret exfiltration.")
+const @data = <untrusted-input.txt>
+const @verdict = @airlock(@data, "No destructive actions. No secret exfiltration.")
 if @verdict.verdict == "deny" [
-  show `Blocked: @verdict.reasoning`
+  show `Blocked: ${@verdict.reasoning}`
 ]
 ```
 
@@ -23,7 +23,7 @@ Two-call pattern with defaults: haiku extracts, sonnet evaluates.
 Returns `{ verdict: "allow"|"deny"|"retry", reasoning, findings, confidence }`.
 
 ```mlld
-var @v = @airlock(@userInput, "Only approve safe read-only operations")
+const @v = @airlock(@userInput, "Only approve safe read-only operations")
 ```
 
 ### `@airlockWith(data, policy, extractModel, evalModel, dir)`
@@ -31,7 +31,7 @@ var @v = @airlock(@userInput, "Only approve safe read-only operations")
 Full control over models and working directory.
 
 ```mlld
-var @v = @airlockWith(@data, @policy, "haiku", "opus", @base)
+const @v = @airlockWith(@data, @policy, "haiku", "opus", @root)
 ```
 
 ### `@extract(data, model, dir)`

@@ -10,7 +10,7 @@ import { @lms } from @mlld/lms
 show @lms("What is REST?")
 
 >> Guaranteed structured output via JSON Schema
-var @result = @lms("Classify: patient SSN 123-45-6789", {
+const @result = @lms("Classify: patient SSN 123-45-6789", {
   model: "google/gemma-4-26b-a4b",
   temperature: 0,
   schema: {
@@ -18,7 +18,7 @@ var @result = @lms("Classify: patient SSN 123-45-6789", {
     properties: { labels: { type: "array", items: { type: "string" } } },
     required: ["labels"]
   }
-}) | @json
+}) | @parse
 show @result.labels
 ```
 
@@ -28,7 +28,7 @@ Requires LM Studio's local server running (`lms server start`, default `http://l
 
 ### `@lms(prompt, config)`
 
-Calls the OpenAI-compatible `/v1/chat/completions` endpoint and returns the assistant's message content. Pipe through `@json` when using `schema` / `responseFormat`.
+Calls the OpenAI-compatible `/v1/chat/completions` endpoint and returns the assistant's message content. Pipe through `@parse` when using `schema` / `responseFormat`.
 
 | Field | Type | Default | Purpose |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Calls the OpenAI-compatible `/v1/chat/completions` endpoint and returns the assi
 | `ttl` | number | — | Seconds to keep the model loaded after the call |
 | `baseUrl` | string | `http://localhost:1234/v1` | API base URL |
 | `apiKey` | string | — | Bearer token, if the server requires auth |
-| `full` | boolean | `false` | Return JSON `{ content, model, usage, finishReason }` instead of just content |
+| `full` | boolean | `false` | Return `{ content, model, usage, finishReason }` instead of just content |
 
 ```mlld
 >> Deterministic one-word classification
@@ -54,8 +54,8 @@ show @lms("Classify this doc's sensitivity", {
 })
 
 >> Inspect token usage and finish reason
-var @meta = @lms("Summarize the changelog.", { full: true }) | @json
-show `tokens: @meta.usage.total_tokens, finish: @meta.finishReason`
+const @meta = @lms("Summarize the changelog.", { full: true })
+show `tokens: ${@meta.usage.total_tokens}, finish: ${@meta.finishReason}`
 
 >> Multi-turn conversation
 show @lms("And in one sentence?", {

@@ -7,11 +7,11 @@ SQLite-backed artifact storage.
 ```mlld
 import { @init, @putArtifact, @appendArtifact, @getArtifact, @listArtifacts } from @mlld/sqlite
 
-var @db = { path: "/tmp/artifacts.sqlite" }
+const @db = { path: "/tmp/artifacts.sqlite" }
 run @init(@db)
 
-var @saved = @putArtifact(@db, "runs", "scan-123", { status: "ok" }, { source: "demo" })
-var @event = @appendArtifact(@db, "events", { kind: "done" })
+const @saved = @putArtifact(@db, "runs", "scan-123", { status: "ok" }, { source: "demo" })
+const @event = @appendArtifact(@db, "events", { kind: "done" })
 show @getArtifact(@db, "runs", "scan-123")
 show @listArtifacts(@db, "events", 10)
 ```
@@ -31,9 +31,9 @@ Upsert one artifact record at `collection/key`.
 Stores:
 - `payload`
 - `meta`
-- `labels` from `@mx.labels`
-- `provenance` from `@mx.taint` and `@mx.sources`
-- full `mx`
+- `labels` the payload carries (`@payload.mx.labels`)
+- `provenance` from the payload's `mx.taint` and `mx.sources`
+- `mx`: those three lists together
 - timestamps
 
 ### `@appendArtifact(config, collection, payload, meta)`

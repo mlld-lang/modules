@@ -1,0 +1,21 @@
+>> The URL checks @mdFetch runs before any request. Kept apart from index.mld so
+>> they load, and test, without the environment input index.mld imports.
+
+>> The host part of an https URL, without path, query or port.
+exe @domainOf(url) = @url.replace("https://", "").split("/")[0].split("?")[0].split(":")[0]
+
+>> null when the URL may be fetched, else the error @mdFetch returns.
+>> allowed is a comma-separated domain list, or "*" for any domain; unset allows none.
+exe @urlRefusal(url, allowed) = [
+  if !@url.startsWith("https://") [
+    => { error: true, message: "Only HTTPS URLs are allowed" }
+  ]
+  let @domain = @domainOf(@url)
+  let @list = @allowed ? @allowed.split(",") : []
+  if @allowed != "*" && !@list.includes(@domain) [
+    => { error: true, message: `Domain not in allowlist: ${@domain}` }
+  ]
+  => null
+]
+
+export { @domainOf, @urlRefusal }

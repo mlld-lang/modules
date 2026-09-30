@@ -14,7 +14,7 @@ pip3 install ddgs
 
 ```mlld
 import { @search } from @mlld/duckduckgo
-var @results = @search("mlld scripting language", 5)
+const @results = @search("mlld scripting language", 5)
 show @results
 ```
 

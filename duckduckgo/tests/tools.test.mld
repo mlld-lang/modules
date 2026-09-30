@@ -1,0 +1,7 @@
+>> Tests for the duckduckgo tool collection, with no search.
+>> Run: mlld test duckduckgo/tests/
+
+import { @tools } from "../index.mld"
+
+const @test_search_is_served = @tools.mx.tools.includes("search")
+const @test_only_search_is_served = @tools.mx.tools.length == 1

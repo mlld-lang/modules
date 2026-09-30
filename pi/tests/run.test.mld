@@ -1,0 +1,53 @@
+>> Tests for the arguments @runPiSh gives pi, against a stub pi that prints them.
+>> Run: mlld test pi/tests/run.test.mld
+
+import { @runPiSh } from "../index.mld"
+
+var @fixtures = "@root/pi/tests/fixtures/run"
+var @stub = "@fixtures/pi-stub.sh"
+var @workdir = "@fixtures/workdir"
+var @sid = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+
+exe @has(out, line) = js { return out.split("\n").includes(line); }
+exe @hasPrefix(out, prefix) = js { return out.split("\n").some(l => l.startsWith(prefix)); }
+exe @argsAfter(out, flag) = js {
+  const args = out.split("\n").filter(l => l.startsWith("arg=")).map(l => l.slice(4));
+  const i = args.indexOf(flag);
+  return i < 0 ? "" : args[i + 1];
+}
+>> Emptied first so the header check sees a file this run wrote.
+exe @emptyDir(dir) = sh { rm -rf "$dir"; echo "$dir" }
+exe @sessionPath(dir, id) = js { return `${dir}/${id}.jsonl`; }
+exe @readFile(path) = sh { cat "$path" }
+
+>> ── dir ──
+
+var @inDir = @runPiSh("hi", @workdir, "", "", "", "", "", "", "", "", @stub)
+var @test_dir_is_pwd = @has(@inDir, "pwd=@workdir")
+var @test_dir_not_a_flag = !@hasPrefix(@inDir, "arg=--dir")
+
+var @missingDir = try @runPiSh("hi", "@fixtures/nonexistent", "", "", "", "", "", "", "", "", @stub)
+var @test_missing_dir_fails = !@missingDir.ok
+
+>> ── flags ──
+
+var @flagged = @runPiSh("hi", "", "", "", "", "--no-tools --no-context-files", "", "", "", "", @stub)
+var @test_flags_reach_pi = @has(@flagged, "arg=--no-context-files")
+var @test_flags_word_split = @has(@flagged, "arg=--no-tools")
+
+>> ── session ──
+
+var @unsaved = @runPiSh("hi", "", "", "", "", "", "", "", "", "", @stub)
+var @test_no_session_id_means_no_session = @has(@unsaved, "arg=--no-session")
+
+>> @runPiSh writes a .gitignore of * into it, so the folder stays out of git.
+var @sessionDir = @emptyDir("@fixtures/sessions")
+var @saved = @runPiSh("hi", @workdir, "", "", "", "", "", "", @sid, @sessionDir, @stub)
+var @sessionFile = @sessionPath(@sessionDir, @sid)
+var @test_session_file_passed = @argsAfter(@saved, "--session") == @sessionFile
+var @test_session_not_disabled = !@has(@saved, "arg=--no-session")
+var @header = @readFile(@sessionFile) | @json
+var @test_header_id = @header.id == @sid
+var @test_header_type = @header.type == "session"
+var @test_header_cwd_is_dir = @header.cwd == @workdir
+var @test_session_dir_ignores_itself = @readFile("@sessionDir/.gitignore").trim() == "*"

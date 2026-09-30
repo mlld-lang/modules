@@ -1,0 +1,16 @@
+>> Tests for the checks @mdFetch runs before any request.
+>> Run: mlld test md-fetch/tests/
+
+import { @domainOf, @urlRefusal } from "../check.mld"
+
+const @test_domain_plain = @domainOf("https://github.com/mlld-lang/mlld") == "github.com"
+const @test_domain_drops_port = @domainOf("https://localhost:8443/x") == "localhost"
+const @test_domain_drops_query = @domainOf("https://example.com?q=1") == "example.com"
+
+const @test_http_refused = @urlRefusal("http://example.com", "*").message == "Only HTTPS URLs are allowed"
+const @test_any_domain_with_star = @urlRefusal("https://example.com/a", "*") == null
+const @test_listed_domain_allowed = @urlRefusal("https://docs.python.org/3/", "github.com,docs.python.org") == null
+const @test_unlisted_domain_refused = @urlRefusal("https://evil.example/", "github.com").message == "Domain not in allowlist: evil.example"
+const @test_unset_allowlist_refuses = @urlRefusal("https://example.com/", null).error
+>> A listed domain must match whole, not as a suffix.
+const @test_suffix_not_matched = @urlRefusal("https://notgithub.com/", "github.com").error

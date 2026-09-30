@@ -1,10 +1,10 @@
 needs { network }
 
->> Credential sealing — resolved via keychain then process.env fallback
-auth @openai = "OPENAI_API_KEY"
+>> Looked up in the keychain first, then the OPENAI_API_KEY environment variable.
+creds @openai = "OPENAI_API_KEY"
 
 >> Stream format adapter for OpenAI NDJSON output
-var @openaiStreamFormat = {
+const @openaiStreamFormat = {
   name: "openai",
   format: "ndjson",
   schemas: [
@@ -32,34 +32,35 @@ var @openaiStreamFormat = {
   ]
 }
 
->> ── Internal call helper ──
->> Handles both streaming (SSE → NDJSON) and non-streaming modes.
->> Params arrive as JS locals from the exe signature.
-
-exe @openaiImpl(prompt, opts) = js {
-  const cfg = opts || {};
-  const model = cfg.model || "gpt-4o";
-  const baseUrl = cfg.baseUrl || "https://api.openai.com/v1";
-
-  const messages = [];
-  if (cfg.system) messages.push({ role: "system", content: cfg.system });
-  if (cfg.messages) {
-    for (const m of cfg.messages) messages.push(m);
+>> ── Request ──
+>> The chat/completions body, built in mlld so it can be read and tested apart
+>> from the network call.
+exe @openaiRequest(prompt, cfg) = [
+  let @sys = @cfg.system ? [{ role: "system", content: @cfg.system }] : []
+  let @prior = @cfg.messages && @cfg.messages.isArray() ? @cfg.messages : []
+  let @temperature = @cfg.temperature != null ? { temperature: @cfg.temperature } : {}
+  let @maxTokens = @cfg.maxTokens ? { max_tokens: @cfg.maxTokens } : {}
+  let @format = @cfg.responseFormat ? { response_format: @cfg.responseFormat } : {}
+  let @fnTools = @cfg.fnTools ? { tools: @cfg.fnTools } : {}
+  let @fnToolChoice = @cfg.fnToolChoice ? { tool_choice: @cfg.fnToolChoice } : {}
+  let @stream = @cfg.stream ? { stream: true, stream_options: { include_usage: true } } : {}
+  => {
+    model: @cfg.model ?? "gpt-4o",
+    messages: [...@sys, ...@prior, { role: "user", content: @prompt }],
+    ...@temperature,
+    ...@maxTokens,
+    ...@format,
+    ...@fnTools,
+    ...@fnToolChoice,
+    ...@stream
   }
-  messages.push({ role: "user", content: prompt });
+]
 
-  const body = { model, messages };
-  if (cfg.temperature != null) body.temperature = cfg.temperature;
-  if (cfg.maxTokens) body.max_tokens = cfg.maxTokens;
-  if (cfg.responseFormat) body.response_format = cfg.responseFormat;
-  if (cfg.fnTools) body.tools = cfg.fnTools;
-  if (cfg.fnToolChoice) body.tool_choice = cfg.fnToolChoice;
-  if (cfg.stream) {
-    body.stream = true;
-    body.stream_options = { include_usage: true };
-  }
-
-  const resp = await fetch(baseUrl + "/chat/completions", {
+>> ── Network call ──
+>> Node because it needs fetch and reads the server-sent event stream.
+>> Streaming prints NDJSON lines for @openaiStreamFormat and returns the full text.
+exe @openaiPost(body, baseUrl) using creds:openai = node {
+  const resp = await fetch((baseUrl || "https://api.openai.com/v1") + "/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -69,29 +70,27 @@ exe @openaiImpl(prompt, opts) = js {
   });
 
   if (!resp.ok) {
-    const errBody = await resp.text();
-    throw new Error("OpenAI API " + resp.status + ": " + errBody);
+    throw new Error("OpenAI API " + resp.status + ": " + await resp.text());
   }
 
-  if (!cfg.stream) {
+  if (!body.stream) {
     const json = await resp.json();
     const msg = json.choices[0].message;
 
     // Native function calling: return structured tool_calls
     if (msg.tool_calls && msg.tool_calls.length > 0) {
-      return JSON.stringify({
+      return {
         type: "tool_calls",
         tool_calls: msg.tool_calls.map(tc => ({
           function: tc.function.name,
           args: JSON.parse(tc.function.arguments)
         }))
-      });
+      };
     }
 
     return msg.content;
   }
 
-  // Streaming: parse SSE, emit NDJSON lines via console.log
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let full = "";
@@ -126,7 +125,7 @@ exe @openaiImpl(prompt, opts) = js {
   }
 
   return full;
-} using auth:openai
+}
 
 >> ── Core invocation ──
 
@@ -141,15 +140,15 @@ exe @openaiImpl(prompt, opts) = js {
 >> config.fnToolChoice   - "auto", "required", "none", or {type: "function", function: {name: "..."}}
 >> config.baseUrl        - API base URL (default: https://api.openai.com/v1)
 >> config.stream         - boolean, enables streaming
-exe llm @openai(prompt, config) = [
+llm @openai(prompt, config) with { stream: @config.stream, stream_format: @openaiStreamFormat } = [
   let @cfg = @config ? @config : {}
-  => @openaiImpl(@prompt, @cfg)
-] with { stream: @cfg.stream, streamFormat: @openaiStreamFormat }
+  => @openaiPost(@openaiRequest(@prompt, @cfg), @cfg.baseUrl)
+]
 
 >> ── Model shortcuts ──
 
-exe llm @gpt4o(prompt) = @openai(@prompt, { model: "gpt-4o" })
-exe llm @gpt4oMini(prompt) = @openai(@prompt, { model: "gpt-4o-mini" })
-exe llm @o3Mini(prompt) = @openai(@prompt, { model: "o3-mini" })
+llm @gpt4o(prompt) = @openai(@prompt, { model: "gpt-4o" })
+llm @gpt4oMini(prompt) = @openai(@prompt, { model: "gpt-4o-mini" })
+llm @o3Mini(prompt) = @openai(@prompt, { model: "o3-mini" })
 
-export { @openai, @gpt4o, @gpt4oMini, @o3Mini, @openaiStreamFormat }
+export { @openai, @gpt4o, @gpt4oMini, @o3Mini, @openaiStreamFormat, @openaiRequest }

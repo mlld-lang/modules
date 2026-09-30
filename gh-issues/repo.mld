@@ -1,0 +1,13 @@
+>> Repo naming for the gh-issues calls, kept apart from index.mld so it tests
+>> without gh.
+
+>> The repo the caller named, or null when either part is missing.
+exe @repoOf(owner, repo) = match [
+  @owner && @repo => { owner: @owner, repo: @repo }
+  * => null
+]
+
+>> The gh api path for a repo, with a suffix such as "/issues".
+exe @repoPath(target, suffix) = `repos/${@target.owner}/${@target.repo}${@suffix}`
+
+export { @repoOf, @repoPath }

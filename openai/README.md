@@ -10,7 +10,7 @@ import { @openai, @gpt4o, @gpt4oMini } from @mlld/openai
 show @gpt4oMini("What is REST?")
 show @gpt4o("Summarize this document")
 
-var @result = @openai("Review this code", {
+const @result = @openai("Review this code", {
   model: "gpt-4o",
   system: "You are a code reviewer",
   temperature: 0.3,
@@ -35,23 +35,23 @@ Core invocation. All other exes delegate to this.
 
 ```mlld
 >> Simple call
-var @answer = @openai("Explain TCP/IP", { model: "gpt-4o-mini" })
+const @answer = @openai("Explain TCP/IP", { model: "gpt-4o-mini" })
 
 >> With system prompt and temperature
-var @review = @openai("Review the auth module", {
+const @review = @openai("Review the auth module", {
   model: "gpt-4o",
   system: "Focus on security implications",
   temperature: 0.2
 })
 
 >> JSON mode
-var @structured = @openai("List 3 colors as JSON", {
+const @structured = @openai("List 3 colors as JSON", {
   responseFormat: { type: "json_object" },
   system: "Respond with valid JSON"
 })
 
 >> Multi-turn conversation
-var @followup = @openai("What about error handling?", {
+const @followup = @openai("What about error handling?", {
   messages: [
     { role: "user", content: "Review this auth code" },
     { role: "assistant", content: "The auth code looks solid..." }
@@ -59,7 +59,7 @@ var @followup = @openai("What about error handling?", {
 })
 
 >> Custom endpoint (Azure, local models, etc.)
-var @local = @openai("Hello", {
+const @selfHosted = @openai("Hello", {
   model: "llama-3",
   baseUrl: "http://localhost:8080/v1"
 })
@@ -79,11 +79,11 @@ o3-mini — reasoning model.
 
 ### `@openaiStreamFormat`
 
-NDJSON adapter for OpenAI streaming output. Use with `with { streamFormat: @openaiStreamFormat }` in custom exe definitions.
+NDJSON adapter for OpenAI streaming output. Use with `with { stream_format: @openaiStreamFormat }` in custom exe definitions.
 
 ## Auth
 
-Credentials resolve via mlld's auth sealing:
+The key reaches the request through `using creds:openai`, never through the script text:
 
 ```mlld
 >> Option 1: Set env var
@@ -96,9 +96,11 @@ Credentials resolve via mlld's auth sealing:
 For policy-controlled auth:
 
 ```mlld
-policy @p = {
-  auth: {
-    openai: { from: "keychain", as: "OPENAI_API_KEY" }
+policy @keys = {
+  * {
+    credentials: {
+      openai: { from: "keychain", as: "OPENAI_API_KEY" }
+    }
   }
 }
 ```
