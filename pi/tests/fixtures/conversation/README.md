@@ -22,10 +22,6 @@ The goldens are fray's output unchanged. They differ from opgate's IFT format in
 
 `home/` stands in for `~/.pi/agent` in the `locate` tests: `home/sessions/--tmp-proj--/2026-09-10T00-22-39-649Z_<id>.jsonl` is one saved session. The tests pass both `home` and `home/sessions` as the root. The file holds the first line of `pi-basic.jsonl` and is never ingested.
 
-## Fake project
-
-`project/` stands in for a user's project in `../../session.test.mld`: `project/.llm/pi-sessions/2026-09-23T10-00-00-000Z_<id>.jsonl` is one session saved where `@pi` saves them. It holds only a header line and is never ingested.
-
 ## Environment note
 
 The goldens' headers carry cwds under `/tmp/` and `/scrubbed`. `ingest` resolves symlinks in the cwd, as fray does, so if one of those directories exists on the test machine, macOS reports it as `/private/tmp/...` and the header check fails. Remove the directory; the port is not at fault.

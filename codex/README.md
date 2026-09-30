@@ -19,6 +19,16 @@ const @review = @codex("Review code in src/", {
 
 ## docs
 
+### Sandbox
+
+mlld runs `codex` inside a fence that limits what it may write. `@codex` declares its own fence (a `using { harness }` profile; see mlld's `config-files` docs), which grants:
+
+- the calling project's folder, except its `.llm/` and `.mlld/` folders, `mlld-config.json` and `mlld-lock.json`, so codex can edit your files but not the settings that set its fence;
+- `~/.codex`, where codex keeps its settings, login and session rollouts;
+- the open network.
+
+Everything else is read-only to codex, including a `dir` outside the project. The paths are written into the module, so a `CODEX_HOME` pointing somewhere else is not granted. Each path must exist: a call refuses, naming the missing one, while importing the module still works. This profile replaces any `llm.harness` profile in your `mlld-config.json` for these functions.
+
 ### `@codex(prompt, config)`
 
 Runs `codex exec` and returns the final agent message. Output is parsed from `codex exec --json` so session ids, usage, and the final text are captured in a single call regardless of streaming mode.

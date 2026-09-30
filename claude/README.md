@@ -20,6 +20,16 @@ const @result = @claude("Review code in src/", {
 
 ## docs
 
+### Sandbox
+
+mlld runs `claude` inside a fence that limits what it may write. `@claude` and the poll functions declare their own fence (a `using { harness }` profile; see mlld's `config-files` docs), which grants:
+
+- the calling project's folder, except its `.llm/` and `.mlld/` folders, `mlld-config.json` and `mlld-lock.json`, so claude can edit your files but not the settings that set its fence;
+- `~/.claude` and `~/.claude.json`, where claude keeps its settings, login state and conversations;
+- the open network.
+
+Everything else is read-only to claude, including a `dir` outside the project. The paths are written into the module, so a `CLAUDE_CONFIG_DIR` pointing somewhere else is not granted. Each path must exist: a call refuses, naming the missing one, while importing the module still works. This profile replaces any `llm.harness` profile in your `mlld-config.json` for these functions. `@haiku`, `@sonnet` and `@opus` call `@claude`, so they run under the same fence.
+
 ### Isolation
 
 `CLAUDECODE` is always unset so child processes aren't blocked by the nested-session guard.

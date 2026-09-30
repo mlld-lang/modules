@@ -283,7 +283,7 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
 >>   consumes chunks as they arrive; @raw still holds the full JSONL.
 >> - Uses a `sh { }` block instead of `cmd { }` so interpolated values flow as
 >>   bash env vars and TOML `"` literals in MCP overrides survive unescaped.
-llm @codex(prompt, config) with { stream: @config.stream, stream_format: @codexStreamFormat } = [
+llm @codex(prompt, config) using { harness: { write: [".", "~/.codex"], net: "open" } } with { stream: @config.stream, stream_format: @codexStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "gpt-5.4"

@@ -1,30 +1,30 @@
 >> Tests for the session @pi saves to, with no pi call.
 >> Run: mlld test pi/tests/session.test.mld
 
-import { @piSession, @piResult, @conversationLocateIn, @conversation } from "../index.mld"
+import { @piSession, @piResult, @conversation } from "../index.mld"
 
-const @projRoot = "/some/project"
 exe @isUuid(s) = node { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s); }
 exe @keys(o) = node { return Object.keys(o || {}).sort().join(","); }
 
 >> ── @piSession ──
 
-const @fresh = @piSession({}, @projRoot)
-const @fresh2 = @piSession(null, @projRoot)
+const @fresh = @piSession({})
+const @fresh2 = @piSession(null)
 const @test_default_id_is_lowercase_uuid = @isUuid(@fresh.sessionId)
-const @test_default_dir_in_project = @fresh.sessionDir == "/some/project/.llm/pi-sessions"
+const @test_default_agent_dir_is_pis_own = @fresh.agentDir == ""
 const @test_default_ids_differ = @fresh.sessionId != @fresh2.sessionId
 
-const @named = @piSession({ sessionId: " 3C1F0B52-8E4D-4A7B-9F21-6D5E4C3B2A10 " }, @projRoot)
+const @named = @piSession({ sessionId: " 3C1F0B52-8E4D-4A7B-9F21-6D5E4C3B2A10 ", agentDir: "/some/agent" })
 const @test_named_id_lowercased = @named.sessionId == "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+const @test_agent_dir_passed = @named.agentDir == "/some/agent"
 
-const @bad = try @piSession({ sessionId: "my-session" }, @projRoot)
+const @bad = try @piSession({ sessionId: "my-session" })
 const @test_non_uuid_throws = !@bad.ok
 const @test_non_uuid_error_names_value = @bad.error.message.includes("my-session")
 
-const @off = @piSession({ session: false }, @projRoot)
+const @off = @piSession({ session: false })
 const @test_off_has_no_id = @off.sessionId == ""
-const @test_off_has_no_dir = @off.sessionDir == ""
+const @test_off_has_no_agent_dir = @off.agentDir == ""
 
 >> ── @piResult ──
 
@@ -36,21 +36,3 @@ const @test_on_envelope_keys = @keys(@onResult) == "_mlld,value"
 const @test_on_envelope_value = @onResult.value == "answer"
 const @test_on_envelope_session = @onResult._mlld.sessionId == "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
 const @test_on_envelope_provider = @onResult._mlld.provider == "pi"
-
->> ── locate: the project store ──
-
-const @fixtures = `${@root}/pi/tests/fixtures/conversation`
-const @fixtureProject = `${@fixtures}/project`
-const @projectSid = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
-
->> Built from the arguments alone, with no symlink resolved.
-const @test_locate_project_store = @conversationLocateIn(@projectSid, "/anywhere", "", @fixtureProject) == `${@fixtureProject}/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl`
->> The folder does not exist, so only a path built without reading can match.
-const @test_locate_project_store_no_read = @conversationLocateIn(@projectSid, "/anywhere", "", "/nonexistent/proj") == "/nonexistent/proj/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
-const @test_locate_project_store_lowercases_id = @conversationLocateIn("3C1F0B52-8E4D-4A7B-9F21-6D5E4C3B2A10", "/anywhere", "", "/nonexistent/proj") == "/nonexistent/proj/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl"
->> An explicit root is the only place searched, even with a project set.
-const @test_locate_root_excludes_project = @conversationLocateIn(@projectSid, "/anywhere", `${@fixtures}/home`, @fixtureProject) == null
-
->> The public wrapper, with the store root left out and given.
-const @test_wrapper_without_root = @conversation.locate(@projectSid, "/anywhere") == `${@root}/.llm/pi-sessions/3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10.jsonl`
-const @test_wrapper_with_root = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345678", "/anywhere", `${@fixtures}/home`) != null

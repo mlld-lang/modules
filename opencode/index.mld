@@ -446,7 +446,7 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >>   consumes `text` events as they arrive; @raw still holds the full NDJSON.
 >> - Uses a `sh { }` block so interpolated values flow as bash env vars and
 >>   survive unescaped (see ticket m-8694 for the `cmd` block escaping bug).
-llm @opencode(prompt, config) with { stream: @config.stream, stream_format: @opencodeStreamFormat } = [
+llm @opencode(prompt, config) using { harness: { write: [".", "~/.local/share/opencode", "~/.config/opencode", "~/.cache/opencode", "~/.local/state/opencode"], net: "open" } } with { stream: @config.stream, stream_format: @opencodeStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"

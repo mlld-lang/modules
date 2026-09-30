@@ -19,6 +19,16 @@ const @review = @opencode("Review code in src/", {
 
 ## docs
 
+### Sandbox
+
+mlld runs `opencode` inside a fence that limits what it may write. `@opencode` declares its own fence (a `using { harness }` profile; see mlld's `config-files` docs), which grants:
+
+- the calling project's folder, except its `.llm/` and `.mlld/` folders, `mlld-config.json` and `mlld-lock.json`, so opencode can edit your files but not the settings that set its fence;
+- `~/.local/share/opencode`, `~/.config/opencode`, `~/.cache/opencode` and `~/.local/state/opencode`, where opencode keeps its login, sessions, settings and caches;
+- the open network.
+
+Everything else is read-only to opencode, including a `dir` outside the project. The paths are written into the module, so an `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` or `XDG_STATE_HOME` pointing somewhere else is not granted. Each path must exist: a call refuses, naming the missing one, while importing the module still works. This profile replaces any `llm.harness` profile in your `mlld-config.json` for these functions. A `config.dataHome` or `config.stateHome` must be inside the project or one of these folders.
+
 ### `@opencode(prompt, config)`
 
 Runs `opencode run --format json` and returns the final agent message. Session id, text chunks, and token usage are parsed from opencode's NDJSON events in a single call regardless of streaming mode.

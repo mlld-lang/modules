@@ -68,9 +68,10 @@ exe @isPiBuiltin(name) = [
 >>
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Parameters are passed positionally, not by name, so order matters.
->> sessionId and sessionDir come last so 8-argument callers keep --no-session.
+>> sessionId and agentDir come last so 8-argument callers keep --no-session.
+>> An empty agentDir means pi's own: $PI_CODING_AGENT_DIR, else ~/.pi/agent.
 >> piBin is last so tests can point it at a stub; empty runs `pi` from PATH.
-exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir, piBin) = sh {
+exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, agentDir, piBin) = sh {
   set -e
   export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
 
@@ -106,21 +107,30 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
   modeFlag=()
   if [ -n "$mode" ]; then modeFlag=(--mode json); fi
 
-  # Nothing ignores .llm/ in a user project yet, so the sessions dir ignores itself.
+  # Sessions go where pi keeps its own, so pi /resume lists them and
+  # @conversation.locate finds them without being told where to look.
   sessionFlag=(--no-session)
   if [ -n "$sessionId" ]; then
-    mkdir -p "$sessionDir"
-    if [ ! -e "$sessionDir/.gitignore" ]; then printf '*\n' > "$sessionDir/.gitignore"; fi
-    # pi names a file it creates <timestamp>_<id>.jsonl, which locate could only find
-    # by listing a .llm/ folder the sandbox fences off. Given an existing file holding
-    # only its header line, pi takes the id from the header and appends to that file,
-    # so writing the header first fixes both the name and the id.
-    # pi runs its tools in the cwd the header names, hence $PWD from this shell.
-    sessionFile="$sessionDir/$sessionId.jsonl"
-    if [ ! -e "$sessionFile" ]; then
-      cwdJson=$(printf '%s' "$PWD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+    agent="$agentDir"
+    if [ -z "$agent" ]; then agent="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"; fi
+    case "$agent" in "~") agent="$HOME" ;; "~/"*) agent="$HOME/${agent#??}" ;; esac
+    # A saved session lies in sessions/ or one folder below it, as locate searches.
+    sessionFile=$(find "$agent/sessions" -maxdepth 2 -type f -name "*_$sessionId.jsonl" 2>/dev/null | sort | head -n 1)
+    if [ -z "$sessionFile" ]; then
+      # pi takes the physical cwd (process.cwd()) and encodes it into a folder name
+      # as session-manager.js getDefaultSessionDirPath does.
+      cwd=$(pwd -P)
+      encoded="--$(printf '%s' "$cwd" | sed -e 's|^[/\\]||' -e 's|[/\\:]|-|g')--"
+      mkdir -p "$agent/sessions/$encoded"
+      stamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+      # pi names a file <timestamp>_<id>.jsonl, with : and . in the timestamp as -.
+      sessionFile="$agent/sessions/$encoded/$(printf '%s' "$stamp" | tr ':.' '--')_$sessionId.jsonl"
+      # Given an existing file holding only its header line, pi takes the id from
+      # the header and appends to that file, so writing the header first makes pi
+      # keep the id @pi reports. pi runs its tools in the cwd the header names.
+      cwdJson=$(printf '%s' "$cwd" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
       printf '{"type":"session","version":3,"id":"%s","timestamp":"%s","cwd":"%s"}\n' \
-        "$sessionId" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$cwdJson" > "$sessionFile"
+        "$sessionId" "$stamp" "$cwdJson" > "$sessionFile"
     fi
     sessionFlag=(--session "$sessionFile")
   fi
@@ -130,14 +140,13 @@ exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, s
 }
 
 >> Picks the session a @pi call saves to: a fresh UUID per call unless
->> config.sessionId names one (the same id again continues that conversation), in
->> <projectRoot>/.llm/pi-sessions so writes stay inside the project and the user's
->> own pi history stays clean. config.session: false turns saving off. Ids must be
->> UUIDs because @conversation.locate finds nothing else.
-exe @piSession(config, projectRoot) = node {
-  const path = require("path");
+>> config.sessionId names one (the same id again continues that conversation).
+>> config.session: false turns saving off. Ids must be UUIDs because
+>> @conversation.locate finds nothing else. agentDir is config.agentDir, or empty
+>> for pi's own.
+exe @piSession(config) = node {
   const cfg = config || {};
-  if (cfg.session === false) return { sessionId: "", sessionDir: "" };
+  if (cfg.session === false) return { sessionId: "", agentDir: "" };
   let id;
   if (cfg.sessionId !== undefined && cfg.sessionId !== null && cfg.sessionId !== "") {
     id = String(cfg.sessionId).trim().toLowerCase();
@@ -147,7 +156,7 @@ exe @piSession(config, projectRoot) = node {
   } else {
     id = require("crypto").randomUUID().toLowerCase();
   }
-  return { sessionId: id, sessionDir: path.join(String(projectRoot), ".llm", "pi-sessions") };
+  return { sessionId: id, agentDir: typeof cfg.agentDir === "string" ? cfg.agentDir : "" };
 }
 
 >> The runtime strips `_mlld` before callers see the result and reads the session
@@ -176,8 +185,11 @@ exe @piResult(inputValue, session) = match [
 >> config.thinking - thinking level: off, minimal, low, medium, high, xhigh
 >> config.stream   - boolean, enables JSONL streaming
 >> config.session  - false to save nothing (pi --no-session); default saves to
->>                   <project>/.llm/pi-sessions
+>>                   pi's own store, <agent dir>/sessions
 >> config.sessionId - UUID naming the session; an existing one is continued
+>> config.agentDir - pi agent dir whose sessions/ saves go to (default
+>>                   $PI_CODING_AGENT_DIR, else ~/.pi/agent); the harness profile
+>>                   must grant it
 >>
 >> Tool behavior:
 >>   - When config.tools is provided, mlld runtime creates MCP bridge
@@ -185,7 +197,7 @@ exe @piResult(inputValue, session) = match [
 >>   - pi-mcp-adapter extension loads MCP servers from config
 >>   - Built-in pi tools can be selectively enabled via @mx.llm.native
 >>   - Use config.noTools: true to disable all tools
-llm @pi(prompt, config) with { stream: @config.stream, stream_format: @piStreamFormat } = [
+llm @pi(prompt, config) using { harness: { write: [".", "~/.pi/agent"], net: "open" } } with { stream: @config.stream, stream_format: @piStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : ""
   let @provider = @cfg.provider ? @cfg.provider : ""
@@ -213,8 +225,8 @@ llm @pi(prompt, config) with { stream: @config.stream, stream_format: @piStreamF
 
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
-  let @session = @piSession(@cfg, @root)
-  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir, @cfg.piBin ?? "")
+  let @session = @piSession(@cfg)
+  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.agentDir, @cfg.piBin ?? "")
 
   => @piResult(@raw, @session)
 ]
@@ -232,15 +244,11 @@ llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
 
 >> @conversation.locate(sessionId, cwd, storeRoot?) → absolute path, or null
 >> storeRoot is pi's agent dir or the sessions dir inside it, and only it is searched.
->> Without it, the path is <projectRoot>/.llm/pi-sessions/<id>.jsonl (where @pi
->> saves), built without touching the disk: mlld's sandbox keeps modules out of
->> .llm/ folders, so the file may exist and still be unreadable here, or not exist
->> at all. The home store is not searched after it. With neither, pi's own store
->> $PI_CODING_AGENT_DIR/sessions, else ~/.pi/agent/sessions, is searched. cwd is
->> ignored: every encoded-cwd directory is searched rather than rebuilding pi's
->> encoding. The parameter keeps the signature shared with the other harnesses.
->> projectRoot is a parameter because a node exe cannot see @root.
-exe @conversationLocateIn(sessionId, cwd, storeRoot, projectRoot) = node {
+>> Without it, pi's own store $PI_CODING_AGENT_DIR/sessions, else
+>> ~/.pi/agent/sessions, is searched, which is where @pi saves. cwd is ignored:
+>> every encoded-cwd directory is searched rather than rebuilding pi's encoding.
+>> The parameter keeps the signature shared with the other harnesses.
+exe @conversationLocate(sessionId, cwd, storeRoot) = node {
   const fs = require("fs");
   const path = require("path");
   const os = require("os");
@@ -249,9 +257,6 @@ exe @conversationLocateIn(sessionId, cwd, storeRoot, projectRoot) = node {
   // The id is matched against file names, so anything but a UUID is refused outright.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return null;
   const hasRoot = typeof storeRoot === "string" && storeRoot;
-  if (!hasRoot && typeof projectRoot === "string" && projectRoot) {
-    return path.join(projectRoot, ".llm", "pi-sessions", id + ".jsonl");
-  }
   const bases = [];
   if (hasRoot) bases.push(storeRoot);
   else if (process.env.PI_CODING_AGENT_DIR) bases.push(path.join(process.env.PI_CODING_AGENT_DIR, "sessions"));
@@ -312,10 +317,6 @@ exe @conversationLocateIn(sessionId, cwd, storeRoot, projectRoot) = node {
   }
   return null;
 }
-
->> @root is the calling script's project root. The third parameter cannot be named
->> root, which would shadow it.
-exe @conversationLocate(sessionId, cwd, storeRoot) = @conversationLocateIn(@sessionId, @cwd, @storeRoot ?? "", @root)
 
 >> @conversation.ingest(text) → { header, events }
 >> text is the log's contents; ingest reads no files. header is the tape header line
@@ -595,6 +596,5 @@ export {
   @runPiSh,
   @piSession,
   @piResult,
-  @conversationLocateIn,
   @conversation
 }

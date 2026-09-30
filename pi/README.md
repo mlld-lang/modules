@@ -68,15 +68,15 @@ This is the same pattern as the Claude and Opencode modules.
 | `stream` | Boolean, enable streaming output |
 | `session` | `false` to save nothing (see Sessions) |
 | `sessionId` | UUID naming the session; an existing one is continued (see Sessions) |
+| `agentDir` | pi agent directory whose `sessions/` folder saves go to (default `$PI_CODING_AGENT_DIR`, else `~/.pi/agent`); must be one the sandbox grants |
 
 ## Sessions
 
-`@pi` saves each call's session to `<project>/.llm/pi-sessions/`, where `<project>` is the calling script's project root. Earlier versions saved nothing (they ran pi with `--no-session`), so this is a change in default behaviour. Saving to the project rather than pi's own store (`~/.pi/agent/sessions`) keeps your pi history clean and keeps every write inside the project.
+`@pi` saves each call's session in pi's own store, `~/.pi/agent/sessions` (or `$PI_CODING_AGENT_DIR/sessions`), where pi itself saves them, so pi's `/resume` lists them too. Earlier versions saved to `<project>/.llm/pi-sessions/`; the harness may not write there (see Sandbox).
 
 - Each call gets a fresh session id unless `sessionId` names one. Passing the same `sessionId` again continues that conversation. It must be a UUID (any case), because `@conversation.locate` finds nothing else; anything else is an error.
-- `session: false` turns saving off and runs pi with `--no-session`, as earlier versions did.
-- Each session is one file, `<project>/.llm/pi-sessions/<session-id>.jsonl`. Before the first call, `@pi` writes pi's header line into it itself, so pi keeps the id `@pi` reports instead of choosing its own.
-- The first save writes `.llm/pi-sessions/.gitignore` containing `*`, so the sessions stay out of git.
+- `session: false` turns saving off and runs pi with `--no-session`.
+- Each session is one file, `<sessions>/<encoded-cwd>/<timestamp>_<session-id>.jsonl`, named the way pi names its own. Before the first call, `@pi` writes pi's header line into it itself, so pi keeps the id `@pi` reports instead of choosing its own. A `sessionId` that already has a file anywhere in the store continues that file.
 - The session id travels to the mlld runtime with the result, which it uses to find the conversation. Your script sees only pi's output.
 
 ```mlld
@@ -89,7 +89,17 @@ const @id = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
 @pi("Quick question", { session: false })
 ```
 
-`@runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, sessionDir)` has two optional trailing parameters. When `sessionId` is empty or left out it runs pi with `--no-session`, so direct callers passing eight arguments keep the earlier behaviour. `@piSession(config, projectRoot)` picks the id and folder for a call, and `@piResult(value, session)` wraps a result with its session id.
+`@runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, agentDir, piBin)` has optional trailing parameters. When `sessionId` is empty or left out it runs pi with `--no-session`, so direct callers passing eight arguments keep the earlier behaviour. An empty `agentDir` means pi's own. `@piSession(config)` picks the id and agent directory for a call, and `@piResult(value, session)` wraps a result with its session id.
+
+## Sandbox
+
+mlld runs `pi` inside a fence that limits what it may write. `@pi` declares its own fence (a `using { harness }` profile; see mlld's `config-files` docs), which grants:
+
+- the calling project's folder, except its `.llm/` and `.mlld/` folders, `mlld-config.json` and `mlld-lock.json`, so pi can edit your files but not the settings that set its fence;
+- `~/.pi/agent`, where pi keeps its settings, login and sessions;
+- the open network.
+
+Everything else is read-only to pi, including a `dir` outside the project. The paths are written into the module, so a `PI_CODING_AGENT_DIR` (or a `config.agentDir`) pointing somewhere else is not granted. Each path must exist: a call refuses, naming the missing one, while importing the module still works. This profile replaces any `llm.harness` profile in your `mlld-config.json` for these functions. `@haiku`, `@sonnet` and `@opus` call `@pi`, so they run under the same fence.
 
 ## Available Built-in Tools
 
@@ -109,7 +119,7 @@ These can be selectively enabled via the native tools list.
 | `@piBuiltInTools` | pi's built-in tool names, comma-separated |
 | `@isPiBuiltin(name)` | Whether a tool is one of pi's built-ins |
 | `@runPiSh(...)` | Shell wrapper that runs pi (see Sessions) |
-| `@piSession(config, root)` | Session id and folder for a call |
+| `@piSession(config)` | Session id and agent directory for a call |
 | `@piResult(value, session)` | Result with its session id attached |
 | `@conversation` | Find and read saved pi sessions (below) |
 
@@ -131,7 +141,7 @@ show @tape.events.length
 
 - pi saves sessions in its own store at `<sessions>/<encoded-cwd>/<timestamp>_<session-id>.jsonl`. When that store is searched, every `<encoded-cwd>` directory is read, so `cwd` is ignored. It is there so every harness's `locate` takes the same arguments. A path found by searching has its symlinks resolved.
 - `root` may be pi's agent directory or the `sessions` directory inside it, and when given only it is searched, as above.
-- Without `root`, it returns `<project>/.llm/pi-sessions/<session-id>.jsonl`, where `@pi` saves (see Sessions), without checking that the file exists: mlld's sandbox keeps modules out of `.llm/` folders, so it cannot look. The file is missing if that session was never saved, for example with `session: false`.
+- Without `root`, pi's own store is searched: `$PI_CODING_AGENT_DIR/sessions`, else `~/.pi/agent/sessions`. That is where `@pi` saves (see Sessions).
 - The id is matched case-insensitively.
 - It returns `null`, never an error, when the id is not a UUID, when no file exists, or when the file would lie outside the root.
 

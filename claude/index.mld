@@ -240,7 +240,7 @@ exe @runClaudeSh(prompt, dir, model, bare, sessionId, outputFormat, nativeTools,
 >>   Non-stream mode forwards `--session-id` only for explicit public ids and
 >>   otherwise lets Claude allocate one; stream mode mints one instead
 >>   (@claudeStreamSession) because its output carries no session_id to read back.
-llm @claude(prompt, config) with { stream: @config.stream, stream_format: @claudeStreamFormat } = [
+llm @claude(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } with { stream: @config.stream, stream_format: @claudeStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @dir = @cfg.dir ? @cfg.dir : @root
@@ -407,7 +407,7 @@ exe @pollEventImpl(prompt, cmdLine, jsonlFile, eventType, itemId, timeout) = sh 
 >>   config.poll    - marker file path (required)
 >>   config.timeout - seconds (default: 3600)
 
-llm @claudePoll(prompt, config) = [
+llm @claudePoll(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
@@ -423,7 +423,7 @@ llm @claudePoll(prompt, config) = [
 >>   config.pattern - grep pattern to match (required)
 >>   config.timeout - seconds (default: 3600)
 
-llm @claudePollJsonl(prompt, config) = [
+llm @claudePollJsonl(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
@@ -440,7 +440,7 @@ llm @claudePollJsonl(prompt, config) = [
 >>   config.itemId  - item ID to match (required)
 >>   config.timeout - seconds (default: 3600)
 
-llm @claudePollEvent(prompt, config) = [
+llm @claudePollEvent(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "sonnet"
   let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""

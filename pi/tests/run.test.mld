@@ -1,7 +1,7 @@
 >> Tests for the arguments @runPiSh gives pi, against a stub pi that prints them.
 >> Run: mlld test pi/tests/run.test.mld
 
-import { @runPiSh } from "../index.mld"
+import { @runPiSh, @pi } from "../index.mld"
 
 const @fixtures = `${@root}/pi/tests/fixtures/run`
 const @stub = `${@fixtures}/pi-stub.sh`
@@ -16,9 +16,14 @@ exe @argsAfter(out, flag) = js {
   return i < 0 ? "" : args[i + 1];
 }
 >> Emptied first so the header check sees a file this run wrote.
-exe @emptyDir(dir) = sh { rm -rf "$dir"; echo "$dir" }
-exe @sessionPath(dir, id) = js { return `${dir}/${id}.jsonl`; }
+exe @emptyDir(dir) = sh { rm -rf "$dir"; mkdir -p "$dir"; echo "$dir" }
 exe @readFile(path) = sh { cat "$path" }
+>> Every session file under an agent dir, one per line.
+exe @sessionFiles(agent) = sh { find "$agent/sessions" -type f -name '*.jsonl' | sort }
+exe @baseName(path) = js { return path.split("/").pop(); }
+>> pi's rule for a cwd's folder name (session-manager.js getDefaultSessionDirPath).
+exe @encodeCwd(cwd) = js { return "--" + cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-") + "--"; }
+exe @parentName(path) = js { const parts = path.split("/"); return parts[parts.length - 2]; }
 
 >> ── dir ──
 
@@ -40,17 +45,32 @@ const @test_flags_word_split = @has(@flagged, "arg=--no-tools")
 const @unsaved = @runPiSh("hi", "", "", "", "", "", "", "", "", "", @stub)
 const @test_no_session_id_means_no_session = @has(@unsaved, "arg=--no-session")
 
->> @runPiSh writes a .gitignore of * into it, so the folder stays out of git.
-const @sessionDir = @emptyDir(`${@fixtures}/sessions`)
-const @saved = @runPiSh("hi", @workdir, "", "", "", "", "", "", @sid, @sessionDir, @stub)
-const @sessionFile = @sessionPath(@sessionDir, @sid)
+>> A session is saved in pi's own layout: <agent>/sessions/<encoded cwd>/<timestamp>_<id>.jsonl.
+const @agentDir = @emptyDir(`${@fixtures}/agent`)
+const @saved = @runPiSh("hi", @workdir, "", "", "", "", "", "", @sid, @agentDir, @stub)
+const @sessionFile = @sessionFiles(@agentDir).trim()
+const @test_one_session_file = @sessionFile != "" && !@sessionFile.includes("\n")
 const @test_session_file_passed = @argsAfter(@saved, "--session") == @sessionFile
 const @test_session_not_disabled = !@has(@saved, "arg=--no-session")
+const @test_session_file_named_by_pi_rule = @baseName(@sessionFile).endsWith(`_${@sid}.jsonl`) && @baseName(@sessionFile).length == 24 + 1 + 36 + 6
+const @test_session_dir_is_encoded_cwd = @parentName(@sessionFile) == @encodeCwd(@workdir)
 const @header = @readFile(@sessionFile) | @json
 const @test_header_id = @header.id == @sid
 const @test_header_type = @header.type == "session"
 const @test_header_cwd_is_dir = @header.cwd == @workdir
-const @test_session_dir_ignores_itself = @readFile(`${@sessionDir}/.gitignore`).trim() == "*"
+
+>> The same id again continues the file it already has, from any directory.
+const @again = @runPiSh("hi", "", "", "", "", "", "", "", @sid, @agentDir, @stub)
+const @test_same_id_same_file = @argsAfter(@again, "--session") == @sessionFile
+const @test_same_id_no_second_file = @sessionFiles(@agentDir).trim() == @sessionFile
+
+>> Through @pi with sessions on (the default): the harness profile lets the
+>> stub pi append to the session file.
+const @piAgent = @emptyDir(`${@fixtures}/pi-agent`)
+const @viaPi = @pi("hi", { sessionId: @sid, agentDir: @piAgent, piBin: `${@fixtures}/pi-append-stub.sh` })
+const @piSessionFile = @sessionFiles(@piAgent).trim()
+const @test_pi_reports_file = @viaPi.trim() == `appended=${@piSessionFile}`
+const @test_pi_stub_wrote_session = @readFile(@piSessionFile).includes('"type":"message"')
 
 >> ── system prompt ──
 
