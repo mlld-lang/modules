@@ -168,6 +168,7 @@ exe @piResult(inputValue, session) = match [
 >> config.model    - model pattern or provider/id
 >> config.provider - provider name (default: google)
 >> config.dir      - working directory pi runs in; also bounds its file tools
+>> config.piBin    - the pi executable to run (default: pi on PATH)
 >> config.system   - system prompt
 >> config.tools    - tool collection (triggers @mx.llm context)
 >> config.noTools  - boolean, disable all tools
@@ -213,7 +214,7 @@ llm @pi(prompt, config) with { stream: @config.stream, stream_format: @piStreamF
   >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
   let @session = @piSession(@cfg, @root)
-  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir)
+  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir, @cfg.piBin ?? "")
 
   => @piResult(@raw, @session)
 ]

@@ -351,7 +351,8 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Routing through sh {} with env vars sidesteps the mlld cmd-block double-escape
 >> bug for interpolated values (see ticket m-8694).
-exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt) = sh {
+>> opencodeBin is last so tests can point it at a stub; empty runs `opencode` from PATH.
+exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt, opencodeBin) = sh {
   set -e
 
   if [ -n "$dataHome" ]; then
@@ -406,7 +407,7 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
     promptArg=$(printf '%s' "$prompt" | perl -0pe 's/\r//g; s/\n+/ /g')
   fi
 
-  opencode run "${pureFlag[@]}" --format json "${dirFlag[@]}" "${modelFlag[@]}" "${agentFlag[@]}" "${variantFlag[@]}" "${bypassFlag[@]}" "${sessionFlag[@]}" "$promptArg"
+  "${opencodeBin:-opencode}" run "${pureFlag[@]}" --format json "${dirFlag[@]}" "${modelFlag[@]}" "${agentFlag[@]}" "${variantFlag[@]}" "${bypassFlag[@]}" "${sessionFlag[@]}" "$promptArg"
 }
 
 >> ── Core invocation ──
@@ -414,6 +415,7 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >> @opencode(prompt, config)
 >> config.model     - provider/model string, e.g. "anthropic/claude-sonnet-4-5"
 >> config.dir       - working directory (passed via --dir)
+>> config.opencodeBin - the opencode executable to run (default: opencode on PATH)
 >> config.agent     - opencode agent name (--agent)
 >> config.variant   - reasoning variant: "minimal" | "high" | "max" (--variant)
 >> config.bypass    - boolean, passes --dangerously-skip-permissions
@@ -476,12 +478,12 @@ llm @opencode(prompt, config) with { stream: @config.stream, stream_format: @ope
   let @stateHome = @cfg.stateHome ? @cfg.stateHome : ""
   let @pure = @cfg.pure ? "1" : ""
   let @escapePrompt = @hasToolBridge ? "" : "1"
-  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt)
+  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt, @cfg.opencodeBin ?? "")
   let @parsed = @parseOpencodeJsonl(@raw)
   let @sessionId = @normalizeOpencodeSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
   let @value = match [
     @cfg.stream => @raw
-    @parsed.text => @parsed.text
+    @parsed.text != "" => @parsed.text
     * => @raw
   ]
   => @opencodeResult(@value, {
