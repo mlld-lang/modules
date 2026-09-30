@@ -6,14 +6,14 @@ import { @conversation } from "../index.mld"
 >> Reads a fixture raw: <file> would parse a .jsonl, changing what a truncated line does.
 exe @text(p) = node { return require("fs").readFileSync(p, "utf8"); }
 
-var @fixtures = "@root/pi/tests/fixtures/conversation"
-var @agentDir = "@fixtures/home"
-var @sessions = "@fixtures/home/sessions"
-var @sid = "7e5e5e5e-1234-4321-8abc-def012345678"
+const @fixtures = `${@root}/pi/tests/fixtures/conversation`
+const @agentDir = `${@fixtures}/home`
+const @sessions = `${@fixtures}/home/sessions`
+const @sid = "7e5e5e5e-1234-4321-8abc-def012345678"
 
 >> locate returns the path with symlinks resolved, so the expected value is too.
 exe @realpath(p) = node { return require("fs").realpathSync(p); }
-var @sessionFile = @realpath("@sessions/--tmp-proj--/2026-09-10T00-22-39-649Z_7e5e5e5e-1234-4321-8abc-def012345678.jsonl")
+const @sessionFile = @realpath(`${@sessions}/--tmp-proj--/2026-09-10T00-22-39-649Z_7e5e5e5e-1234-4321-8abc-def012345678.jsonl`)
 
 >> Compares with key order ignored, because mlld may reorder object keys; a golden's
 >> line 1 is the header and the remaining lines are the events in order.
@@ -49,19 +49,19 @@ exe @matchesGolden(result, goldenPath) = node {
 >> ── ingest: fray's output over fray's native fixtures ──
 
 >> A loaded file arrives as an object, not text; ingest must refuse it rather than read it.
-var @rejected = try @conversation.ingest({})
-var @test_ingest_rejects_path_like_object = !@rejected.ok
+const @rejected = try @conversation.ingest({})
+const @test_ingest_rejects_path_like_object = !@rejected.ok
 
-var @test_ingest_basic = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-basic.jsonl")), "@fixtures/pi-basic.fray.jsonl")
-var @test_ingest_branched = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-branched.jsonl")), "@fixtures/pi-branched.fray.jsonl")
-var @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-compacted.jsonl")), "@fixtures/pi-compacted.fray.jsonl")
-var @test_ingest_openrouter = @matchesGolden(@conversation.ingest(@text("@fixtures/pi-openrouter.jsonl")), "@fixtures/pi-openrouter.fray.jsonl")
+const @test_ingest_basic = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/pi-basic.jsonl`)), `${@fixtures}/pi-basic.fray.jsonl`)
+const @test_ingest_branched = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/pi-branched.jsonl`)), `${@fixtures}/pi-branched.fray.jsonl`)
+const @test_ingest_compacted = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/pi-compacted.jsonl`)), `${@fixtures}/pi-compacted.fray.jsonl`)
+const @test_ingest_openrouter = @matchesGolden(@conversation.ingest(@text(`${@fixtures}/pi-openrouter.jsonl`)), `${@fixtures}/pi-openrouter.fray.jsonl`)
 
 >> ── locate ──
 
-var @test_locate_sessions_root = @conversation.locate(@sid, "/anywhere", @sessions) == @sessionFile
-var @test_locate_uppercase = @conversation.locate("7E5E5E5E-1234-4321-8ABC-DEF012345678", "/anywhere", @sessions) == @sessionFile
-var @test_locate_agent_dir_root = @conversation.locate(@sid, "/anywhere", @agentDir) == @sessionFile
-var @test_locate_unknown_uuid = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345679", "/anywhere", @sessions) == null
-var @test_locate_traversal = @conversation.locate("../../etc/passwd", "/anywhere", @sessions) == null
-var @test_locate_non_uuid = @conversation.locate("not-a-session", "/anywhere", @sessions) == null
+const @test_locate_sessions_root = @conversation.locate(@sid, "/anywhere", @sessions) == @sessionFile
+const @test_locate_uppercase = @conversation.locate("7E5E5E5E-1234-4321-8ABC-DEF012345678", "/anywhere", @sessions) == @sessionFile
+const @test_locate_agent_dir_root = @conversation.locate(@sid, "/anywhere", @agentDir) == @sessionFile
+const @test_locate_unknown_uuid = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345679", "/anywhere", @sessions) == null
+const @test_locate_traversal = @conversation.locate("../../etc/passwd", "/anywhere", @sessions) == null
+const @test_locate_non_uuid = @conversation.locate("not-a-session", "/anywhere", @sessions) == null

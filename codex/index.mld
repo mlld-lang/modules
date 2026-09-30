@@ -1,7 +1,7 @@
 needs { sh }
 
 >> ── Stream format adapter for Codex CLI JSONL output (codex exec --json) ──
-var @codexStreamFormat = {
+const @codexStreamFormat = {
   name: "codex",
   format: "ndjson",
   schemas: [
@@ -93,7 +93,7 @@ exe @codexResume(config) = [
   let @runtimeSessionId = @normalizeCodexSessionId(@resume.sessionId)
   let @publicSessionId = @normalizeCodexSessionId(@cfg.sessionId)
   let @publicResumeId = @normalizeCodexSessionId(@cfg.resume)
-  => when [
+  => match [
     @resume.continue && @runtimeSessionId && @runtimeProvider == "codex" => {
       continue: true,
       sessionId: @runtimeSessionId,
@@ -131,7 +131,7 @@ exe @codexResume(config) = [
 >>
 >> The interpreter strips this before normal callers see the result, but uses the
 >> hidden `_mlld` block to persist the provider session across guard-driven resume.
-exe @codexResult(inputValue, resume) = when [
+exe @codexResult(inputValue, resume) = match [
   @resume.sessionId => {
     value: @inputValue,
     _mlld: {
@@ -277,7 +277,7 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
 >>   consumes chunks as they arrive; @raw still holds the full JSONL.
 >> - Uses a `sh { }` block instead of `cmd { }` so interpolated values flow as
 >>   bash env vars and TOML `"` literals in MCP overrides survive unescaped.
-exe llm @codex(prompt, config) = [
+llm @codex(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "gpt-5.4"
@@ -292,7 +292,7 @@ exe llm @codex(prompt, config) = [
   let @raw = @runCodexSh(@finalPrompt, @dir, @model, @sandbox, @search, @bypass, @mcpArgsFile, @doResume, @resumeId)
   let @parsed = @parseCodexJsonl(@raw)
   let @sessionId = @normalizeCodexSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
-  let @value = when [
+  let @value = match [
     @cfg.stream => @raw
     @parsed.text => @parsed.text
     * => @raw
@@ -302,7 +302,7 @@ exe llm @codex(prompt, config) = [
     provider: "codex",
     source: @resume.source
   })
-] with { stream: @cfg.stream, streamFormat: @codexStreamFormat }
+] with { stream: @cfg.stream, stream_format: @codexStreamFormat }
 
 >> ── Conversation adapter ──
 >> Finds the rollout JSONL codex writes for a session and translates it into IFT
@@ -716,6 +716,6 @@ exe @conversationIngest(text) = node {
   };
 }
 
-var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
 export { @codex, @codexStreamFormat, @conversation }

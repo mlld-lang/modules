@@ -14,7 +14,7 @@ needs { sh }
 
 >> Stream format adapter for Pi CLI JSONL output (pi --mode json)
 >> Maps pi's AgentEvent types to mlld's stream format conventions
-var @piStreamFormat = {
+const @piStreamFormat = {
   name: "pi",
   format: "ndjson",
   schemas: [
@@ -57,7 +57,7 @@ var @piStreamFormat = {
 }
 
 >> Pi's built-in tool names (lowercase)
-var @piBuiltInTools = "read,bash,edit,write,grep,find,ls"
+const @piBuiltInTools = "read,bash,edit,write,grep,find,ls"
 
 >> Check if tool name is a pi built-in
 exe @isPiBuiltin(name) = js {
@@ -146,7 +146,7 @@ exe @piSession(config, projectRoot) = node {
 
 >> The runtime strips `_mlld` before callers see the result and reads the session
 >> id from it to find the conversation.
-exe @piResult(inputValue, session) = when [
+exe @piResult(inputValue, session) = match [
   @session.sessionId => {
     value: @inputValue,
     _mlld: {
@@ -178,7 +178,7 @@ exe @piResult(inputValue, session) = when [
 >>   - pi-mcp-adapter extension loads MCP servers from config
 >>   - Built-in pi tools can be selectively enabled via @mx.llm.native
 >>   - Use config.noTools: true to disable all tools
-exe llm @pi(prompt, config) = [
+llm @pi(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : ""
   let @provider = @cfg.provider ? @cfg.provider : ""
@@ -193,20 +193,20 @@ exe llm @pi(prompt, config) = [
 
   >> Build tool argument string
   let @extraFlags = @cfg.flags ? @cfg.flags : ""
-  let @toolArg = when [
-    @cfg.noTools => `--no-tools @extraFlags`
-    @llmHasTools && @llmConfig && @llmNative => `--tools "@llmNative" --mcp-config "@llmConfig" @extraFlags`
-    @llmHasTools && @llmConfig => `--no-tools --mcp-config "@llmConfig" @extraFlags`
-    @llmHasTools && @llmNative => `--tools "@llmNative" @extraFlags`
-    @llmHasTools => `--no-tools @extraFlags`
+  let @toolArg = match [
+    @cfg.noTools => `--no-tools ${@extraFlags}`
+    @llmHasTools && @llmConfig && @llmNative => `--tools "${@llmNative}" --mcp-config "${@llmConfig}" ${@extraFlags}`
+    @llmHasTools && @llmConfig => `--no-tools --mcp-config "${@llmConfig}" ${@extraFlags}`
+    @llmHasTools && @llmNative => `--tools "${@llmNative}" ${@extraFlags}`
+    @llmHasTools => `--no-tools ${@extraFlags}`
     * => @extraFlags
   ]
 
   >> System prompt via temp file
-  let @systemArg = when [
+  let @systemArg = match [
     @cfg.system => [
       let @ts = js { return Date.now() }
-      let @systemFile = `/tmp/pi-system-@ts.txt`
+      let @systemFile = `/tmp/pi-system-${@ts.txt}`
       let @b64 = node {
         const content = `@cfg.system`;
         return Buffer.from(content).toString('base64');
@@ -223,12 +223,12 @@ exe llm @pi(prompt, config) = [
   let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.sessionDir)
 
   => @piResult(@raw, @session)
-] with { stream: @cfg.stream, streamFormat: @piStreamFormat }
+] with { stream: @cfg.stream, stream_format: @piStreamFormat }
 
 >> Model shortcuts (all follow standard @fn(prompt, config) pattern)
-exe llm @haiku(prompt, config) = @pi(@prompt, { ...@config, model: "claude-haiku" })
-exe llm @sonnet(prompt, config) = @pi(@prompt, { ...@config, model: "claude-sonnet" })
-exe llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
+llm @haiku(prompt, config) = @pi(@prompt, { ...@config, model: "claude-haiku" })
+llm @sonnet(prompt, config) = @pi(@prompt, { ...@config, model: "claude-sonnet" })
+llm @opus(prompt, config) = @pi(@prompt, { ...@config, model: "claude-opus" })
 
 >> ── Conversation adapter ──
 >> Finds the JSONL file pi writes when it saves a session and translates it into
@@ -588,7 +588,7 @@ exe @conversationIngest(text) = node {
   return result();
 }
 
-var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
 export {
   @pi,

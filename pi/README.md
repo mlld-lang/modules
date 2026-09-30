@@ -96,7 +96,7 @@ This is the same pattern as the Claude and Opencode modules.
 
 ```mlld
 >> Continue one conversation across calls
-var @id = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
+const @id = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
 @pi("Remember the number 7", { sessionId: @id })
 @pi("What number did I give you?", { sessionId: @id })
 
@@ -135,9 +135,9 @@ Reads the JSONL file pi writes when it saves a session and turns it into IFT eve
 ```mlld
 import { @conversation } from @mlld/pi
 
-var @path = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345678", @base)
-var @log = <@path>
-var @tape = @conversation.ingest(@log.mx.text)
+const @path = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345678", @root)
+const @log = <@path>
+const @tape = @conversation.ingest(@log.mx.text)
 show @tape.events.length
 ```
 

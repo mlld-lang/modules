@@ -6,7 +6,7 @@ needs { sh }
 >> tool-result into a single `tool_use` event at completion time, so the tool-use
 >> kind here carries `result` inline instead of being paired with a separate
 >> tool-result event. See modules/claude/index.mld for the claude-shape reference.
-var @opencodeStreamFormat = {
+const @opencodeStreamFormat = {
   name: "opencode",
   format: "ndjson",
   schemas: [
@@ -172,7 +172,7 @@ exe @opencodeResume(config) = [
   let @runtimeSessionId = @normalizeOpencodeSessionId(@resume.sessionId)
   let @publicSessionId = @normalizeOpencodeSessionId(@cfg.sessionId)
   let @publicResumeId = @normalizeOpencodeSessionId(@cfg.resume)
-  => when [
+  => match [
     @resume.continue && @runtimeSessionId && @runtimeProvider == "opencode" => {
       continue: true,
       sessionId: @runtimeSessionId,
@@ -208,7 +208,7 @@ exe @opencodeResume(config) = [
 
 >> Wraps the result with a runtime-visible `_mlld` envelope so the interpreter
 >> can harvest the session id and provider across guard-driven resume.
-exe @opencodeResult(inputValue, resume) = when [
+exe @opencodeResult(inputValue, resume) = match [
   @resume.sessionId => {
     value: @inputValue,
     _mlld: {
@@ -442,7 +442,7 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >>   consumes `text` events as they arrive; @raw still holds the full NDJSON.
 >> - Uses a `sh { }` block so interpolated values flow as bash env vars and
 >>   survive unescaped (see ticket m-8694 for the `cmd` block escaping bug).
-exe llm @opencode(prompt, config) = [
+llm @opencode(prompt, config) = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
   let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"
@@ -458,11 +458,11 @@ exe llm @opencode(prompt, config) = [
   >> pure `{ '*': 'deny' }` surface in that case.
   let @hasToolBridge = @mx.llm && @mx.llm.hasTools
   let @mcpTimeoutMs = @cfg.mcpTimeoutMs.isDefined() ? @cfg.mcpTimeoutMs : null
-  let @inlineConfig = when [
+  let @inlineConfig = match [
     @hasToolBridge => @opencodeInlineConfig(@mx.llm.config ?? "", @mx.llm.allowed ?? "", @requestedAgent, true, @mcpTimeoutMs)
     * => ""
   ]
-  let @agent = when [
+  let @agent = match [
     @inlineConfig && @hasToolBridge => @opencodeToolAgentName(@requestedAgent)
     * => @requestedAgent
   ]
@@ -477,7 +477,7 @@ exe llm @opencode(prompt, config) = [
   let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt)
   let @parsed = @parseOpencodeJsonl(@raw)
   let @sessionId = @normalizeOpencodeSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
-  let @value = when [
+  let @value = match [
     @cfg.stream => @raw
     @parsed.text => @parsed.text
     * => @raw
@@ -487,7 +487,7 @@ exe llm @opencode(prompt, config) = [
     provider: "opencode",
     source: @resume.source
   })
-] with { stream: @cfg.stream, streamFormat: @opencodeStreamFormat }
+] with { stream: @cfg.stream, stream_format: @opencodeStreamFormat }
 
 >> ── Conversation adapter ──
 >> Finds a stored opencode session and translates it into IFT events (the tape's
@@ -687,6 +687,6 @@ exe @conversationIngest(text) = node {
   return { header: { type: "session", session_id: sessionID, harness, cwd, started_at: startedAt }, events };
 }
 
-var @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
 export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation }
