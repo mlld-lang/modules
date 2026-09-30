@@ -1,0 +1,9 @@
+name: jev
+author: mlld
+type: library
+about: "Typed, calibrated answers from TypeSafe's jev model — choice, score, and noul questions over unstructured state"
+version: 0.1.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: ">=2.2.0"

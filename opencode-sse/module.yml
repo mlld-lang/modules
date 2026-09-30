@@ -1,0 +1,14 @@
+name: opencode-sse
+author: mlld
+type: library
+about: "Opencode via opencode serve + SSE — real-time tool events, claude-shaped stream"
+version: 1.0.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+mlldVersion: ">=2.0.5"
+keywords:
+  - llm
+  - opencode
+  - sse
+  - streaming
