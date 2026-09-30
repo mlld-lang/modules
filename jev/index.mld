@@ -6,6 +6,8 @@ about: TypeSafe jev — typed, calibrated answers over unstructured state
 license: CC0
 ---
 
+needs { js: [], network }
+
 >> ── Endpoint ──
 
 const @endpoint = "https://api.typesafe.ai/v1/systemone"

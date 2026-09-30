@@ -1,3 +1,5 @@
+needs { js: [] }
+
 >> String helpers mlld's builtin methods don't cover. Each reads its input as
 >> text. For what moved to builtins, see README.md.
 

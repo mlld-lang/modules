@@ -6,6 +6,8 @@ about: One @agent that runs claude, codex, pi or opencode, picked by config.harn
 license: CC0
 ---
 
+needs { js: [] }
+
 import @mlld/claude as @claudeHarness
 import @mlld/codex as @codexHarness
 import @mlld/pi as @piHarness

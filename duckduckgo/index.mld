@@ -1,3 +1,5 @@
+needs { python: [ddgs], network }
+
 >> DuckDuckGo web search
 >> Requires: pip install ddgs
 

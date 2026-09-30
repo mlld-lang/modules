@@ -1,3 +1,5 @@
+needs { js: [] }
+
 >> Array helpers mlld's builtin methods don't cover. Each returns an empty
 >> result (an empty array, 0, or {}) when given something that is not an array.
 >> For what moved to builtins, see README.md.

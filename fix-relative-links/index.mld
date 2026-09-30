@@ -1,3 +1,5 @@
+needs { node: [] }
+
 >> Rewrites relative markdown links so they point at the same files after the
 >> content moves from sourceDir to destDir.
 

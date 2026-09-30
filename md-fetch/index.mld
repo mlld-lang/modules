@@ -1,3 +1,5 @@
+needs { node: [], network }
+
 >> Guardable alternative to built-in WebFetch tool
 >> Fetches markdownified content of websites
 >> Serve: mlld mcp mdfetch.mld --tools-collection @tools

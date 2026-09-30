@@ -6,6 +6,8 @@ about: Typed decisions (choice, score, noul, classify) with the model chosen in 
 license: CC0
 ---
 
+needs { js: [] }
+
 import @mlld/jev as @jev
 import { @choice, @score, @noul } from @mlld/jev
 import { @resolveModel, @toCriteria, @keyList, @pickKey } from "./helpers.mld"
