@@ -1,6 +1,6 @@
 # @mlld/claude
 
-Claude invocation primitives with tool use, streaming, and polling.
+Claude invocation primitives with tool use and streaming.
 
 ## tldr
 
@@ -22,7 +22,7 @@ const @result = @claude("Review code in src/", {
 
 ### Sandbox
 
-mlld runs `claude` inside a fence that limits what it may write. `@claude` and the poll functions declare their own fence (a `using { harness }` profile; see mlld's `config-files` docs), which grants:
+mlld runs `claude` inside a fence that limits what it may write. `@claude` declares its own fence (a `using { harness }` profile; see mlld's `config-files` docs), which grants:
 
 - the calling project's folder, except its `.llm/` and `.mlld/` folders, `mlld-config.json` and `mlld-lock.json`, so claude can edit your files but not the settings that set its fence;
 - `~/.claude` and `~/.claude.json`, where claude keeps its settings, login state and conversations;
@@ -114,69 +114,6 @@ Claude Sonnet — balanced capability and speed.
 ### `@opus(prompt)`
 
 Claude Opus — most capable model.
-
-### `@claudePoll(prompt, config)`
-
-Runs claude in the background and polls for a marker file. Works around `claude -p` process hang ([#20084](https://github.com/anthropics/claude-code/issues/20084)).
-
-Extends `@claude` config with:
-- `config.poll` — marker file path (required). Your prompt must instruct the agent to write this file.
-- `config.timeout` — seconds before giving up (default: 3600)
-
-Returns the marker file contents.
-
-```mlld
-const @result = @claudePoll("Analyze data and write results to /tmp/out.json", {
-  model: "opus",
-  dir: @root,
-  tools: ["Read", "Write", "Glob"],
-  poll: "/tmp/out.json"
-})
-```
-
-### `@claudePollJsonl(prompt, config)`
-
-Polls for a grep pattern in a JSONL file.
-
-Extends `@claude` config with:
-- `config.poll` — JSONL file path (required)
-- `config.pattern` — grep pattern to match (required)
-- `config.timeout` — seconds (default: 3600)
-
-Returns the matching JSONL line.
-
-```mlld
-const @result = @claudePollJsonl("Process item and log to events.jsonl", {
-  model: "opus",
-  dir: @root,
-  tools: ["Read", "Write"],
-  poll: "/path/to/events.jsonl",
-  pattern: "\"id\":\"m-24a0\".*\"status\":\"done\""
-})
-```
-
-### `@claudePollEvent(prompt, config)`
-
-Polls for a specific event type and item ID in a JSONL file.
-
-Extends `@claude` config with:
-- `config.poll` — JSONL file path (required)
-- `config.event` — event type to match (required)
-- `config.itemId` — item ID to match (required)
-- `config.timeout` — seconds (default: 3600)
-
-Returns the matching JSONL line.
-
-```mlld
-const @result = @claudePollEvent("Process ticket m-24a0", {
-  model: "opus",
-  dir: @root,
-  tools: ["Read", "Write"],
-  poll: "/path/to/events.jsonl",
-  event: "item_done",
-  itemId: "m-24a0"
-})
-```
 
 ### `@claudeStreamFormat`
 
