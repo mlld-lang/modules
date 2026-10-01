@@ -20,7 +20,7 @@ const @queue = match choice @team [
 
 ## setup
 
-jev needs a TypeSafe API key, declared as a policy credential named `typesafe`. See [jev's setup section](../jev/README.md#setup); nothing else is needed here.
+jev needs a TypeSafe API key, declared as a policy secret named `typesafe`. See [jev's setup section](../jev/README.md#setup); nothing else is needed here.
 
 ## choosing the model
 

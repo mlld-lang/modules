@@ -23,7 +23,7 @@ exe @pause(attempt) = js {
 
 >> 429 and 529 are the two statuses TypeSafe asks you to back off on.
 llm @send(body, attempt) = [
-  let @res = @http.post(@endpoint, @body) using creds:typesafe
+  let @res = @http.post(@endpoint, @body) using secret:typesafe
   let @retryable = @res.status == 429 || @res.status == 529
   => match [
     @res.ok => { ok: true, value: @res.body }
@@ -63,7 +63,7 @@ exe @ask(state, questions, config) = [
 
 >> Model names this key may send in `config.model`.
 exe @models() = [
-  let @res = @http.get(@modelsEndpoint) using creds:typesafe
+  let @res = @http.get(@modelsEndpoint) using secret:typesafe
   => match [
     @res.ok => @res.body.models
     * => @raise({ status: @res.status, value: @res.body })

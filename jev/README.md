@@ -30,7 +30,7 @@ Every question in a call is answered against the same state, in parallel, in one
 
 ## setup
 
-jev needs an API key from [console.typesafe.ai](https://console.typesafe.ai/settings/keys). Declare it as a policy credential; the module never sees the value.
+jev needs an API key from [console.typesafe.ai](https://console.typesafe.ai/settings/keys). Declare it as a policy secret; the module never sees the value.
 
 From the keychain (`mlld keychain add TYPESAFE_API_KEY`):
 
@@ -38,7 +38,7 @@ From the keychain (`mlld keychain add TYPESAFE_API_KEY`):
 policy @keys = {
   * {
     capabilities: { danger: ["@keychain"] }
-    credentials: { typesafe: "TYPESAFE_API_KEY" }
+    secrets: { typesafe: "TYPESAFE_API_KEY" }
   }
 }
 ```
@@ -48,7 +48,7 @@ From the environment instead, which needs no `danger` grant:
 ```mlld
 policy @keys = {
   * {
-    credentials: { typesafe: { from: "env:TYPESAFE_API_KEY", as: "TYPESAFE_API_KEY" } }
+    secrets: { typesafe: { from: "env:TYPESAFE_API_KEY", as: "TYPESAFE_API_KEY" } }
   }
 }
 ```
