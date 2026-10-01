@@ -557,7 +557,11 @@ exe @opencodeSseTurn(prompt, providerID, modelID, dir, system, sessionId, port, 
 >>   config.agent    - opencode agent override not plumbed through /message yet.
 >>   config.variant  - reasoning variant not plumbed through /message yet.
 >>   config.bypass   - permissions bypass is a CLI flag, not a /message option.
-llm @opencode(prompt, config) = [
+>>
+>> The harness profile lists the directories `opencode serve` keeps its state
+>> in, the same set as @mlld/opencode. Without one, an llm body may write only
+>> inside the project folder, and a server this call starts fails writing them.
+llm @opencode(prompt, config) using { harness: { write: [".", "~/.local/share/opencode", "~/.config/opencode", "~/.cache/opencode", "~/.local/state/opencode"], net: "open" } } = [
   let @cfg = @config ? @config : {}
   let @model = @cfg.model ? @cfg.model : "openrouter/z-ai/glm-5.1"
   let @dir = @cfg.dir ? @cfg.dir : @root
