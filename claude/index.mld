@@ -168,29 +168,6 @@ exe @claudeResult(inputValue, resume) = match [
   * => @inputValue
 ]
 
->> ── CLI flag builder ──
->> Reads @mx.llm (set automatically by the runtime for exe llm with config.tools)
->> and produces Claude CLI flags. --strict-mcp-config is used whenever a bridge
->> config exists to prevent the child agent from loading its own MCP servers.
->> --disallowedTools explicitly blocks native tools the user didn't select.
-
-exe @claudeFlags(llm) = [
-  let @nativeFlag = match [
-    @llm.hasTools && @llm.native => `--tools "${@llm.native}"`
-    @llm.hasTools => '--tools ""'
-    * => ""
-  ]
-  let @allowedFlag = @llm.allowed ? `--allowedTools "${@llm.allowed}"` : ""
-  let @dis = @llm.hasTools ? @computeDisallowed(@llm.native, @ccNativeTools) : ""
-  let @disFlag = @dis ? `--disallowedTools "${@dis}"` : ""
-  => match [
-    @llm.config => `${@nativeFlag} --mcp-config "${@llm.config}" --strict-mcp-config ${@allowedFlag} ${@disFlag}`
-    @llm.allowed => `${@allowedFlag} ${@disFlag}`
-    @llm.hasTools => `${@nativeFlag} ${@disFlag}`
-    * => ""
-  ]
-]
-
 >> ── Command line ──
 
 >> sh because each optional flag has to be its own argument: a value pasted into a
@@ -307,148 +284,6 @@ llm @claude(prompt, config) using { harness: { write: [".", "~/.claude", "~/.cla
 llm @haiku(prompt) = @claude(@prompt, { model: "haiku" })
 llm @sonnet(prompt) = @claude(@prompt, { model: "sonnet" })
 llm @opus(prompt) = @claude(@prompt, { model: "opus" })
-
->> ── Internal poll helpers ──
->> Flat params for sh env var compatibility.
->> cmdLine is a fully-formed claude CLI command string.
-
-exe @pollFileImpl(prompt, cmdLine, poll, timeout) = sh {
-  PROMPT_FILE=$(mktemp)
-  printf '%s' "$prompt" > "$PROMPT_FILE"
-
-  eval "$cmdLine" < "$PROMPT_FILE" > /dev/null 2>&1 &
-  CLAUDE_PID=$!
-
-  ELAPSED=0
-  while ! test -f "$poll"; do
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-    if [ "$ELAPSED" -ge "$timeout" ]; then
-      kill $CLAUDE_PID 2>/dev/null
-      wait $CLAUDE_PID 2>/dev/null
-      rm -f "$PROMPT_FILE"
-      exit 0
-    fi
-    if ! kill -0 $CLAUDE_PID 2>/dev/null; then
-      break
-    fi
-  done
-
-  sleep 15
-  kill $CLAUDE_PID 2>/dev/null
-  wait $CLAUDE_PID 2>/dev/null
-  rm -f "$PROMPT_FILE"
-  cat "$poll" 2>/dev/null
-}
-
-exe @pollJsonlImpl(prompt, cmdLine, jsonlFile, pattern, timeout) = sh {
-  PROMPT_FILE=$(mktemp)
-  printf '%s' "$prompt" > "$PROMPT_FILE"
-
-  eval "$cmdLine" < "$PROMPT_FILE" > /dev/null 2>&1 &
-  CLAUDE_PID=$!
-
-  ELAPSED=0
-  while ! grep -q "$pattern" "$jsonlFile" 2>/dev/null; do
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-    if [ "$ELAPSED" -ge "$timeout" ]; then
-      kill $CLAUDE_PID 2>/dev/null
-      wait $CLAUDE_PID 2>/dev/null
-      rm -f "$PROMPT_FILE"
-      exit 0
-    fi
-    if ! kill -0 $CLAUDE_PID 2>/dev/null; then
-      break
-    fi
-  done
-
-  sleep 15
-  kill $CLAUDE_PID 2>/dev/null
-  wait $CLAUDE_PID 2>/dev/null
-  rm -f "$PROMPT_FILE"
-  grep "$pattern" "$jsonlFile" 2>/dev/null | tail -1
-}
-
-exe @pollEventImpl(prompt, cmdLine, jsonlFile, eventType, itemId, timeout) = sh {
-  PROMPT_FILE=$(mktemp)
-  printf '%s' "$prompt" > "$PROMPT_FILE"
-
-  PATTERN="\"event\":[[:space:]]*\"$eventType\".*\"id\":[[:space:]]*\"$itemId\""
-
-  eval "$cmdLine" < "$PROMPT_FILE" > /dev/null 2>&1 &
-  CLAUDE_PID=$!
-
-  ELAPSED=0
-  while ! grep -qE "$PATTERN" "$jsonlFile" 2>/dev/null; do
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-    if [ "$ELAPSED" -ge "$timeout" ]; then
-      kill $CLAUDE_PID 2>/dev/null
-      wait $CLAUDE_PID 2>/dev/null
-      rm -f "$PROMPT_FILE"
-      exit 0
-    fi
-    if ! kill -0 $CLAUDE_PID 2>/dev/null; then
-      break
-    fi
-  done
-
-  sleep 15
-  kill $CLAUDE_PID 2>/dev/null
-  wait $CLAUDE_PID 2>/dev/null
-  rm -f "$PROMPT_FILE"
-  grep -E "$PATTERN" "$jsonlFile" 2>/dev/null | tail -1
-}
-
->> ── Poll exes ──
->> @claudePoll(prompt, config)
->> config extends @claude config plus:
->>   config.poll    - marker file path (required)
->>   config.timeout - seconds (default: 3600)
-
-llm @claudePoll(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
-  let @cfg = @config ? @config : {}
-  let @model = @cfg.model ? @cfg.model : "sonnet"
-  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
-  let @systemFlag = @cfg.system ? `--append-system-prompt "${@cfg.system}"` : ""
-  let @cmdLine = `env -u CLAUDECODE claude -p --bare --model ${@model} ${@flags} ${@systemFlag}`
-  let @timeout = @cfg.timeout ? @cfg.timeout : 3600
-  => @pollFileImpl(@prompt, @cmdLine, @cfg.poll, @timeout)
-]
-
->> @claudePollJsonl(prompt, config)
->> config extends @claude config plus:
->>   config.poll    - JSONL file path (required)
->>   config.pattern - grep pattern to match (required)
->>   config.timeout - seconds (default: 3600)
-
-llm @claudePollJsonl(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
-  let @cfg = @config ? @config : {}
-  let @model = @cfg.model ? @cfg.model : "sonnet"
-  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
-  let @systemFlag = @cfg.system ? `--append-system-prompt "${@cfg.system}"` : ""
-  let @cmdLine = `env -u CLAUDECODE claude -p --bare --model ${@model} ${@flags} ${@systemFlag}`
-  let @timeout = @cfg.timeout ? @cfg.timeout : 3600
-  => @pollJsonlImpl(@prompt, @cmdLine, @cfg.poll, @cfg.pattern, @timeout)
-]
-
->> @claudePollEvent(prompt, config)
->> config extends @claude config plus:
->>   config.poll    - JSONL file path (required)
->>   config.event   - event type to match (required)
->>   config.itemId  - item ID to match (required)
->>   config.timeout - seconds (default: 3600)
-
-llm @claudePollEvent(prompt, config) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
-  let @cfg = @config ? @config : {}
-  let @model = @cfg.model ? @cfg.model : "sonnet"
-  let @flags = @mx.llm ? @claudeFlags(@mx.llm) : ""
-  let @systemFlag = @cfg.system ? `--append-system-prompt "${@cfg.system}"` : ""
-  let @cmdLine = `env -u CLAUDECODE claude -p --bare --model ${@model} ${@flags} ${@systemFlag}`
-  let @timeout = @cfg.timeout ? @cfg.timeout : 3600
-  => @pollEventImpl(@prompt, @cmdLine, @cfg.poll, @cfg.event, @cfg.itemId, @timeout)
-]
 
 >> ── Conversation adapter ──
 >> Finds the JSONL log Claude Code writes for a session and translates it into IFT
@@ -775,4 +610,4 @@ exe @conversationIngest(text) = node {
 
 const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
 
-export { @claude, @haiku, @sonnet, @opus, @claudePoll, @claudePollJsonl, @claudePollEvent, @claudeStreamFormat, @claudeStreamSession, @conversation, @runClaudeSh }
+export { @claude, @haiku, @sonnet, @opus, @claudeStreamFormat, @claudeStreamSession, @conversation, @runClaudeSh }

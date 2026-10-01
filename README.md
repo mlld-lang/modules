@@ -7,7 +7,7 @@ Core modules for the mlld prompt scripting language. Each module lives in its ow
 - [@mlld/airlock](./airlock/README.md) — Dual-LLM security pattern: tainted input never shares context with the evaluation model.
 - [@mlld/array](./array/README.md) — Array helpers that mlld's builtin methods don't cover.
 - [@mlld/bravesearch](./bravesearch/README.md) — Brave Search API tool; reads its API key from the keychain first, then the environment.
-- [@mlld/claude](./claude/README.md) — Claude invocation primitives with tool use, streaming, and polling.
+- [@mlld/claude](./claude/README.md) — Claude invocation primitives with tool use and streaming.
 - [@mlld/codex](./codex/README.md) — Codex CLI invocation with session resume, streaming, sandboxing, web search, and MCP tool bridging.
 - [@mlld/decision-harness](./decision-harness/README.md) — Typed decisions (choice, score, yes/no, classify) from a model you pick in config.
 - [@mlld/duckduckgo](./duckduckgo/README.md) — DuckDuckGo web search, no API key required.
@@ -31,7 +31,7 @@ Core modules for the mlld prompt scripting language. Each module lives in its ow
 These published modules are not carried into this major version. Old versions stay installable from the registry.
 
 - `@mlld/ai-cli` — use [@mlld/multi-harness](./multi-harness/README.md), [@mlld/claude](./claude/README.md) or [@mlld/codex](./codex/README.md). Its gemini support has no replacement.
-- `@mlld/claude-poll` — use `@claudePoll`, `@claudePollJsonl` and `@claudePollEvent` from [@mlld/claude](./claude/README.md).
+- `@mlld/claude-poll` — use [@mlld/multi-harness](./multi-harness/README.md). It worked around a `claude -p` hang that Claude Code has since fixed.
 - `@mlld/env` — use `@input`, `using { env }` and `using creds:`.
 - `@mlld/prose` — use [@mlld/claude](./claude/README.md).
 - `@mlld/stream-claude-agent-sdk` — use the built-in `claude-agent-sdk` stream format.
