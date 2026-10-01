@@ -32,7 +32,7 @@ These published modules are not carried into this major version. Old versions st
 
 - `@mlld/ai-cli` — use [@mlld/multi-harness](./multi-harness/README.md), [@mlld/claude](./claude/README.md) or [@mlld/codex](./codex/README.md). Its gemini support has no replacement.
 - `@mlld/claude-poll` — use [@mlld/multi-harness](./multi-harness/README.md). It worked around a `claude -p` hang that Claude Code has since fixed.
-- `@mlld/env` — use `@input`, `using { env }` and `using creds:`.
+- `@mlld/env` — use `@input`, `using { env }` and `using secret:`.
 - `@mlld/prose` — use [@mlld/claude](./claude/README.md).
 - `@mlld/stream-claude-agent-sdk` — use the built-in `claude-agent-sdk` stream format.
 - `@mlld/github` — use [@mlld/gh-issues](./gh-issues/README.md).

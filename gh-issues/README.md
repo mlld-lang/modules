@@ -9,7 +9,7 @@ Authenticate with one of:
 ```bash
 gh auth login                     # interactive (recommended)
 export GITHUB_TOKEN=ghp_...       # env var
-mlld keychain add GITHUB_TOKEN    # mlld keychain (declare it with creds in your script)
+mlld keychain add GITHUB_TOKEN    # mlld keychain (declare it with secret in your script)
 ```
 
 ## tldr
