@@ -83,7 +83,7 @@ o3-mini — reasoning model.
 
 ## Auth
 
-The key reaches the request through `using creds:openai` as an `Authorization: Bearer` header, never through the script text:
+The key reaches the request through `using secret:openai` as an `Authorization: Bearer` header, never through the script text:
 
 ```mlld
 >> Option 1: Set env var
@@ -98,7 +98,7 @@ For policy-controlled auth:
 ```mlld
 policy @keys = {
   * {
-    credentials: {
+    secrets: {
       openai: { from: "keychain", as: "OPENAI_API_KEY" }
     }
   }

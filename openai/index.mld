@@ -1,7 +1,7 @@
 needs { network }
 
 >> Looked up in the keychain first, then the OPENAI_API_KEY environment variable.
-creds @openai = "OPENAI_API_KEY"
+secret @openai = "OPENAI_API_KEY"
 
 >> ── Request ──
 >> The chat/completions body, built in mlld so it can be read and tested apart
@@ -53,7 +53,7 @@ exe @openaiResult(res) = [
 >> ── Network call ──
 
 exe @openaiPost(body, baseUrl) = [
-  let @res = @http.post(`${@baseUrl || "https://api.openai.com/v1"}/chat/completions`, @body) using creds:openai
+  let @res = @http.post(`${@baseUrl || "https://api.openai.com/v1"}/chat/completions`, @body) using secret:openai
   => @openaiResult(@res)
 ]
 
