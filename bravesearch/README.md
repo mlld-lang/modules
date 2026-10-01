@@ -1,6 +1,6 @@
 # bravesearch
 
-Brave Search API tool. Declares its key with `creds`: keychain first, then the environment.
+Brave Search API tool. Declares its key with `secret`: keychain first, then the environment.
 
 ## Setup
 

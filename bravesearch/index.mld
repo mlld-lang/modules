@@ -15,7 +15,7 @@ needs { js: [], network }
 >> The key is looked up in the keychain first, then the BRAVE_API_KEY environment
 >> variable, and goes out as Brave's X-Subscription-Token header.
 
-creds @brave = { from: "keychain", as: "BRAVE_API_KEY", auth_header: "X-Subscription-Token" }
+secret @brave = { from: "keychain", as: "BRAVE_API_KEY", auth_header: "X-Subscription-Token" }
 
 >> js because mlld has no URL encoding for a query string.
 exe @encodeQuery(text) = js {
@@ -31,7 +31,7 @@ exe @braveResponse(res) = match [
 ]
 
 exe @braveFetch(query, count) = [
-  let @res = @http.get(@braveUrl(@query, @count)) using creds:brave
+  let @res = @http.get(@braveUrl(@query, @count)) using secret:brave
   => @braveResponse(@res)
 ]
 
