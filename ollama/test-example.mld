@@ -1,0 +1,45 @@
+#!/usr/bin/env mlld
+
+>> Example usage of the Ollama module
+>> Make sure Ollama is running: ollama serve
+>> And models are pulled: ollama pull qwen3-coder
+
+import { @ollama, @llama3_2, @qwen3Coder, @qwenCoder, @deepseekCoder } from @mlld/ollama
+
+>> Simple call with general model
+show "=== Basic Query ==="
+var @answer = @llama3_2("What is REST in one sentence?")
+show @answer
+
+>> Code generation with Qwen 3 Coder (latest!)
+show "\n=== Code Generation (Qwen 3 - Latest) ==="
+var @code = @qwen3Coder("Write a Python function to calculate factorial")
+show @code
+
+>> Code generation with Qwen 2.5 (still excellent)
+show "\n=== Code Generation (Qwen 2.5) ==="
+var @code2 = @qwenCoder("Write a function to find prime numbers")
+show @code2
+
+>> Code review with DeepSeek
+show "\n=== Code Review (DeepSeek) ==="
+var @review = @deepseekCoder("Review this: def add(a, b): return a + b")
+show @review
+
+>> Advanced usage with Qwen 3 32B model
+show "\n=== Advanced Code (Qwen 3 32B) ==="
+var @advanced = @ollama("Implement a binary search tree with insert and search", {
+  model: "qwen3-coder:32b",
+  system: "Write clean, documented Python code",
+  temperature: 0.2
+})
+show @advanced
+
+>> Streaming example
+show "\n=== Streaming Response ==="
+var @story = @ollama("Explain recursion with a simple example", {
+  model: "qwen3-coder",
+  stream: true,
+  temperature: 0.7
+})
+show @story

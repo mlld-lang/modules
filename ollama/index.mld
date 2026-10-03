@@ -1,0 +1,149 @@
+needs { network }
+
+>> Stream format adapter for Ollama NDJSON output
+var @ollamaStreamFormat = {
+  name: "ollama",
+  format: "ndjson",
+  schemas: [
+    {
+      kind: "message",
+      matchPath: "message",
+      extract: { chunk: "message.content" }
+    },
+    {
+      kind: "error",
+      matchPath: "error",
+      extract: { message: "error" }
+    },
+    {
+      kind: "metadata",
+      matchPath: "done",
+      matchValue: true,
+      extract: {
+        inputTokens: "prompt_eval_count",
+        outputTokens: "eval_count"
+      }
+    }
+  ]
+}
+
+>> ── Internal call helper ──
+>> Handles both streaming and non-streaming modes.
+>> Params arrive as JS locals from the exe signature.
+
+exe @ollamaImpl(prompt, opts) = js {
+  const cfg = opts || {};
+  const model = cfg.model || "llama3.2";
+  const baseUrl = cfg.baseUrl || "http://localhost:11434";
+
+  const messages = [];
+  if (cfg.system) messages.push({ role: "system", content: cfg.system });
+  if (cfg.messages) {
+    for (const m of cfg.messages) messages.push(m);
+  }
+  messages.push({ role: "user", content: prompt });
+
+  const body = { model, messages };
+  if (cfg.temperature != null) body.options = { ...body.options, temperature: cfg.temperature };
+  if (cfg.numPredict) body.options = { ...body.options, num_predict: cfg.numPredict };
+  if (cfg.topK) body.options = { ...body.options, top_k: cfg.topK };
+  if (cfg.topP) body.options = { ...body.options, top_p: cfg.topP };
+  if (cfg.repeatPenalty) body.options = { ...body.options, repeat_penalty: cfg.repeatPenalty };
+  if (cfg.stream) body.stream = true;
+  if (cfg.format === "json") body.format = "json";
+
+  const resp = await fetch(baseUrl + "/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error("Ollama API " + resp.status + ": " + errBody);
+  }
+
+  if (!cfg.stream) {
+    const json = await resp.json();
+    return json.message.content;
+  }
+
+  // Streaming: parse NDJSON lines
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let full = "";
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        try {
+          const chunk = JSON.parse(trimmed);
+          if (chunk.message && chunk.message.content) {
+            const content = chunk.message.content;
+            full += content;
+            console.log(JSON.stringify({ message: { content: content } }));
+          }
+          if (chunk.done && chunk.prompt_eval_count != null) {
+            console.log(JSON.stringify({
+              done: true,
+              prompt_eval_count: chunk.prompt_eval_count,
+              eval_count: chunk.eval_count
+            }));
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  return full;
+}
+
+>> ── Core invocation ──
+
+>> @ollama(prompt, config)
+>> config.model          - model name (default: llama3.2)
+>> config.system         - system prompt
+>> config.messages       - prior conversation turns (array of {role, content})
+>> config.temperature    - sampling temperature (0.0 to 2.0)
+>> config.numPredict     - max output tokens
+>> config.topK           - top-k sampling
+>> config.topP           - top-p (nucleus) sampling
+>> config.repeatPenalty  - repeat penalty (default: 1.1)
+>> config.format         - "json" for structured output
+>> config.baseUrl        - API base URL (default: http://localhost:11434)
+>> config.stream         - boolean, enables streaming
+exe llm @ollama(prompt, config) = [
+  let @cfg = @config ? @config : {}
+  => @ollamaImpl(@prompt, @cfg)
+] with { stream: @cfg.stream, streamFormat: @ollamaStreamFormat }
+
+>> ── Model shortcuts ──
+
+>> General purpose models
+exe llm @llama3_2(prompt) = @ollama(@prompt, { model: "llama3.2" })
+exe llm @llama3_1(prompt) = @ollama(@prompt, { model: "llama3.1" })
+exe llm @mixtral(prompt) = @ollama(@prompt, { model: "mixtral" })
+exe llm @phi3(prompt) = @ollama(@prompt, { model: "phi3" })
+exe llm @mistral(prompt) = @ollama(@prompt, { model: "mistral" })
+
+>> Code-specialized models
+exe llm @codellama(prompt) = @ollama(@prompt, { model: "codellama" })
+exe llm @qwenCoder(prompt) = @ollama(@prompt, { model: "qwen2.5-coder" })
+exe llm @qwenCoder32b(prompt) = @ollama(@prompt, { model: "qwen2.5-coder:32b" })
+exe llm @qwenCoder7b(prompt) = @ollama(@prompt, { model: "qwen2.5-coder:7b" })
+exe llm @qwen3Coder(prompt) = @ollama(@prompt, { model: "qwen3-coder" })
+exe llm @qwen3Coder14b(prompt) = @ollama(@prompt, { model: "qwen3-coder:14b" })
+exe llm @qwen3Coder32b(prompt) = @ollama(@prompt, { model: "qwen3-coder:32b" })
+exe llm @deepseekCoder(prompt) = @ollama(@prompt, { model: "deepseek-coder" })
+exe llm @deepseekCoder33b(prompt) = @ollama(@prompt, { model: "deepseek-coder:33b" })
+
+export { @ollama, @llama3_2, @llama3_1, @mixtral, @phi3, @mistral, @codellama, @qwenCoder, @qwenCoder32b, @qwenCoder7b, @qwen3Coder, @qwen3Coder14b, @qwen3Coder32b, @deepseekCoder, @deepseekCoder33b, @ollamaStreamFormat }
