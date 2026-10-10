@@ -132,20 +132,9 @@ exe .role:worker @fileAll(s, rs) = @observe(@s, @rs)
 show @fileAll(@st, [@mkContact("c1", "Ann")]).redundant   >> true
 ```
 
-Records holding a `.secret` value are filed and keep the label, given one at a time or as a list written out in place. A list that an exe returned is different: if one of its records holds a `.secret` value, core runs every write in the loop under `.secret`, and refuses to write a state that does not carry that label ("Cannot write … this write runs under conditions labeled .secret"). Tool results usually arrive that way. Until core resolves it (mlld ticket #m-318f), declare the shelf `.secret` when it will hold secret data:
+Records holding a `.secret` value are filed into a plain state and keep the label, however the list arrived: written out in place, or returned by an exe (the usual shape of a tool result).
 
-```mlld
-state .secret @st from @recs
-```
-
-This has a cost: everything read from a `.secret` shelf is labeled `.secret`, including records that hold no secret, and so is the text `@render` and `@find` return from it. Under a policy that blocks secrets from leaving (such as `@noSecretExfil`, see the mlld security guide), all of it is then treated as a secret. To keep that cost to the records that need it, give the secret-holding record types their own `.secret` shelf and keep the rest in a plain one:
-
-```mlld
-const @secretRecs = { vault: @vault }
-const @plainRecs = { contact: @contact }
-state .secret @vaults from @secretRecs
-state @contacts from @plainRecs
-```
+Once a slot holds a `.secret` value, everything read from that slot directly is labeled `.secret`, including its records that hold no secret (`@st.locker[0].label`), and so is the text `@render` returns for that slot. `@find` returns a record with its own labels only. Other slots are not affected. Under a policy that blocks secrets from leaving (such as `@noSecretExfil`, see the mlld security guide), that slot's whole content is then treated as a secret, so keep secret-holding record types in their own slot, apart from the ones the agent must be free to pass on.
 
 ### `@render(st, families?, options?)`
 

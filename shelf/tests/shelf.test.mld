@@ -211,14 +211,17 @@ const @loB = @observeAs(@lockersB, @mkLocker("b1", "y", @lockerKey))
 const @loC = @observeAs(@lockersC, [@mkLocker("c1", "z", @lockerKey), @mkLocker("c2", "w", @lockerKey)])
 const @test_observe_secret_fresh_slot = @loA.written == 1 && @loB.written == 1 && @loC.written == 2 && @lockersB.locker[0].key.mx.labels.includes(".secret")
 const @test_observe_single_and_empty = @observeAs(@lockersB, @mkLocker("b1", "y", @lockerKey)).redundant && @observeAs(@lockersB, []).written == 0
->> A list an exe returned, holding a `.secret` record, is filed into a state declared
->> `.secret` (the README's workaround; without the label core refuses the loop's writes).
+>> A list an exe returned, holding a `.secret` record, is filed into a plain state and into
+>> a state declared `.secret`, and keeps the label.
 exe @lockerList(k) = [
   => [@mkLocker("s1", "one", @k), @mkLocker("s2", "two", @k)]
 ]
 state .secret @secretLockers from @lrecs
 const @loS = @observeAs(@secretLockers, @lockerList(@lockerKey))
 const @test_observe_exe_list_into_secret_state = @loS.written == 2 && @secretLockers.locker.length == 2
+state @plainLockers from @lrecs
+const @loP = @observeAs(@plainLockers, @lockerList(@lockerKey))
+const @test_observe_exe_list_into_plain_state = @loP.written == 2 && @plainLockers.locker.length == 2 && @plainLockers.locker[0].key.mx.labels.includes(".secret")
 const @test_put_non_record_still_refused = !@putAs(@lockers, "x").written && !@putAs(@lockers, {}).written && !@putAs(@lockers, null).written
 
 >> ── render ──
