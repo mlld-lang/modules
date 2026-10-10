@@ -174,54 +174,36 @@ exe @readModes(recordName) = [
   => match [ @found.length > 0 => @found[0]; * => {} ]
 ]
 
->> A new object holding `keys` of `obj`, in the order of `keys`.
-exe @pick(obj, keys) = [
-  if @keys.length == 0 [ => {} ]
-  let @k = @keys[0]
-  let @rest = @pick(@obj, @keys.slice(1))
-  => { [@k]: @obj[@k], ...@rest }
-]
-
->> True for the `{ preview, handle }` / `{ handle }` wrapper `@project` puts in place of a
->> masked or handle-only field.
-exe @isWrapper(v) = [
-  if @typeof(@v) != "object" [ => false ]
-  let @keys = for @k, @x in @v => @k
-  let @others = for @k in @keys if @k != "handle" && @k != "preview" => @k
-  => @keys.includes("handle") && @others.length == 0
-]
-
->> One `<observed>` entry. Fields the role may see go in `fields`; fields it may cite but
->> not see (`mask`, `handle`, `protected`) are named in `ref_fields`. With a role active, the
->> read modes decide, and values are taken from the projection only for `bare`/`value`
->> fields. With none, `@mx.actors` is empty and the projection follows the record's `*`
->> rule: its plain values are shown and its wrappers named. A wrapper never reaches the
->> output either way.
-exe @entry(rec) = [
-  let @modes = @readModes(@rec.mx.address.record)
-  let @view = @project(@rec)
+>> The entries of one slot. Each record's entry is built inside the loop, with no exe call per
+>> record: passing a value read from a state into an exe costs time that grows with the
+>> size of the state, which made rendering a large shelf quadratic.
+>>
+>> Fields the role may see go in `fields`; fields it may cite but not see (`mask`, `handle`,
+>> `protected`) are named in `ref_fields`. With a role active, its read modes decide, and
+>> values are taken from the projection only for `bare`/`value` fields. With none,
+>> `@mx.actors` is empty and the projection follows the record's `*` rule: its plain values
+>> are shown and its `{ preview, handle }` / `{ handle }` wrappers named. A wrapper never
+>> reaches the output either way.
+exe @slotLines(st, slot) = [
+  let @stored = @st[@slot]
+  if @stored.length == 0 [ => [] ]
+  let @modes = @readModes(@stored[0].mx.address.record)
   let @hasModes = @modes.mx.keys.length > 0
-  let @seen = match [
-    @hasModes => for @f, @mode in @modes if @mode == "bare" || @mode == "value" => @f;
-    * => for @f, @v in @view if !@isWrapper(@v) => @f
+  let @shownByMode = for @f, @mode in @modes if @mode == "bare" || @mode == "value" => @f
+  let @citedByMode = for @f, @mode in @modes if @mode == "mask" || @mode == "handle" || @mode == "protected" => @f
+  => for @rec in @stored [
+    let @view = @project(@rec)
+    let @wrapped = for @f, @v in @view if @typeof(@v) == "object" && @v.mx.keys.includes("handle") && @v.mx.keys.every(@item == "handle" || @item == "preview") => @f
+    let @shown = match [
+      @hasModes => @shownByMode;
+      * => for @f, @v in @view if !@wrapped.includes(@f) => @f
+    ]
+    let @cited = match [ @hasModes => @citedByMode; * => @wrapped ]
+    >> A `for` yielding `{ [key]: value }` collects into one object; with no keys it yields `[]`.
+    let @picked = for @f in @shown => { [@f]: @view[@f] }
+    let @fields = match [ @shown.length > 0 => @picked; * => {} ]
+    => { address: @rec.mx.address.string, fields: @fields, ref_fields: @cited }
   ]
-  let @refFields = match [
-    @hasModes => for @f, @mode in @modes if @mode == "mask" || @mode == "handle" || @mode == "protected" => @f;
-    * => for @f, @v in @view if @isWrapper(@v) => @f
-  ]
-  => { address: @rec.mx.address.string, fields: @pick(@view, @seen), ref_fields: @refFields }
-]
-
->> Entries as compact JSON, one per line. Joined by recursion through a template because a
->> JSON-looking string collected by `for` is read back as an object, and `.join` would
->> print that as `[object Object]`.
-exe @jsonLines(entries) = [
-  if @entries.length == 0 [ => "" ]
-  let @head = `${@entries[0]}`
-  if @entries.length == 1 [ => @head ]
-  let @tail = @jsonLines(@entries.slice(1))
-  => `${@head}
-${@tail}`
 ]
 
 >> Every record stored in `families` (default: all slots), one JSON line each, in slot
@@ -229,11 +211,18 @@ ${@tail}`
 exe @render(st, families = null) = [
   let @allowed = @allowedFamilies(@st, @families)
   let @slots = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
-  let @groups = for @f in @slots => for @rec in @st[@f] => @entry(@rec)
+  let @groups = for @f in @slots => @slotLines(@st, @f)
   let @entries = @groups.flat()
   if @entries.length == 0 [ => "" ]
+  >> A template loop writes each entry as compact JSON on its own line. It also leaves a
+  >> blank line after the last one, which `.trim()` drops; every entry ends in `}`.
+  let @body = `
+/for @e in @entries
+${@e}
+/end
+`
   => `<observed>
-${@jsonLines(@entries)}
+${@body.trim()}
 </observed>`
 ]
 

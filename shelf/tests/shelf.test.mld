@@ -231,6 +231,17 @@ const @test_render_empty_family = @renderAsAdmin(@rs, []) == ""
 >> With no role active, the record's `*` rule decides: memo shows both fields, card none.
 const @test_render_no_role = @render(@rs).includes(@memoLine) && !@render(@rs).includes("Ada")
 
+>> A shelf past the recursion limit (64) renders every record, one line each.
+const @bigRecs = { memo: @memo }
+state @big from @bigRecs
+const @x1 = "x"
+const @xs = @x1.repeat(100)
+const @ids = @xs.split("")
+const @many = for @c in @ids => @mkMemo(`m${@c.mx.index}`, "t")
+const @filed = @observeAs(@big, @many)
+const @bigOut = @renderAsAdmin(@big)
+const @test_render_many_records = @filed.written == 100 && @bigOut.split("\n").length == 102 && @bigOut.includes(`"fields":{"id":"m99","text":"t"}`)
+
 >> A fyi field is evaluated when an llm call reads it, as that call's role.
 fyi @shelfView = { observed: @render(@rs), push: [observed] }
 llm .role:planner @plannerAgent(prompt, config) = `${@config.system}`
