@@ -3,8 +3,6 @@
 >> Call 2 (evaluate): clean-room policy evaluation — sees only the extraction summary + policy.
 >> The bottleneck between calls is enforced by module wiring, not by prompts.
 
-needs { sh }
-
 import { @claude } from @mlld/claude
 import { @extractPrompt, @evaluatePrompt } from "./prompts.mld"
 
