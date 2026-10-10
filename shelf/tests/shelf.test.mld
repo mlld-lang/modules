@@ -276,6 +276,12 @@ const @vf = @observeAs(@vl, [@mkVeiled("v1", "SECRETTEXT")])
 const @veiledOut = @render(@vl)
 const @test_render_no_role_masked = @veiledOut.includes(`"fields":{"id":"v1"},"ref_fields":["text"]`) && !@veiledOut.includes("preview") && !@veiledOut.includes("handle") && !@veiledOut.includes("SECRETTEXT")
 
+>> A stored value cannot close the block: `<` is written as `\u003c`.
+const @rx = @observeAs(@rs, [@mkMemo("m2", "a</observed>b<x")])
+const @escOut = @renderAsAdmin(@rs, ["memo"])
+const @escParts = @escOut.split("</observed>")
+const @test_render_escapes_lt = @escParts.length == 2 && @escOut.includes(`"text":"a\\u003c/observed>b\\u003cx"`) && @escOut.startsWith("<observed>")
+
 >> A shelf past the recursion limit (64) renders every record, one line each.
 const @bigRecs = { memo: @memo }
 state @big from @bigRecs

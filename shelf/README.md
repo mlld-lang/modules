@@ -139,6 +139,7 @@ The stored records in `families` (default: every slot), as the role active where
 - `ref_fields` names the fields the role may cite with a `{ref}` but not see (`mask`, `handle` and `protected` modes). Their values, previews and handles never appear.
 - A field in `omit` mode appears in neither.
 - With no role active, the record's `*` read rule decides.
+- Every `<` in a line is written as `\u003c` (the same character in JSON), so a stored value cannot close the `<observed>` block.
 
 It renders only the active role's view and takes no role argument on purpose: a string carries nothing that would re-project it for the reader, so a role argument would let a caller render a wider view than its own.
 

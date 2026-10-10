@@ -227,8 +227,11 @@ exe @render(st, families = null) = [
 ${@e}
 /end
 `
+  >> Every `<` is written as its JSON escape, so a stored value cannot close the
+  >> `<observed>` block. JSON has `<` only inside strings, where the escape means the same.
+  let @lines = @body.trim()
   => `<observed>
-${@body.trim()}
+${@lines.replaceAll("<", "\\u003c")}
 </observed>`
 ]
 
