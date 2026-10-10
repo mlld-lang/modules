@@ -14,7 +14,7 @@ const @test_stub_runs_under_policy = @out == "stub opencode: run --format json -
 
 >> Only a file named opencode can be put in front on PATH.
 const @misnamed = try @opencode("hi", { opencodeBin: `${@root}/opencode/tests/fixtures/bin` })
-const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.includes("config.opencodeBin must be a file named opencode")
+const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.includes("config.opencodeBin must be an absolute path to a file named opencode")
 
 >> A missing file would otherwise fall through to the opencode on PATH.
 const @missing = try @opencode("hi", { opencodeBin: "/nonexistent/opencode" })
@@ -24,3 +24,6 @@ const @test_missing_bin_refused = !@missing.ok && @missing.error.message.include
 >> through to the opencode on PATH.
 const @folder = try @opencode("hi", { opencodeBin: `${@root}/opencode/tests/fixtures/folder/opencode` })
 const @test_folder_bin_refused = !@folder.ok && @folder.error.message.includes("config.opencodeBin is not an executable file")
+
+const @relative = try @opencode("hi", { opencodeBin: "opencode/tests/fixtures/bin/opencode" })
+const @test_relative_bin_refused = !@relative.ok && @relative.error.message.includes("must be an absolute path")

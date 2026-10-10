@@ -13,8 +13,12 @@ const @test_stub_runs_under_policy = @out == "stub codex: exec --json --skip-git
 
 >> Only a file named codex can be put in front on PATH.
 const @misnamed = try @codex("hi", { codexBin: `${@root}/codex/tests/fixtures/run/codex-stub.sh` })
-const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.includes("config.codexBin must be a file named codex")
+const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.includes("config.codexBin must be an absolute path to a file named codex")
 
 >> A missing file would otherwise fall through to the codex on PATH.
 const @missing = try @codex("hi", { codexBin: "/nonexistent/codex" })
 const @test_missing_bin_refused = !@missing.ok && @missing.error.message.includes("config.codexBin is not an executable file")
+
+>> A relative codexBin would be looked up from dir, not from where mlld runs.
+const @relative = try @codex("hi", { codexBin: "codex/tests/fixtures/bin/codex", dir: "/tmp" })
+const @test_relative_bin_refused = !@relative.ok && @relative.error.message.includes("must be an absolute path")

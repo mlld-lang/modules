@@ -69,7 +69,7 @@ Keys only one tool understands pass through and are ignored by the others:
 | pi | `provider`, `thinking`, `flags`, `noTools`, `session`, `piBin` |
 | opencode | `agent`, `variant`, `bypass`, `pure`, `dataHome`, `stateHome`, `mcpTimeoutMs`, `resume`, `opencodeBin` |
 
-The `…Bin` keys name a file to run instead of the program on your `PATH`; the tests use them to run stand-in programs. The file must carry the tool's own name (`…/claude`, `…/codex`, `…/pi`, `…/opencode`): its folder goes first on `PATH` for the call, so a policy's command rules still see the program by name. Auto checks the same programs, and counts a `…Bin` that is missing or named otherwise as not installed.
+The `…Bin` keys name a file, by absolute path, to run instead of the program on your `PATH`; the tests use them to run stand-in programs. The file must carry the tool's own name (`…/claude`, `…/codex`, `…/pi`, `…/opencode`): its folder goes first on `PATH` for the call, so a policy's command rules still see the program by name. Auto checks the same programs, and counts a `…Bin` that is missing, relative or named otherwise as not installed.
 
 Auto runs each tool's sign-in check as a command, so a policy that refuses one of those programs makes auto fail with that refusal rather than skip the tool.
 

@@ -41,13 +41,14 @@ exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
 exe @envSet(key) = cmd { printenv "$key" | grep -q . }
 
 >> The PATH a check runs with: "" for the tool on PATH, the bin's folder in front
->> otherwise, or null when bin names no runnable file called `name`.
+>> otherwise, or null when bin is not an absolute path to a runnable file called
+>> `name`.
 exe @checkPath(bin, name) = [
   if !@bin || @bin == @name [
     let @found = try @onPath(@name)
     => @found.ok ? "" : null
   ]
-  if !@bin.endsWith(`/${@name}`) [ => null ]
+  if !@bin.startsWith("/") || !@bin.endsWith(`/${@name}`) [ => null ]
   let @found = try @isExecutable(@bin)
   if !@found.ok [ => null ]
   => `${@bin.slice(0, @bin.length - @name.length - 1)}:${@shellPath()}`
