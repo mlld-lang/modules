@@ -1,0 +1,28 @@
+>> Tests for the opencode command line @opencode builds, against a stub opencode
+>> whose reply text holds the arguments it was given. No model is called.
+>> Run: mlld test opencode/tests/
+
+import { @opencode, @parseOpencodeJsonl } from "../index.mld"
+
+const @stub = `${@root}/opencode/tests/fixtures/bin/opencode`
+const @sid = "ses_f32dab56cffemtZGIZ407tXu7U"
+
+>> The config the runtime builds for a native continue, plus the stub.
+exe @runtimeResume(bin, fork) = js {
+  const resume = { sessionId: "ses_f32dab56cffemtZGIZ407tXu7U", provider: "opencode", continue: true };
+  if (fork) resume.fork = true;
+  return { opencodeBin: bin, dir: "/work", _mlld: { resume } };
+}
+
+>> ── runtime continue: fork, never resume in place ──
+
+const @forked = @opencode("again", @runtimeResume(@stub, true))
+const @test_runtime_fork_line = @forked == `stub opencode: run --format json --dir /work -m openrouter/z-ai/glm-5.1 -s ${@sid} --fork again `
+
+>> Without fork a runtime resume is today's resume line.
+const @resumed = @opencode("again", @runtimeResume(@stub, false))
+const @test_runtime_resume_without_fork_unchanged = @resumed == `stub opencode: run --format json --dir /work -m openrouter/z-ai/glm-5.1 -s ${@sid} again `
+
+>> A fork answers with the branch's sessionID, which @opencode returns over the resumed one.
+const @forkOutput = @parseOpencodeJsonl("{\"type\":\"step_start\",\"sessionID\":\"ses_branch0000000000000000000\"}\n{\"type\":\"text\",\"sessionID\":\"ses_branch0000000000000000000\",\"part\":{\"text\":\"ok\"}}\n")
+const @test_fork_reports_new_session_id = @forkOutput.sessionId == "ses_branch0000000000000000000" && @forkOutput.sessionId != @sid

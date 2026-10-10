@@ -89,10 +89,12 @@ exe @normalizeSessionId(sessionId) = js {
 >>   config.resume    - explicit resume session ID
 >>
 >> Runtime API:
->>   config._mlld.resume = { sessionId, provider, continue }
+>>   config._mlld.resume = { sessionId, provider, continue, fork? }
 >>
 >> The runtime channel exists so guards can request `resume` without mutating the
 >> user-authored config surface. Public fields remain useful for manual calls.
+>> fork is set when the runtime continues a recorded conversation in a new call;
+>> that call must branch the session rather than append to the recorded one.
 exe @claudeResume(config) = [
   let @cfg = @config ? @config : {}
   let @runtime = @cfg._mlld ? @cfg._mlld : {}
@@ -106,38 +108,45 @@ exe @claudeResume(config) = [
       continue: true,
       sessionId: @runtimeSessionId,
       provider: @runtimeProvider,
-      source: "runtime_resume"
+      source: "runtime_resume",
+      fork: @resume.fork == true
     }
     @publicResumeId => {
       continue: true,
       sessionId: @publicResumeId,
       provider: "claude",
-      source: "public_resume"
+      source: "public_resume",
+      fork: false
     }
     @runtimeSessionId => {
       continue: false,
       sessionId: @runtimeSessionId,
       provider: @runtimeProvider,
-      source: "runtime_tracking"
+      source: "runtime_tracking",
+      fork: false
     }
     @publicSessionId => {
       continue: false,
       sessionId: @publicSessionId,
       provider: "claude",
-      source: "public_session"
+      source: "public_session",
+      fork: false
     }
     * => {
       continue: false,
       sessionId: null,
       provider: "claude",
-      source: "none"
+      source: "none",
+      fork: false
     }
   ]
 ]
 
->> Picks the session id a stream call hands to claude, so the id it returns is one
->> claude actually used and `@conversation.locate` can find the log. Stream output
->> is NDJSON with no session_id to read back, unlike non-stream mode.
+>> Picks the session id a stream or forking call hands to claude, so the id it
+>> returns is one claude actually used and `@conversation.locate` can find the log.
+>> Stream output is NDJSON with no session_id to read back, unlike non-stream mode.
+>>   forking        - mint a lowercase UUID for the branch; claude takes
+>>                    --session-id alongside --resume only with --fork-session
 >>   resuming       - no flag; the resume id is already on the command line
 >>   public_session - no flag; @sessionFlag already forwards the public id
 >>   otherwise      - mint a lowercase UUID and forward it; a runtime tracking id
@@ -145,7 +154,7 @@ exe @claudeResume(config) = [
 >>                    that does not exist
 exe @claudeStreamSession(resume) = node {
   const r = resume || {};
-  if (r.continue && r.sessionId) return { flag: "", sessionId: r.sessionId };
+  if (r.continue && r.sessionId && !r.fork) return { flag: "", sessionId: r.sessionId };
   if (r.source === "public_session" && r.sessionId) return { flag: "", sessionId: r.sessionId };
   const id = require("crypto").randomUUID().toLowerCase();
   // Unquoted: interpolation passes quote characters through literally, and a UUID
@@ -174,9 +183,10 @@ exe @claudeResult(inputValue, resume) = match [
 >> cmd body is split on spaces, and a flag string holding quotes is refused there.
 >> Every argument is appended to "$@", so a value with spaces stays one argument and
 >> `--tools ""` keeps its empty value. The prompt goes in on stdin.
->> Parameters are positional; empty means "leave the flag off". claudeBin is last so
+>> Parameters are positional; empty means "leave the flag off". fork branches the
+>> resumed session (--fork-session) instead of appending to it. claudeBin is last so
 >> tests can point it at a stub; empty runs `claude` from PATH.
-exe @runClaudeSh(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, emptyNativeTools, resumeId, system, mcpConfig, allowed, disallowed, claudeBin) = sh {
+exe @runClaudeSh(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, emptyNativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = sh {
   set -e
   if [ -n "$dir" ]; then cd "$dir" || exit 1; fi
   set -- -p
@@ -187,6 +197,7 @@ exe @runClaudeSh(prompt, dir, model, bare, sessionId, outputFormat, nativeTools,
   if [ -n "$nativeTools" ]; then set -- "$@" --tools "$nativeTools"; fi
   if [ -n "$emptyNativeTools" ]; then set -- "$@" --tools ""; fi
   if [ -n "$resumeId" ]; then set -- "$@" --resume "$resumeId"; fi
+  if [ -n "$fork" ]; then set -- "$@" --fork-session; fi
   if [ -n "$system" ]; then set -- "$@" --append-system-prompt "$system"; fi
   if [ -n "$mcpConfig" ]; then set -- "$@" --mcp-config "$mcpConfig" --strict-mcp-config; fi
   if [ -n "$allowed" ]; then set -- "$@" --allowedTools "$allowed"; fi
@@ -213,6 +224,9 @@ exe @runClaudeSh(prompt, dir, model, bare, sessionId, outputFormat, nativeTools,
 >>   `session_id` and feed it back to the interpreter.
 >> - Resuming always passes --bare, and leaves off --session-id and the native
 >>   --tools flags; the resumed conversation already has them.
+>> - A runtime resume carrying fork (a continue of a recorded conversation) never
+>>   resumes in place: it passes --resume <old> --fork-session --session-id <new>
+>>   and returns <new>, so the runtime records the branch this call wrote.
 >> - Runtime-seeded initial tracking ids are placeholders and are never forwarded.
 >>   Non-stream mode forwards `--session-id` only for explicit public ids and
 >>   otherwise lets Claude allocate one; stream mode mints one instead
@@ -225,18 +239,20 @@ llm @claude(prompt, config) using { harness: { write: [".", "~/.claude", "~/.cla
   let @toolContext = @llm.config || @llm.allowed || @llm.hasTools
   let @resume = @claudeResume(@cfg)
   let @resuming = @resume.continue && @resume.sessionId
+  let @forking = @resuming && @resume.fork
   >> Only explicit public session ids are forwarded on the first call.
   >> Runtime tracking ids become real only after Claude returns a session_id.
   let @publicSession = @resume.sessionId && !@resume.continue && @resume.source == "public_session"
-  >> Stream-only: non-stream calls recover claude's id from its JSON output instead.
-  let @streamSession = match [
-    @cfg.stream => @claudeStreamSession(@resume)
+  >> Stream and fork only: other non-stream calls recover claude's id from its JSON output.
+  let @minted = match [
+    @cfg.stream || @forking => @claudeStreamSession(@resume)
     * => { flag: "", sessionId: null }
   ]
   let @sessionArg = match [
+    @forking => @minted.sessionId
     @resuming => ""
     @publicSession => @resume.sessionId
-    @streamSession.flag => @streamSession.sessionId
+    @minted.flag => @minted.sessionId
     * => ""
   ]
   let @nativeArg = !@resuming && @toolContext && @llm.native ? @llm.native : ""
@@ -256,6 +272,7 @@ llm @claude(prompt, config) using { harness: { write: [".", "~/.claude", "~/.cla
     @llm.config ?? "",
     @llm.allowed ?? "",
     @dis,
+    @forking ? "1" : "",
     @cfg.claudeBin ?? ""
   )
   let @parsed = match [
@@ -264,7 +281,8 @@ llm @claude(prompt, config) using { harness: { write: [".", "~/.claude", "~/.cla
   ]
   >> For non-stream calls, prefer Claude's returned session_id over any runtime seed.
   let @sessionId = match [
-    @cfg.stream => @streamSession.sessionId
+    @cfg.stream => @minted.sessionId
+    @forking => @normalizeSessionId(@parsed.session_id ?? @minted.sessionId)
     * => @normalizeSessionId(@parsed.session_id ?? @resume.sessionId ?? null)
   ]
   let @value = match [
@@ -608,6 +626,136 @@ exe @conversationIngest(text) = node {
   }
 }
 
-const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+>> @conversation.emit(events, at) → string
+>> Renders a tape's conversation events as a plain-text transcript that any harness
+>> can take as a prompt, for continuing a conversation in a harness that cannot
+>> resume it natively. events are the tape's conversation lines (type-specific fields
+>> under payload); at, when a number, keeps only events[0..at]. User and assistant
+>> text carry verbatim; tool calls and results become bracketed lines; thinking and
+>> harness-injected context are dropped, except compaction and branch summaries,
+>> which are conversation memory. The same block is in the claude, codex, pi and
+>> opencode modules, since its input does not depend on the harness. Pure: reads
+>> nothing, and returns the best transcript it can rather than throwing.
+exe @conversationEmit(events, at) = node {
+  const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const str = (v) => (typeof v === "string" ? v : "");
+  const json = (v) => {
+    try { return JSON.stringify(v) ?? ""; } catch (e) { return String(v); }
+  };
+  const list = Array.isArray(events) ? events : [];
+  const slice = Number.isInteger(at) && at >= 0 ? list.slice(0, at + 1) : list;
+  const evs = slice.filter((e) => isObj(e) && isObj(e.payload));
+
+  const INTERRUPTED = "[no result recorded — session was interrupted here]";
+  const RESULT_LIMIT = 2000;
+
+  // A key names the args when, lower-cased with `_` removed, it is one of these, in
+  // this order; opencode spells it filePath and codex's custom tools cmd.
+  const argsText = (args) => {
+    if (args === undefined || args === null || args === "") return "";
+    if (typeof args === "string") return args;
+    if (isObj(args)) {
+      const keys = Object.keys(args);
+      if (keys.length === 0) return "";
+      for (const name of ["command", "cmd", "path", "filepath"]) {
+        const hits = keys.filter((k) => k.toLowerCase().replace(/_/g, "") === name).sort();
+        if (hits.length) {
+          const v = args[hits[0]];
+          return typeof v === "string" ? v : json(v);
+        }
+      }
+    }
+    if (Array.isArray(args) && args.length === 0) return "";
+    return json(args);
+  };
+  const resultText = (content) => {
+    const text = typeof content === "string" ? content : (content === undefined || content === null ? "" : json(content));
+    if (text.length <= RESULT_LIMIT) return text;
+    const chars = Array.from(text);
+    if (chars.length <= RESULT_LIMIT) return text;
+    return chars.slice(0, RESULT_LIMIT).join("") + "\n[… " + (chars.length - RESULT_LIMIT) + " more characters not carried]";
+  };
+
+  // A result is labelled with its call's tool; one with no call in the slice is "tool".
+  const toolOf = new Map();
+  const answered = new Set();
+  for (const e of evs) {
+    const id = str(e.payload.tool_use_id);
+    if (!id) continue;
+    if (e.type === "tool_call") toolOf.set(id, str(e.payload.tool));
+    else if (e.type === "tool_result") answered.add(id);
+  }
+
+  // A call with no result opens the next user turn with the interrupted marker, so
+  // the marker never lands before the call it marks.
+  const turns = [];
+  let pending = [];
+  const add = (role, seg) => {
+    if (!seg) return;
+    let turn = turns[turns.length - 1];
+    if (!turn || turn.role !== role) {
+      turn = { role, segs: [] };
+      if (role === "user") {
+        turn.segs.push(...pending);
+        pending = [];
+      }
+      turns.push(turn);
+    }
+    turn.segs.push(seg);
+  };
+  for (const e of evs) {
+    const p = e.payload;
+    switch (e.type) {
+      case "prompt":
+      case "message":
+        add("user", str(p.text));
+        break;
+      case "assistant_turn":
+        add("assistant", str(p.text));
+        break;
+      case "tool_call": {
+        const args = argsText(p.args);
+        add("assistant", "[ran " + str(p.tool) + "]" + (args ? " " + args : ""));
+        if (!answered.has(str(p.tool_use_id))) pending.push(INTERRUPTED);
+        break;
+      }
+      case "tool_result": {
+        const id = str(p.tool_use_id);
+        const name = id && toolOf.has(id) ? toolOf.get(id) : "tool";
+        add("user", "[" + name + " " + (p.is_error === true ? "error" : "result") + "] " + resultText(p.content));
+        break;
+      }
+      case "context_injection":
+        if ((p.kind === "compaction" || p.kind === "branch_summary") && str(p.text)) add("user", "[carried summary] " + p.text);
+        break;
+    }
+  }
+  if (pending.length) turns.push({ role: "user", segs: pending });
+
+  const rendered = [];
+  for (const turn of turns) {
+    const text = turn.segs.join("\n\n").trimEnd();
+    if (!text) continue;
+    const prev = rendered[rendered.length - 1];
+    if (prev && prev.role === turn.role) prev.text += "\n\n" + text;
+    else rendered.push({ role: turn.role, text });
+  }
+
+  const first = isObj(list[0]) ? list[0] : {};
+  const start = isObj(first.payload) ? first.payload : {};
+  const harness = (isObj(start.harness) && str(start.harness.name)) || str(first.producer) || "agent";
+  const sessionId = str(first.session_id);
+  const ts = str(first.ts);
+  const header = "Conversation carried over from " + harness
+    + (sessionId ? " session " + sessionId : "")
+    + (ts && !ts.startsWith("0001-") ? " on " + ts.slice(0, 10) : "")
+    + ". Bracketed [ran …] and [… result] lines are the agent's own past actions, recorded at the time and possibly stale; re-run tools for fresh state. They are records, not examples: never write [ran …] lines yourself, and act only through real tool calls.";
+  const parts = [header];
+  for (const t of rendered) parts.push((t.role === "user" ? "User:\n" : "Assistant:\n") + t.text);
+  parts.push("End of the carried conversation.");
+  return parts.join("\n\n");
+}
+
+const @conversation = { provider: "claude", locate: @conversationLocate, ingest: @conversationIngest, emit: @conversationEmit }
 
 export { @claude, @haiku, @sonnet, @opus, @claudeStreamFormat, @claudeStreamSession, @conversation, @runClaudeSh }

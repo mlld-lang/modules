@@ -79,11 +79,48 @@ const @test_prompt_unchanged_on_stdin = @stdinOf(@echoed) == @tricky
 
 >> ── @runClaudeSh directly: flags @claude only sets from the tool bridge ──
 
-const @tooled = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "", "", "", "/tmp/mcp config.json", "Read,Write Bash", "Edit", @stub)
+const @tooled = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "", "", "", "/tmp/mcp config.json", "Read,Write Bash", "Edit", "", @stub)
 const @test_mcp_allowed_disallowed = @argv(@tooled) == "-p|--model|sonnet|--mcp-config|/tmp/mcp config.json|--strict-mcp-config|--allowedTools|Read,Write Bash|--disallowedTools|Edit"
 
-const @emptyNative = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "1", "", "", "", "", "", @stub)
+const @emptyNative = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "1", "", "", "", "", "", "", @stub)
 const @test_empty_native_tools_keeps_empty_value = @argv(@emptyNative) == "-p|--model|sonnet|--tools|"
 
-const @missingDir = try @runClaudeSh("hi", `${@fixtures}/nonexistent`, "sonnet", "", "", "", "", "", "", "", "", "", "", @stub)
+const @forkFlag = @runClaudeSh("hi", "", "sonnet", "1", "", "", "", "", @sid, "", "", "", "", "1", @stub)
+const @test_fork_flag_follows_resume = @argv(@forkFlag) == `-p|--bare|--model|sonnet|--resume|${@sid}|--fork-session`
+
+const @missingDir = try @runClaudeSh("hi", `${@fixtures}/nonexistent`, "sonnet", "", "", "", "", "", "", "", "", "", "", "", @stub)
 const @test_missing_dir_fails = !@missingDir.ok
+
+>> ── runtime continue: fork, never resume in place ──
+
+>> The config the runtime builds for a native continue, plus the stub.
+exe @runtimeResume(bin, fork, stream) = js {
+  const resume = { sessionId: "3f2a1b4c-0000-4000-8000-abcdef000002", provider: "claude", continue: true };
+  if (fork) resume.fork = true;
+  const cfg = { claudeBin: bin, _mlld: { resume } };
+  if (stream) cfg.stream = true;
+  return cfg;
+}
+
+>> The command line with the minted --session-id value swapped for NEW, once it is
+>> checked to be a lowercase UUID other than the resumed id.
+exe @forkLine(line, old) = js {
+  const args = line.split("|");
+  const i = args.indexOf("--session-id");
+  if (i < 0) return "no --session-id: " + line;
+  const id = args[i + 1];
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) return "not a UUID: " + id;
+  if (id.toLowerCase() === old.toLowerCase()) return "reused the resumed id";
+  args[i + 1] = "NEW";
+  return args.join("|");
+}
+
+const @forked = @claude("again", @runtimeResume(@stub, true, false))
+const @test_runtime_fork_line = @forkLine(@argv(@forked), @sid) == `-p|--bare|--session-id|NEW|--output-format|json|--model|sonnet|--resume|${@sidUpper}|--fork-session`
+
+const @forkedStream = @claude("again", @runtimeResume(@stub, true, true))
+const @test_runtime_fork_stream_line = @forkLine(@argv(@forkedStream), @sid) == `-p|--bare|--session-id|NEW|--model|sonnet|--resume|${@sidUpper}|--fork-session`
+
+>> Without fork a runtime resume is today's resume line.
+const @resumedInPlace = @claude("again", @runtimeResume(@stub, false, false))
+const @test_runtime_resume_without_fork_unchanged = @argv(@resumedInPlace) == `-p|--bare|--output-format|json|--model|sonnet|--resume|${@sidUpper}`

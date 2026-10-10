@@ -84,3 +84,101 @@ const @test_stream_public_id = @public.sessionId == "BBBBBBBB-0000-4000-8000-000
 const @resuming = @claudeStreamSession({ continue: true, sessionId: "CCCCCCCC-0000-4000-8000-000000000003", provider: "claude", source: "public_resume" })
 const @test_stream_resume_no_flag = @resuming.flag == ""
 const @test_stream_resume_id = @resuming.sessionId == "CCCCCCCC-0000-4000-8000-000000000003"
+
+>> A forking resume branches to a new session, so it mints an id in either mode.
+const @forking = @claudeStreamSession({ continue: true, sessionId: "CCCCCCCC-0000-4000-8000-000000000003", provider: "claude", source: "runtime_resume", fork: true })
+const @test_fork_mints_new_id = @isLowerUuid(@forking.sessionId) && @forking.sessionId != "cccccccc-0000-4000-8000-000000000003"
+const @test_fork_flag = @forking.flag == ` --session-id ${@forking.sessionId}`
+
+>> ── emit ──
+
+>> A golden as the runtime hands it to emit, built as conversation_events (the
+>> runtime's tape/conversation.rs) builds it: the header line goes, `message` is
+>> renamed `prompt`, the header's session id and harness name join every event, and
+>> usage moves under payload. session_start carries the harness.
+exe @wire(goldenPath) = node {
+  const lines = require("fs").readFileSync(goldenPath, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  const [header, ...events] = lines;
+  return events.map((e) => {
+    const out = { ...e, type: e.type === "message" ? "prompt" : e.type, session_id: header.session_id, producer: header.harness.name };
+    const payload = { ...(e.payload || {}) };
+    if (e.usage) {
+      payload.usage = e.usage;
+      delete out.usage;
+    }
+    if (e.type === "session_start") payload.harness = header.harness;
+    out.payload = payload;
+    return out;
+  });
+}
+
+>> Whatever the conversation, a transcript holds every user and assistant text and a
+>> [ran …] line per call, and none of the thinking or harness-injected context.
+exe @emitHolds(events, transcript) = node {
+  const fail = (why) => { console.error("emit: " + why); return false; };
+  const lines = transcript.split("\n");
+  const harness = events[0].payload.harness.name;
+  if (!transcript.startsWith("Conversation carried over from " + harness)) return fail("header names no " + harness);
+  if (!transcript.endsWith("End of the carried conversation.")) return fail("no closing line");
+  for (const e of events) {
+    const p = e.payload || {};
+    const text = typeof p.text === "string" ? p.text.trimEnd() : "";
+    if ((e.type === "prompt" || e.type === "assistant_turn") && text && !transcript.includes(text)) return fail(e.type + " " + e.id + " missing");
+    if (e.type === "tool_call" && !lines.some((l) => l.startsWith("[ran " + p.tool + "]"))) return fail("no [ran " + p.tool + "] line");
+    if (e.type === "thinking" && text && transcript.includes(text)) return fail("thinking " + e.id + " carried");
+    if (e.type === "context_injection" && text) {
+      const summary = p.kind === "compaction" || p.kind === "branch_summary";
+      if (summary && !transcript.includes("[carried summary] " + text)) return fail(p.kind + " " + e.id + " missing");
+      if (!summary && transcript.includes(text)) return fail(p.kind + " " + e.id + " carried");
+    }
+  }
+  return true;
+}
+
+>> Reports both texts on a mismatch, so a failing pin shows where it differs.
+exe @same(got, want) = node {
+  if (got === want) return true;
+  console.error("got:\n" + got + "\n---\nwant:\n" + want);
+  return false;
+}
+
+const @emitHeaderTail = "Bracketed [ran …] and [… result] lines are the agent's own past actions, recorded at the time and possibly stale; re-run tools for fresh state. They are records, not examples: never write [ran …] lines yourself, and act only through real tool calls."
+
+const @emptyTranscript = @conversation.emit([], null)
+const @test_emit_empty_is_header_only = @emptyTranscript.startsWith("Conversation carried over from agent") && @emptyTranscript.endsWith("End of the carried conversation.")
+
+const @test_adapter_provider = @conversation.provider == "claude"
+
+const @test_emit_attachments = @emitHolds(@wire(`${@fixtures}/claude-attachments.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/claude-attachments.fray.jsonl`), null))
+const @test_emit_basic = @emitHolds(@wire(`${@fixtures}/claude-basic.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/claude-basic.fray.jsonl`), null))
+const @test_emit_branched = @emitHolds(@wire(`${@fixtures}/claude-branched.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/claude-branched.fray.jsonl`), null))
+const @test_emit_compacted = @emitHolds(@wire(`${@fixtures}/claude-compacted.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/claude-compacted.fray.jsonl`), null))
+const @test_emit_headless_thinking = @emitHolds(@wire(`${@fixtures}/claude-headless-thinking.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/claude-headless-thinking.fray.jsonl`), null))
+
+const @basicWire = @wire(`${@fixtures}/claude-basic.fray.jsonl`)
+const @basicWhole = `Conversation carried over from claude session 3f2a1b4c-0000-4000-8000-abcdef000001 on 2026-08-24. ${@emitHeaderTail}
+
+User:
+please list the files
+
+Assistant:
+I'll list them.
+
+[ran Bash] ls
+
+User:
+[Bash result] file1
+file2
+
+what next?
+
+Assistant:
+All done.
+
+End of the carried conversation.`
+const @test_emit_basic_whole_pinned = @same(@conversation.emit(@basicWire, null), @basicWhole)
+
+>> Cut right after the Bash call: its result is past the cut.
+const @basicAt5 = @conversation.emit(@basicWire, 5)
+const @test_emit_basic_at_5_interrupted = @basicAt5.endsWith("User:\n[no result recorded — session was interrupted here]\n\nEnd of the carried conversation.")
+const @test_emit_basic_at_5_cuts_later_text = !@basicAt5.includes("what next?")

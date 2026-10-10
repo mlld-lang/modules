@@ -123,7 +123,7 @@ Handles event types: message, thinking, tool-use, tool-result, error, metadata.
 
 ### `@conversation`
 
-Reads the conversation log Claude Code writes for a session and turns it into IFT events, the event format of mlld's run tape. It is an object of two functions:
+Reads the conversation log Claude Code writes for a session and turns it into IFT events, the event format of mlld's run tape. It is an object of a provider name and three functions:
 
 ```mlld
 import { @conversation } from @mlld/claude
@@ -149,6 +149,19 @@ show @tape.events.length
 - `events` is the conversation as the model last saw it: the path from the newest message back to the start. Abandoned branches, subagent side conversations and anything before a compaction are left out. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
 - It is a port of fray's `IngestClaude` (`internal/ift/ingest_claude.go`) and its output matches fray's exactly, which the tests check against fray's own output (`tests/fixtures/conversation/README.md`).
 - It throws only when `text` is not a string. Unreadable lines are skipped, and a record type it does not know prints one warning line to stderr and is skipped.
+
+**`@conversation.provider`** is `"claude"`, the name `@claude` reports its sessions under. mlld's `@claude.continue(@conv, { at?, prompt })` compares it with the provider a recorded conversation came from. When they match, the session is continued natively (below); otherwise the conversation is carried over as text through `emit`.
+
+**`@conversation.emit(events, at?)`** returns a recorded conversation as one plain-text transcript. mlld puts it in front of the new prompt when it cannot continue the session natively: for a conversation recorded by another harness, a cut before the last event, or a conversation with no session id.
+
+- `events` are the conversation lines of a run tape. `at`, when given, keeps only events `0` through `at`.
+- The transcript opens with a line naming the harness, session and date the conversation came from, alternates `User:` and `Assistant:` turns, and ends with `End of the carried conversation.`
+- User and assistant text is carried verbatim. A tool call becomes `[ran <tool>] <command or path>` and its result `[<tool> result] <content>` (`error` for a failure), cut to its first 2,000 characters. A call whose result falls after the cut is followed by `[no result recorded — session was interrupted here]`.
+- Thinking, and text the harness injected on its own (hook output, reminders, base instructions), are dropped. Compaction and branch summaries are kept, as `[carried summary] <text>`.
+- It reads no files and never throws. The same function is in `@mlld/claude`, `@mlld/codex`, `@mlld/pi` and `@mlld/opencode`, so a transcript reads the same whichever module renders it.
+- **The transcript is a record, not proof.** It repeats what the log says happened, so it is only as trustworthy as that log, and the tool output in it may be stale. Its opening line tells the model so.
+
+**Continuing natively.** When mlld continues a recorded claude conversation in a new call, it calls `@claude` with `config._mlld.resume = { sessionId, provider: "claude", continue: true, fork: true }`. `@claude` then never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `--resume <id> --fork-session --session-id <new id>`, and returns the new id, so the run's tape records the branch this call wrote.
 
 **Treat an ingested conversation as untrusted input.** The log is a plain file that anything on the machine can edit, and nothing in it proves Claude produced it.
 

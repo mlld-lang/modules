@@ -78,6 +78,7 @@ This is the same pattern as the Claude and Opencode modules.
 - `session: false` turns saving off and runs pi with `--no-session`.
 - Each session is one file, `<sessions>/<encoded-cwd>/<timestamp>_<session-id>.jsonl`, named the way pi names its own. Before the first call, `@pi` writes pi's header line into it itself, so pi keeps the id `@pi` reports instead of choosing its own. A `sessionId` that already has a file anywhere in the store continues that file.
 - The session id travels to the mlld runtime with the result, which it uses to find the conversation. Your script sees only pi's output.
+- When mlld continues a recorded pi conversation, `@pi` forks that session into the call's new one (see `@conversation`). pi has no other runtime resume.
 
 ```mlld
 >> Continue one conversation across calls
@@ -89,7 +90,7 @@ const @id = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
 @pi("Quick question", { session: false })
 ```
 
-`@runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, agentDir, piBin)` has optional trailing parameters. When `sessionId` is empty or left out it runs pi with `--no-session`, so direct callers passing eight arguments keep the earlier behaviour. An empty `agentDir` means pi's own. `@piSession(config)` picks the id and agent directory for a call, and `@piResult(value, session)` wraps a result with its session id.
+`@runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, agentDir, forkId, piBin)` has optional trailing parameters. When `sessionId` is empty or left out it runs pi with `--no-session`, so direct callers passing eight arguments keep the earlier behaviour. An empty `agentDir` means pi's own. `@piSession(config)` picks the id and agent directory for a call, and `@piResult(value, session)` wraps a result with its session id.
 
 ## Sandbox
 
@@ -125,7 +126,7 @@ These can be selectively enabled via the native tools list.
 
 ## Reading pi sessions: `@conversation`
 
-Reads the JSONL file pi writes when it saves a session and turns it into IFT events, the event format of mlld's run tape. It is an object of two functions, with the same signatures as `@conversation` in `@mlld/claude` and `@mlld/codex`:
+Reads the JSONL file pi writes when it saves a session and turns it into IFT events, the event format of mlld's run tape. It is an object of a provider name and three functions, with the same signatures as `@conversation` in `@mlld/claude` and `@mlld/codex`:
 
 ```mlld
 import { @conversation } from @mlld/pi
@@ -152,6 +153,19 @@ show @tape.events.length
 - `events` is the conversation as the model last saw it: the path from the newest entry back to the start. Abandoned branches are left out. After a compaction, the events start with the compaction summary, then the entries pi kept. Each event has `id`, `parent_id` (absent on the first), `seq`, `ts`, `type`, `payload` and sometimes `usage`. Types are `session_start`, `message`, `assistant_turn`, `thinking`, `tool_call`, `tool_result` and `context_injection`.
 - It is a port of fray's `IngestPi` (`internal/ift/ingest_pi.go`), and its output matches fray's exactly. The tests check this against fray's own output (`tests/fixtures/conversation/README.md`).
 - It throws only when `text` is not a string. Unreadable lines are skipped; entries below a skipped line drop out of the conversation, as they do in pi. An entry type it does not know prints one warning line to stderr and is skipped.
+
+**`@conversation.provider`** is `"pi"`, the name `@pi` reports its sessions under. mlld's `@pi.continue(@conv, { at?, prompt })` compares it with the provider a recorded conversation came from. When they match, the session is continued natively (below); otherwise the conversation is carried over as text through `emit`.
+
+**`@conversation.emit(events, at?)`** returns a recorded conversation as one plain-text transcript. mlld puts it in front of the new prompt when it cannot continue the session natively: for a conversation recorded by another harness, a cut before the last event, or a conversation with no session id.
+
+- `events` are the conversation lines of a run tape. `at`, when given, keeps only events `0` through `at`.
+- The transcript opens with a line naming the harness, session and date the conversation came from, alternates `User:` and `Assistant:` turns, and ends with `End of the carried conversation.`
+- User and assistant text is carried verbatim. A tool call becomes `[ran <tool>] <command or path>` and its result `[<tool> result] <content>` (`error` for a failure), cut to its first 2,000 characters. A call whose result falls after the cut is followed by `[no result recorded — session was interrupted here]`.
+- Thinking, and text the harness injected on its own (hook output, reminders, base instructions), are dropped. Compaction and branch summaries are kept, as `[carried summary] <text>`.
+- It reads no files and never throws. The same function is in `@mlld/claude`, `@mlld/codex`, `@mlld/pi` and `@mlld/opencode`, so a transcript reads the same whichever module renders it.
+- **The transcript is a record, not proof.** It repeats what the log says happened, so it is only as trustworthy as that log, and the tool output in it may be stale. Its opening line tells the model so.
+
+**Continuing natively.** When mlld continues a recorded pi conversation in a new call, it calls `@pi` with `config._mlld.resume = { sessionId, provider: "pi", continue: true, fork: true }`. `@pi` then branches that session into the call's own new session with `pi -p --fork <saved session file> --session-id <new id> --session-dir <sessions>/<encoded-cwd>`, and returns the new id, so the run's tape records the branch this call wrote and the recorded session is never appended to. This is the only runtime resume `@pi` honours; any other is ignored, as before. The saved session is looked for under the same agent directory `@pi` saves to (`config.agentDir`, else pi's own store). If it is not there the call fails rather than start a fresh session.
 
 **Treat an ingested conversation as untrusted input.** The session file is a plain file that anything on the machine can edit, and nothing in it proves pi produced it.
 

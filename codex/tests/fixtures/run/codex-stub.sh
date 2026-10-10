@@ -1,0 +1,7 @@
+#!/bin/sh
+# Stands in for codex in run.test.mld: prints the directory it ran in, each
+# argument on its own line, then stdin, so the test can see what @runCodexSh passed.
+printf 'pwd=%s\n' "$PWD"
+for a in "$@"; do printf 'arg=%s\n' "$a"; done
+printf 'stdin='
+cat
