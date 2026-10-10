@@ -371,7 +371,7 @@ exe @opencodeBinError(message) = js {
   throw new Error(`opencode: config.opencodeBin ${message}`);
 }
 
-exe @isExecutable(file) = cmd { test -x "$file" }
+exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
 
 >> opencodeBin runs another opencode (a test stub) by putting its folder first on
 >> the call's PATH, so the program stays the literal `opencode`. A file with
