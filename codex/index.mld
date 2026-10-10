@@ -225,7 +225,7 @@ exe @codexBinError(message) = js {
   throw new Error(`codex: config.codexBin ${message}`);
 }
 
-exe @isExecutable(file) = cmd { test -x "$file" }
+exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
 
 >> codexBin runs another codex (a test stub) by putting its folder first on the
 >> call's PATH, so the program stays the literal `codex`. A file with another
