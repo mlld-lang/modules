@@ -2,7 +2,7 @@ name: pi
 author: mlld
 type: library
 about: "Pi CLI invocation with multi-provider model selection and tool control"
-version: 2.0.0
+version: 1.3.0
 license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"

@@ -1,7 +1,7 @@
 ---
 name: pi
 author: mlld
-version: 2.0.0
+version: 1.3.0
 about: Pi adapter for mlld
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
