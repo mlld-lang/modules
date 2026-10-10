@@ -81,6 +81,8 @@ const @folderBin = try @pi("hi", { piBin: `${@root}/pi/tests/fixtures/run/stub`,
 const @test_pibin_folder_refused = !@folderBin.ok
 const @relativeBin = try @pi("hi", { piBin: "pi/tests/fixtures/run/stub/pi", dir: "/tmp", session: false })
 const @test_pibin_relative_refused = !@relativeBin.ok && @relativeBin.error.message.includes("must be an absolute path")
+const @colonBin = try @pi("hi", { piBin: "/a:b/pi", session: false })
+const @test_pibin_colon_refused = !@colonBin.ok && @colonBin.error.message.includes("must not contain ':'")
 
 >> ── session ──
 

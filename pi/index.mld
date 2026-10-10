@@ -198,10 +198,11 @@ exe @piIsExecutable(file) = cmd { test -f "$file" -a -x "$file" }
 
 >> piBin must name a file called `pi`: a command may not take its program from a
 >> variable, so the program stays `pi` and piBin's folder goes first on PATH. A
->> missing file would silently run the pi already on PATH, and a relative one is
->> looked up from dir, so both are refused.
+>> missing file would silently run the pi already on PATH, a relative one is
+>> looked up from dir, and a `:` splits PATH, so all three are refused.
 exe @piBinPath(piBin) = [
   if !@piBin.startsWith("/") || !@piBin.endsWith("/pi") [ => @piFail(`@mlld/pi: piBin must be an absolute path to a file named pi, got ${@piBin}`) ]
+  if @piBin.includes(":") [ => @piFail(`@mlld/pi: piBin must not contain ':', got ${@piBin}`) ]
   let @found = try @piIsExecutable(@piBin)
   if !@found.ok [ => @piFail(`@mlld/pi: piBin is not an executable file: ${@piBin}`) ]
   => `${@piBin.slice(0, -3)}:${@PATH}`

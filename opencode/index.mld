@@ -376,11 +376,12 @@ exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
 >> opencodeBin runs another opencode (a test stub) by putting its folder first on
 >> the call's PATH, so the program stays the literal `opencode`. A file with
 >> another name can't be reached that way, a missing one would silently run the
->> opencode already on PATH, and a relative one depends on where mlld runs, so
->> all three are refused.
+>> opencode already on PATH, a relative one depends on where mlld runs, and a
+>> `:` splits PATH, so all four are refused.
 exe @opencodeBinDir(opencodeBin) = [
   if !@opencodeBin || @opencodeBin == "opencode" [ => "" ]
   if !@opencodeBin.startsWith("/") || !@opencodeBin.endsWith("/opencode") [ => @opencodeBinError(`must be an absolute path to a file named opencode, got '${@opencodeBin}'`) ]
+  if @opencodeBin.includes(":") [ => @opencodeBinError(`must not contain ':', got '${@opencodeBin}'`) ]
   let @found = try @isExecutable(@opencodeBin)
   if !@found.ok [ => @opencodeBinError(`is not an executable file: '${@opencodeBin}'`) ]
   => @opencodeBin.slice(0, -9)

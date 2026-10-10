@@ -27,3 +27,7 @@ const @test_folder_bin_refused = !@folder.ok && @folder.error.message.includes("
 
 const @relative = try @opencode("hi", { opencodeBin: "opencode/tests/fixtures/bin/opencode" })
 const @test_relative_bin_refused = !@relative.ok && @relative.error.message.includes("must be an absolute path")
+
+>> A ':' splits the PATH entry, so the lookup would miss the folder.
+const @colon = try @opencode("hi", { opencodeBin: "/a:b/opencode" })
+const @test_colon_bin_refused = !@colon.ok && @colon.error.message.includes("must not contain ':'")

@@ -69,7 +69,7 @@ This is the same pattern as the Claude and Opencode modules.
 | `session` | `false` to save nothing (see Sessions) |
 | `sessionId` | UUID naming the session; an existing one is continued (see Sessions) |
 | `agentDir` | pi agent directory whose `sessions/` folder saves go to (default `$PI_CODING_AGENT_DIR`, else `~/.pi/agent`); must be one the sandbox grants |
-| `piBin` | An absolute path to a file named `pi` to run instead of `pi` on PATH, for tests: its folder goes first on PATH for the call. Any other file name, a missing file or a relative path is refused, because a command may not take its program from a variable |
+| `piBin` | An absolute path to a file named `pi` to run instead of `pi` on PATH, for tests: its folder goes first on PATH for the call. Any other file name, a missing file, a relative path, or a path containing `:` is refused, because a command may not take its program from a variable |
 
 ## Sessions
 
