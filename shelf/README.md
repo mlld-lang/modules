@@ -1,6 +1,6 @@
 # @mlld/shelf
 
-A shelf is a mlld `state` built from records, with one slot per record family (`contact`, `note`, …). A program files tool results into it with `@observe`, which also says whether a result added anything new, shows them to an agent with `@render`, and the agent cites what it has seen by address — `"contact:69d3c20c81180863"` — or by `{ ref: { address, field } }`. This module finds the record at an address and resolves a ref to the field value it names. A resolved value is the stored field itself, so it keeps its labels and proof, and can be used where proof is required, such as in a grant. This is the same resolution `@mlld/authorize` uses. Core mlld owns the state, its labels and its write permissions; the module only organises the data.
+A shelf is a mlld `state` built from records, with one slot per record family (`contact`, `note`, …). A program files tool results into it with `@observe`, which also says whether a result added anything new, shows them to an agent with `@render`, and the agent cites what it has seen by address — `"contact:69d3c20c81180863"` — or by `{ ref: { address, field } }`. This module finds the record at an address and resolves a ref to the field value it names. A resolved value is the stored field itself, so it keeps its labels and proof, and can be used where proof is required, such as in a grant. This is the same resolution `@mlld/authorize` uses, duplicated on purpose: authorize is bundled into the mlld binary and cannot import a module. Core mlld owns the state, its labels and its write permissions; the module only organises the data.
 
 Every export takes untrusted input and answers `null` or `false` for anything malformed rather than throwing. Exports that take `families` limit lookups to those families; leave it out, or pass anything that is not a list, to allow every slot of the shelf.
 
@@ -14,7 +14,7 @@ record @contact [
   id: string [ kind "contact" ]
   name: string
   * { read: [id, name] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: [upsert] } }
 ]
 exe @mkContact(i, n) = { id: @i, name: @n } => contact
 const @recs = { contact: @contact }
@@ -30,6 +30,13 @@ const @addr = @st.contact[0].mx.address.string
 show @find(@st, @addr).name
 show @resolveRef({ ref: { address: @addr, field: "id" } }, @st)
 ```
+
+## Security
+
+- **Runs as the caller's role.** No exe in the module carries a role label, so every write through `@put` or `@observe` is checked against the role of the code that calls it. A caller without the record's write grant is refused by core.
+- **Keeps labels and proof.** The module is written in mlld only, with no `js` or shell blocks: a value that crosses into js loses its proof. A record found with `@find`, or a field resolved with `@resolveRef`, is the stored value itself and can be used where proof is required.
+- **Renders only the active role's view.** `@render` takes no role argument. It shows what the role active at the call may read, so a caller cannot ask for a wider view than its own. Every `<` in the output is escaped, so stored data cannot close the `<observed>` block.
+- **Never throws on untrusted input.** Addresses, refs and arguments an agent wrote get `null`, `false`, `[]` or `""` back when malformed, including a plain object passed where a state belongs.
 
 ## docs
 
@@ -93,7 +100,7 @@ show @miss   >> { "arg": "to", "addr": "contact:gone" }
 
 `@put` and `@observe` carry no role label, so they write as whoever calls them. Core checks the record's write grant against the caller's role and ends the run on a refusal (`WRITE_DENIED_*`; `try` does not catch it). Call them from an exe labelled with a role the record grants, as `@file` does in the tldr above.
 
-The grant is spelled `.role:<name> { write: { shelves: { upsert: true } } }`. There is no separate `append` capability: appending to a keyless record's slot is checked against `upsert` too.
+The grant is spelled `.role:<name> { write: { state: [upsert] } }` (`shelves` is its older name). There is no separate `append` capability: appending to a keyless record's slot is checked against `upsert` too.
 
 ### `@addsData(st, record)`
 
@@ -169,8 +176,6 @@ fyi @shelfView = { observed: @render(@st, null, { cache: [".role:planner"], key:
 
 Rendering 200 records five times took about 3.1s cached against 10.6s uncached (debug build).
 
-Migrating from a shelf declared `with { projection_cache: [roles] }`: delete that option and pass `{ cache: [roles], key: @cacheFor(@st) }` on the program's `@render` calls.
-
 ### Versions: `@version`, `@versions`, `@changedSince`
 
 Core counts every write applied to a slot (`upsert`, `append`, `set`, `remove`, `clear`) and these read that count. Versions count writes, not changes: an `upsert` of a record identical to the stored one still bumps it. Use `@put`'s `redundant` to detect writes that changed nothing.
@@ -186,7 +191,12 @@ const @w = @fileAll(@st, [@mkContact("c3", "Cy")])
 show @changedSince(@st, @before)   >> ["contact"]
 ```
 
-Migrating from a shelf declared `with { versioned: true }`: delete that option and read versions with `@version`. The counter is always on.
+## Migrating from `with { versioned, projection_cache }`
+
+Shelves used to take these options on their declaration. Both now live in this module:
+
+- `with { versioned: true }`: delete it. Every record slot counts its writes; read the count with `@version`, `@versions` or `@changedSince`.
+- `with { projection_cache: [roles] }`: delete it, mint a key once with `@cacheFor(@st)`, and pass `{ cache: [roles], key: @key }` on the program's `@render` calls.
 
 ## License
 
