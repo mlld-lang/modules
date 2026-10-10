@@ -54,7 +54,7 @@ Core invocation. All other exes delegate to this.
 | `bare` | boolean | `false` | Full isolation: skip CLAUDE.md, hooks, plugins. Requires `ANTHROPIC_API_KEY`. |
 | `sessionId` | string | auto-generated | Session UUID for conversation tracking. Every call gets a session (generated if omitted). |
 | `resume` | string | — | Session UUID to resume. Uses `--resume`, no tools. The prompt is appended to the existing conversation. |
-| `claudeBin` | string | `claude` on PATH | The claude executable to run, e.g. a stub in tests. |
+| `claudeBin` | string | `claude` on PATH | The claude executable to run, e.g. a stub in tests. A program named by a variable is refused under a policy with command rules, so set this only in tests; leave it unset in programs that have a policy. |
 
 ```mlld
 >> Simple call
