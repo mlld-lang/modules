@@ -161,7 +161,7 @@ show @tape.events.length
 - It reads no files and never throws. The same function is in `@mlld/claude`, `@mlld/codex`, `@mlld/pi` and `@mlld/opencode`, so a transcript reads the same whichever module renders it.
 - **The transcript is a record, not proof.** It repeats what the log says happened, so it is only as trustworthy as that log, and the tool output in it may be stale. Its opening line tells the model so.
 
-**Continuing natively.** When mlld continues a recorded claude conversation in a new call, it calls `@claude` with `config._mlld.resume = { sessionId, provider: "claude", continue: true, fork: true }`. `@claude` then it never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `--resume <id> --fork-session --session-id <new id>`, and returns the new id, so the run's tape records the branch this call wrote.
+**Continuing natively.** When mlld continues a recorded claude conversation in a new call, it calls `@claude` with `config._mlld.resume = { sessionId, provider: "claude", continue: true, fork: true }`. `@claude` then never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `--resume <id> --fork-session --session-id <new id>`, and returns the new id, so the run's tape records the branch this call wrote.
 
 **Treat an ingested conversation as untrusted input.** The log is a plain file that anything on the machine can edit, and nothing in it proves Claude produced it.
 

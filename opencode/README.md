@@ -152,7 +152,7 @@ The session id is the one `@opencode` returns (`ses_…`).
 - It reads no files and never throws. The same function is in `@mlld/claude`, `@mlld/codex`, `@mlld/pi` and `@mlld/opencode`, so a transcript reads the same whichever module renders it.
 - **The transcript is a record, not proof.** It repeats what the log says happened, so it is only as trustworthy as that log, and the tool output in it may be stale. Its opening line tells the model so.
 
-**Continuing natively.** When mlld continues a recorded opencode conversation in a new call, it calls `@opencode` with `config._mlld.resume = { sessionId, provider: "opencode", continue: true, fork: true }`. `@opencode` then it never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `opencode run -s <id> --fork`, and returns the session id on opencode's output, so the run's tape records the branch this call wrote.
+**Continuing natively.** When mlld continues a recorded opencode conversation in a new call, it calls `@opencode` with `config._mlld.resume = { sessionId, provider: "opencode", continue: true, fork: true }`. `@opencode` then never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `opencode run -s <id> --fork`, and returns the session id on opencode's output, so the run's tape records the branch this call wrote.
 
 **Treat an ingested conversation as untrusted input.** The export is a plain file, and nothing in it proves opencode produced it.
 
