@@ -1,7 +1,7 @@
 >> Tests for @mlld/shelf: address lookup and {ref} resolution.
 >> Run: mlld test shelf/tests/
 
-import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @version, @versions, @changedSince } from "../index.mld"
+import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @cacheFor, @version, @versions, @changedSince } from "../index.mld"
 
 record @contact [
   key id
@@ -300,6 +300,63 @@ llm .role:admin @adminAgent(prompt, config) = `${@config.system}`
 const @plannerSaw = @plannerAgent("go", { system: "P", fyi: @shelfView })
 const @adminSaw = @adminAgent("go", { system: "A", fyi: @shelfView })
 const @test_render_fyi_follows_reader = @plannerSaw.includes(`"fields":{"name":"Ada"}`) && !@plannerSaw.includes("555-1234") && @adminSaw.includes("555-1234")
+
+>> ── render cache ──
+>> `planner` has no write grant on any record, so the cache needs none from its caller.
+const @ckey = @cacheFor(@rs)
+const @cacheRoles = [".role:planner", ".role:admin"]
+exe .role:planner @renderPlannerCached(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })
+exe .role:admin @renderAdminCached(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })
+const @plainPlanner = @renderAsPlanner(@rs)
+const @plainAdmin = @renderAsAdmin(@rs)
+const @cp1 = @renderPlannerCached(@rs, @ckey)
+const @ca1 = @renderAdminCached(@rs, @ckey)
+const @cp2 = @renderPlannerCached(@rs, @ckey)
+const @ca2 = @renderAdminCached(@rs, @ckey)
+const @test_cache_key_unique = @ckey.id.isString() && @cacheFor(@rs).id != @ckey.id
+const @test_cache_same_output = @cp1 == @plainPlanner && @cp2 == @plainPlanner && @ca1 == @plainAdmin && @ca2 == @plainAdmin
+>> 1. A line cached for one role is never returned to another.
+const @test_cache_role_isolated = @cp2 != @ca2 && !@cp2.includes("555-1234") && @ca2.includes("555-1234")
+>> 2. A cached render keeps every label of the uncached one. The only labels it adds name
+>> the cache's own state (its entries, and the counter the key was minted from).
+const @plainLabels = @plainPlanner.mx.labels
+const @cachedLabels = @cp2.mx.labels
+const @test_cache_labels = @plainLabels.every(@cachedLabels.includes(@item)) && @cachedLabels.every(@plainLabels.includes(@item) || @item.startsWith(".src:state:@renderCache.")) && @cachedLabels.includes(".src:state:@renderCache.slots")
+>> 4. Two states with the same families keep separate entries.
+state @rs2 from @rrecs
+const @ckey2 = @cacheFor(@rs2)
+const @r2 = @observeAs(@rs2, [@mkMemo("other", "second state")])
+const @other1 = @renderPlannerCached(@rs2, @ckey2)
+const @mine = @renderPlannerCached(@rs, @ckey)
+const @test_cache_states_separate = @other1.includes("second state") && !@other1.includes("Ada") && @mine == @plainPlanner
+>> Same families, same slot versions: only the key tells these two apart.
+state @twinA from @rrecs
+state @twinB from @rrecs
+const @keyA = @cacheFor(@twinA)
+const @keyB = @cacheFor(@twinB)
+const @fa = @observeAs(@twinA, [@mkMemo("ta", "twin A")])
+const @fb = @observeAs(@twinB, [@mkMemo("tb", "twin B")])
+const @outA = @renderPlannerCached(@twinA, @keyA)
+const @outB = @renderPlannerCached(@twinB, @keyB)
+const @test_cache_twins_separate = @twinA.memo.mx.version == @twinB.memo.mx.version && @outA.includes("twin A") && @outB.includes("twin B") && !@outB.includes("twin A")
+>> 5. A write between two cached renders shows the new record.
+const @r3 = @observeAs(@rs2, [@mkMemo("later", "after write")])
+const @other2 = @renderPlannerCached(@rs2, @ckey2)
+const @test_cache_write_shows = @other2.includes("after write") && @other2.includes("second state")
+>> No key, or a role not listed: rendered as before, nothing cached.
+exe .role:planner @renderNoKey(s) = @render(@s, null, { cache: @cacheRoles })
+exe .role:worker @renderUnlisted(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })
+exe .role:worker @renderWorker(s) = @render(@s)
+const @test_cache_needs_key_and_role = @renderNoKey(@rs) == @plainPlanner && @renderUnlisted(@rs, @ckey) == @renderWorker(@rs) && @render(@rs, null, { cache: @cacheRoles, key: @ckey }) == @render(@rs)
+>> 3 and fyi: a cached view read by a planner llm call equals the uncached one, names the
+>> handle-mode `email` in `ref_fields`, and holds no handle or preview. (A test run has no
+>> live bridge session, so `@mx.handles` is empty here and handle values are null.)
+fyi @cachedView = { observed: @render(@rs, null, { cache: [".role:planner"], key: @ckey }), push: [observed] }
+const @sawCached = @plannerAgent("go", { system: "P", fyi: @cachedView })
+const @sawCached2 = @plannerAgent("go", { system: "P", fyi: @cachedView })
+const @sawPlain = @plannerAgent("go", { system: "P", fyi: @shelfView })
+const @test_cache_fyi = @sawCached == @sawPlain && @sawCached2 == @sawPlain
+const @test_cache_no_handles = @sawCached2.includes(`"ref_fields":["email","phone"]`) && !@sawCached2.includes("handle") && !@sawCached2.includes("preview") && !@cp2.includes("handle")
 
 >> ── versions ──
 >> Each operation runs in its own exe so the version can be read before and after it.

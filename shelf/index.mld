@@ -218,26 +218,91 @@ exe @slotLines(st, slot) = [
   ]
 ]
 
->> Every record stored in `families` (default: all slots), one JSON line each, in slot
->> order then storage order, inside `<observed>` tags; "" when there are none.
-exe @render(st, families = null) = [
-  let @allowed = @allowedFamilies(@st, @families)
-  let @slots = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
-  let @groups = for @f in @slots => @slotLines(@st, @f)
-  let @entries = @groups.flat()
+>> One slot's lines, escaped. A template loop writes each entry as compact JSON on its own
+>> line and leaves a blank line after the last one, which `.trim()` drops; every entry ends
+>> in `}`. Every `<` is written as its JSON escape, so a stored value cannot close the
+>> `<observed>` block. JSON has `<` only inside strings, where the escape means the same.
+exe @slotText(st, slot) = [
+  let @entries = @slotLines(@st, @slot)
   if @entries.length == 0 [ => "" ]
-  >> A template loop writes each entry as compact JSON on its own line. It also leaves a
-  >> blank line after the last one, which `.trim()` drops; every entry ends in `}`.
   let @body = `
 /for @e in @entries
 ${@e}
 /end
 `
-  >> Every `<` is written as its JSON escape, so a stored value cannot close the
-  >> `<observed>` block. JSON has `<` only inside strings, where the escape means the same.
   let @lines = @body.trim()
+  => @lines.replaceAll("<", "\\u003c")
+]
+
+>> ── Render cache ──
+>>
+>> Rendered slot text, per (cache key, slot, role). An entry holds the slot's version when
+>> it was rendered; every write bumps the version, so a stale entry is never read, and the
+>> next render of that slot replaces it. The state is the module's own, with no record
+>> type, so writing it needs no grant from the caller.
+state @renderCache = { counter: number?, slots: object? }
+
+>> A cache key for one state. mlld shows no identity on a state (two modules may each
+>> declare `@s`), so the code that declares the state mints a key once and passes it to
+>> every cached `@render` of that state.
+exe @cacheFor(st) = [
+  let @bumped = @renderCache.increment("counter")
+  => { id: `shelf-cache-${@renderCache.counter}` }
+]
+
+>> `{ id, role }` when this call may use the cache: the options name the active role in
+>> `cache` and carry a key from `@cacheFor`. Otherwise null, and nothing is cached.
+exe @cacheContext(options) = [
+  if @typeof(@options) != "object" [ => null ]
+  if @typeof(@options.cache) != "array" [ => null ]
+  if @typeof(@options.key) != "object" [ => null ]
+  if !@options.key.id.isString() [ => null ]
+  let @roles = for @r, @actor in @mx.actors => @r
+  if @roles.length != 1 [ => null ]
+  if !@options.cache.includes(@roles[0]) [ => null ]
+  => { id: @options.key.id, role: @roles[0] }
+]
+
+>> True when `text` contains a handle visible in this bridge session. Rendered lines never
+>> hold one, but a line that did must not outlive the session that minted it.
+exe @holdsHandle(text) = [
+  let @groups = for @g in @mx.handles => for @f, @h in @g.instance => @h.handle
+  let @handles = @groups.flat()
+  => @handles.some(@item.isString() && @text.includes(@item))
+]
+
+exe @cachedSlotText(st, slot, ctx) = [
+  if @ctx == null [ => @slotText(@st, @slot) ]
+  let @slotVersion = @st[@slot].mx.version
+  let @entryKey = `${@ctx.id}|${@ctx.role}|${@slot}`
+  let @stored = match [ @typeof(@renderCache.slots) == "object" => @renderCache.slots; * => {} ]
+  let @hit = @stored[@entryKey]
+  if @typeof(@hit) == "object" && @hit.version == @slotVersion [ => @hit.text ]
+  let @text = @slotText(@st, @slot)
+  if @holdsHandle(@text) [ => @text ]
+  let @written = @renderCache.set({ slots: { ...@stored, [@entryKey]: { version: @slotVersion, text: @text } } })
+  => @text
+]
+
+>> Every record stored in `families` (default: all slots), one JSON line each, in slot
+>> order then storage order, inside `<observed>` tags; "" when there are none.
+>> `options.cache` lists the roles whose renders are cached, with `options.key` from
+>> `@cacheFor`.
+exe @render(st, families = null, options = null) = [
+  let @allowed = @allowedFamilies(@st, @families)
+  let @slots = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
+  let @ctx = @cacheContext(@options)
+  >> A template loop, because a JSON-looking string collected by `for` is read back as an
+  >> object. Empty slots leave blank lines, which are dropped.
+  let @body = `
+/for @f in @slots
+${@cachedSlotText(@st, @f, @ctx)}
+/end
+`
+  let @lines = @body.replaceAll(/\n\n+/g, "\n").trim()
+  if @lines == "" [ => "" ]
   => `<observed>
-${@lines.replaceAll("<", "\\u003c")}
+${@lines}
 </observed>`
 ]
 
@@ -269,4 +334,4 @@ exe @changedSince(st, snapshot, families = null) = [
   => for @f, @v in @current if @v > match [ @typeof(@before[@f]) == "number" => @before[@f]; * => 0 ] => @f
 ]
 
-export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @version, @versions, @changedSince }
+export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @cacheFor, @version, @versions, @changedSince }
