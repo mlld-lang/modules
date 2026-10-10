@@ -206,8 +206,8 @@ exe @codexMcpConfigArg(configPath) = node {
 >> codex refuses the sandbox flag after the fork and resume subcommands, and
 >> neither takes --search, so a continue and a fresh run are separate bodies with
 >> the sandbox flag in different places. Exactly one of sandbox and bypass is set.
->> The program is written literally because a policy refuses a command whose
->> program comes from a variable; the `…Bin` bodies run a stub for the tests.
+>> The program is written literally because mlld refuses a command whose program
+>> comes from a variable.
 exe @codexExecCmd(prompt, dir, model, sandbox, bypass, search, mcp) = cmd:@dir {
   codex exec --json --skip-git-repo-check ${sandbox:+-s "$sandbox"} ${bypass:+--dangerously-bypass-approvals-and-sandbox} ${model:+-m "$model"} ${search:+--search} ${mcp:+-c "$mcp"} -
 } with { stdin: @prompt }
@@ -216,13 +216,24 @@ exe @codexContinueCmd(prompt, dir, model, sandbox, bypass, mcp, sub, resumeId) =
   codex exec ${sandbox:+-s "$sandbox"} ${bypass:+--dangerously-bypass-approvals-and-sandbox} "$sub" "$resumeId" --json --skip-git-repo-check ${model:+-m "$model"} ${mcp:+-c "$mcp"} -
 } with { stdin: @prompt }
 
-exe @codexExecBinCmd(prompt, dir, model, sandbox, bypass, search, mcp, codexBin) = cmd:@dir {
-  "$codexBin" exec --json --skip-git-repo-check ${sandbox:+-s "$sandbox"} ${bypass:+--dangerously-bypass-approvals-and-sandbox} ${model:+-m "$model"} ${search:+--search} ${mcp:+-c "$mcp"} -
-} with { stdin: @prompt }
+>> mlld reads only a few named environment variables, so the caller's PATH comes
+>> from the shell.
+exe @shellPath() = cmd { printf '%s' "$PATH" }
 
-exe @codexContinueBinCmd(prompt, dir, model, sandbox, bypass, mcp, sub, resumeId, codexBin) = cmd:@dir {
-  "$codexBin" exec ${sandbox:+-s "$sandbox"} ${bypass:+--dangerously-bypass-approvals-and-sandbox} "$sub" "$resumeId" --json --skip-git-repo-check ${model:+-m "$model"} ${mcp:+-c "$mcp"} -
-} with { stdin: @prompt }
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @codexBinError(codexBin) = js {
+  throw new Error(`codex: config.codexBin must be a file named codex, got '${codexBin}'`);
+}
+
+>> codexBin runs another codex (a test stub) by putting its folder first on the
+>> call's PATH, so the program stays the literal `codex`; a file with another
+>> name can't be reached that way and is refused.
+exe @codexBinDir(codexBin) = match [
+  !@codexBin => ""
+  @codexBin == "codex" => ""
+  @codexBin.endsWith("/codex") => @codexBin.slice(0, -6)
+  * => @codexBinError(@codexBin)
+]
 
 >> doFork branches resumeId (`codex exec fork`) instead of appending to it.
 >> mcp is the @codexMcpConfigArg string. codexBin is last so tests can point it
@@ -239,10 +250,15 @@ exe @runCodex(prompt, dir, model, sandbox, search, bypass, mcp, doResume, resume
     @doResume => "resume"
     * => ""
   ]
+  let @binDir = @codexBinDir(@codexBin)
+  let @path = match [
+    @binDir => `${@binDir}:${@shellPath()}`
+    * => ""
+  ]
   => match [
-    @sub && @codexBin => @codexContinueBinCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @mcp, @sub, @resumeId, @codexBin)
+    @path && @sub => @codexContinueCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @mcp, @sub, @resumeId) using { env: { PATH: @path } }
     @sub => @codexContinueCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @mcp, @sub, @resumeId)
-    @codexBin => @codexExecBinCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @search, @mcp, @codexBin)
+    @path => @codexExecCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @search, @mcp) using { env: { PATH: @path } }
     * => @codexExecCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @search, @mcp)
   ]
 ]
@@ -252,9 +268,8 @@ exe @runCodex(prompt, dir, model, sandbox, search, bypass, mcp, doResume, resume
 >> @codex(prompt, config)
 >> config.model     - model name (codex default unless set)
 >> config.dir       - working directory
->> config.codexBin - the codex executable to run (default: codex on PATH); a test
->>                    hook, refused under a policy with command rules because
->>                    the program then comes from a variable
+>> config.codexBin - path to a file named `codex` to run instead of the one on
+>>                    PATH (a test stub); its folder goes first on the call's PATH
 >> config.sandbox   - read-only | workspace-write | danger-full-access
 >>                    (default: workspace-write)
 >> config.bypass    - boolean, opt into --dangerously-bypass-approvals-and-sandbox
