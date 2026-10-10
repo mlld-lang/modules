@@ -22,6 +22,7 @@ Core modules for the mlld prompt scripting language. Each module lives in its ow
 - [@mlld/opencode-sse](./opencode-sse/README.md) — Drives opencode through `opencode serve` and Server-Sent Events, emitting `@mlld/claude`'s stream format.
 - [@mlld/pg](./pg/README.md) — Postgres-backed artifact storage.
 - [@mlld/pi](./pi/README.md) — Invoke the Pi coding agent with mlld tool integration.
+- [@mlld/shelf](./shelf/README.md) — Record workspaces on core state: file tool results, cite them by address, render them for a prompt.
 - [@mlld/sqlite](./sqlite/README.md) — SQLite-backed artifact storage.
 - [@mlld/string](./string/README.md) — String helpers that mlld's builtin methods don't cover.
 - [@mlld/time](./time/README.md) — Date and time formatting, arithmetic, comparisons, business days, relative time and durations.

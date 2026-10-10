@@ -1,0 +1,94 @@
+>> @mlld/shelf — record workspaces on core state.
+>>
+>> A shelf is a state built from records (`state @st from @recs`), one slot per record
+>> family. These exports find stored records by address and resolve `{ref}` citations to
+>> the field values they name, with the values' labels and proof intact.
+>>
+>> Written in mlld only: a value that crosses into a js block loses its proof labels, and
+>> keeping proof is what makes a resolved value usable in a grant.
+>>
+>> No exe carries a role label, so every state operation runs as the caller's role.
+>>
+>> Every export takes untrusted input (an address or ref an agent wrote) and answers null or
+>> false for anything malformed rather than throwing.
+
+>> ── Addresses ──
+
+>> The record family of an address: the text before the first `:`. Null for anything that
+>> is not a string with a non-empty family, so callers default to deny.
+exe @familyOf(address) = [
+  if !@address.isString() [ => null ]
+  let @i = @address.indexOf(":")
+  if @i < 1 [ => null ]
+  => @address.slice(0, @i)
+]
+
+>> The families a shelf holds, from its slot names. Exports with a `families` parameter
+>> call `@slotNames` because the parameter shadows `@families` inside them.
+exe @slotNames(st) = [
+  if @typeof(@st) != "object" [ => [] ]
+  => for @k, @slot in @st => @k
+]
+exe @families(st) = @slotNames(@st)
+
+>> The families a caller may resolve: the given list, or every slot of the shelf when the
+>> caller passes something that is not a list.
+exe @allowedFamilies(st, families) = [
+  => match [ @typeof(@families) == "array" => @families; * => @slotNames(@st) ]
+]
+
+>> The stored record at an address, or null. The family must be both allowed and a slot of
+>> the shelf: asking the state for a slot it lacks is an error, not a miss.
+exe @find(st, address, families = null) = [
+  let @family = @familyOf(@address)
+  if @family == null [ => null ]
+  if !@allowedFamilies(@st, @families).includes(@family) [ => null ]
+  if !@slotNames(@st).includes(@family) [ => null ]
+  let @rec = @st.byAddress(@family, @address)
+  => match [ @rec.isDefined() => @rec; * => null ]
+]
+
+>> ── {ref} citations ──
+
+>> True exactly for `{ ref: { address: <string>, field: <string> } }`.
+exe @isRef(v) = [
+  if @typeof(@v) != "object" [ => false ]
+  let @ref = @v.ref
+  if @typeof(@ref) != "object" [ => false ]
+  => @ref.address.isString() && @ref.field.isString()
+]
+
+>> Whether `field` is one of the record's own fields, so a cited field name can never reach
+>> the record's metadata (`mx`) or a method.
+exe @hasField(rec, field) = [
+  let @names = for @k, @v in @rec => @k
+  => @names.includes(@field)
+]
+
+>> The field value a ref cites, or null. Returned straight from the record so its labels
+>> and proof come with it.
+exe @resolveRef(refObj, st, families = null) = [
+  if !@isRef(@refObj) [ => null ]
+  let @rec = @find(@st, @refObj.ref.address, @families)
+  if @rec == null [ => null ]
+  if !@hasField(@rec, @refObj.ref.field) [ => null ]
+  => @rec[@refObj.ref.field]
+]
+
+>> The first arg whose value is a ref that does not resolve, as `{ arg, addr }`, so a caller
+>> can deny with the address in hand instead of a bare grant refusal. Null when every ref
+>> resolves.
+exe @unresolvedArg(name, value, st, families = null) = [
+  if !@isRef(@value) [ => null ]
+  if @resolveRef(@value, @st, @families) != null [ => null ]
+  => { arg: @name, addr: @value.ref.address }
+]
+
+exe @firstUnresolved(args, st, families = null) = [
+  if @typeof(@args) != "object" [ => null ]
+  let @misses = for @name, @value in @args => @unresolvedArg(@name, @value, @st, @families)
+  let @hits = for @m in @misses if @m != null => @m
+  => match [ @hits.length > 0 => @hits[0]; * => null ]
+]
+
+export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved }

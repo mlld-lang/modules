@@ -1,0 +1,116 @@
+>> Tests for @mlld/shelf: address lookup and {ref} resolution.
+>> Run: mlld test shelf/tests/
+
+import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved } from "../index.mld"
+
+record @contact [
+  key id
+  id: string [ kind "contact" ]
+  name: string
+  * { read: [id, name] }
+  .role:worker { write: { shelves: true } }
+]
+record @note [
+  key id
+  id: string [ kind "note" ]
+  text: string
+  * { read: [id, text] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkContact(i, n) = { id: @i, name: @n } => contact
+exe @mkNote(i, t) = { id: @i, text: @t } => note
+const @recs = { contact: @contact, note: @note }
+state @st from @recs
+
+exe .role:worker @put(s, slot, r) = [
+  let @w = @s.upsert(@slot, @r)
+  => "stored"
+]
+const @ann = @mkContact("c1", "Ann")
+const @memo = @mkNote("n1", "call Ann")
+const @s1 = @put(@st, "contact", @ann)
+const @s2 = @put(@st, "note", @memo)
+const @annAddr = @st.contact[0].mx.address.string
+const @memoAddr = @st.note[0].mx.address.string
+
+>> ── familyOf ──
+const @test_familyOf_prefix = @familyOf("contact:c1") == "contact"
+const @test_familyOf_first_colon = @familyOf("contact:a:b") == "contact"
+const @test_familyOf_no_colon = @familyOf("contact") == null
+const @test_familyOf_empty_family = @familyOf(":x") == null
+const @test_familyOf_empty = @familyOf("") == null
+const @test_familyOf_not_string = @familyOf(42) == null
+>> Core resolves a `{ handle }` argument before any exe body runs, and refuses an unknown
+>> handle there; either way no family comes back.
+const @handleTry = try @familyOf({ handle: "contact:c1" })
+const @test_familyOf_handle_object = !@handleTry.ok || @handleTry.value == null
+
+>> ── families ──
+const @test_families_slots = @families(@st).join(",") == "contact,note"
+const @test_families_not_state = @families("x").length == 0
+
+>> ── find ──
+const @test_find_record = @find(@st, @annAddr).name == "Ann"
+const @test_find_with_families = @find(@st, @memoAddr, ["note"]).text == "call Ann"
+const @test_find_family_not_allowed = @find(@st, @annAddr, ["note"]) == null
+const @test_find_non_list_families_defaults = @find(@st, @annAddr, "note").name == "Ann"
+const @test_find_missing = @find(@st, "contact:nobody") == null
+const @test_find_unknown_family = @find(@st, "nope:c1") == null
+const @test_find_allowed_but_no_slot = @find(@st, "nope:c1", ["nope"]) == null
+
+>> ── isRef ──
+const @test_isRef_ref = @isRef({ ref: { address: "contact:c1", field: "id" } })
+const @test_isRef_field_not_string = !@isRef({ ref: { address: "contact:c1", field: 1 } })
+const @test_isRef_no_field = !@isRef({ ref: { address: "contact:c1" } })
+const @test_isRef_ref_not_object = !@isRef({ ref: "contact:c1" })
+const @test_isRef_string = !@isRef("contact:c1")
+const @test_isRef_null = !@isRef(null)
+
+>> ── resolveRef ──
+const @annRef = { ref: { address: @annAddr, field: "name" } }
+const @test_resolveRef_value = @resolveRef(@annRef, @st) == "Ann"
+const @test_resolveRef_not_ref = @resolveRef("contact:c1", @st) == null
+const @test_resolveRef_no_record = @resolveRef({ ref: { address: "contact:nobody", field: "name" } }, @st) == null
+const @test_resolveRef_no_field = @resolveRef({ ref: { address: @annAddr, field: "phone" } }, @st) == null
+const @test_resolveRef_metadata_is_not_a_field = @resolveRef({ ref: { address: @annAddr, field: "mx" } }, @st) == null
+const @test_resolveRef_family_not_allowed = @resolveRef(@annRef, @st, ["note"]) == null
+
+>> ── firstUnresolved ──
+const @goodArgs = { to: @annRef, subject: "hi" }
+const @badArgs = { to: @annRef, cc: { ref: { address: "contact:nobody", field: "name" } }, bcc: { ref: { address: "contact:gone", field: "name" } } }
+const @test_firstUnresolved_all_resolve = @firstUnresolved(@goodArgs, @st) == null
+const @miss = @firstUnresolved(@badArgs, @st)
+const @test_firstUnresolved_first_miss = @miss.arg == "cc" && @miss.addr == "contact:nobody"
+const @test_firstUnresolved_family_not_allowed = @firstUnresolved(@goodArgs, @st, ["note"]).arg == "to"
+const @test_firstUnresolved_not_object = @firstUnresolved("x", @st) == null
+
+>> ── ref-resolves-with-proof ──
+>> The contact's `id` is a fact. Resolved through a ref it keeps its proof, so it mints a
+>> grant on a tool whose input field accepts any fact. The same text typed by hand carries
+>> no proof and is refused.
+record @sendInputs [ to: string [ kind "to"; accepts .fact:* ]; validate "strict" ]
+exe .op:tool:w @send(to) = `sent:${@to}`
+tools @T = { send: { mlld: @send, inputs: @sendInputs, labels: [.op:tool:w] } }
+policy @pol = { .role:planner { can_authorize: ["send"] } }
+
+const @granted = { args: { to: @resolveRef({ ref: { address: @annAddr, field: "id" } }, @st) } } as grant for @send
+const @test_ref_resolves_with_proof = @granted.tool.name == "send"
+
+const @typed = try { args: { to: "c1" } } as grant for @send
+const @test_ref_typed_by_hand_refused = !@typed.ok && @typed.error.message.includes("carries no proof")
+
+>> ── security row ──
+>> Attacker-shaped addresses never throw and never reach a record, of any family.
+const @x = "x"
+const @long = `contact:${@x.repeat(9992)}`
+const @hostile = ["../x", "contact:", ":", @long, 42, null, {}]
+const @found = for @a in @hostile => @find(@st, @a)
+const @test_security_find_null = @found.every(@item == null)
+const @resolved = for @a in @hostile => @resolveRef({ ref: { address: @a, field: "name" } }, @st)
+const @test_security_resolveRef_null = @resolved.every(@item == null)
+const @test_security_long_is_long = @hostile[3].length == 10000
+
+>> ── no role labels ──
+>> An exe with a role label would run its writes as that role instead of the caller's.
+const @source = <../index.mld>
+const @test_no_role_label = !@source.includes("exe .role:")
