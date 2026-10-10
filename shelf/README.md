@@ -172,7 +172,7 @@ fyi @shelfView = { observed: @render(@st, null, { cache: [".role:planner"] }), p
 ```
 
 - The cache is used only when the role active at the call is listed in `cache`. Otherwise `@render` renders as usual.
-- Each slot's text is kept per state, role and slot. A state is told apart by its id (`@st.mx.id`), which stays the same when the state is passed as a parameter or as `.readonly()`, and is new for each call of an exe that declares the state. Every write to a slot bumps its version (see Versions), so a write is always shown on the next render, and the old text is replaced.
+- Each slot's text is kept per state, role and slot. A state is told apart by its id (`@st.mx.id`), which stays the same when the state is passed as a parameter, and is new for each call of an exe that declares the state. Every write to a slot bumps its version (see Versions), so a write is always shown on the next render, and the old text is replaced.
 - `key` is optional: `{ cache: [...], key: { id: "…" } }` keys the entries by `key.id` instead of the state's id. `@cacheFor(st)` returns `{ id }` holding the state's id, so `key: @cacheFor(@st)` still works and is no longer needed.
 - The cache lives in the module's own state, so the caller needs no write grant for it. Cached text keeps every label of the uncached render, and also carries `.src:state:@renderCache.…` labels naming that state.
 - A rendered line never contains a handle; a slot whose text would hold one of the session's handles is not cached.

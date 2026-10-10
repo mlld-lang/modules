@@ -403,7 +403,7 @@ exe @perCallRender(t) = [
 const @pc1 = @perCallRender("first call")
 const @pc2 = @perCallRender("second call")
 const @test_cache_per_call_keyless = @pc1.includes("first call") && !@pc1.includes("second call") && @pc2.includes("second call") && !@pc2.includes("first call")
->> A read-only view has the state's id, so a cached render through it keys the same entries.
+>> A read-only view has the state's id. (A render through one shows no records: core gives its slots no version.)
 const @rsKeyless = @renderPlannerKeyless(@rs)
 const @test_cache_readonly_same_id = @cacheFor(@rs.readonly()).id == @cacheFor(@rs).id && @rsKeyless == @plainPlanner
 >> 5. A write between two cached renders shows the new record.
