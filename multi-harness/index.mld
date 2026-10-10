@@ -1,7 +1,7 @@
 ---
 name: multi-harness
 author: mlld
-version: 0.2.0
+version: 0.3.0
 about: One @agent that runs claude, codex, pi or opencode, picked by config.harness or the first one ready
 license: CC0
 ---
@@ -20,52 +20,105 @@ exe @raise(message) = js {
 
 exe @unknownHarness(harness) = @raise(`multi-harness: unknown harness '${@harness}' (supported: auto, claude, codex, pi, opencode)`)
 
->> Each check prints "ready" or why not, and never calls a model, so auto costs
+>> ── Sign-in checks ──
+>>
+>> Each check answers "ready" or why not, and never calls a model, so auto costs
 >> nothing. A check failing for an unexpected reason only skips to the next tool.
->> The bin argument is the config's …Bin key; empty means the tool on PATH.
+>> The bin argument is the config's …Bin key: a file named after the tool whose
+>> folder goes first on PATH for the check, as the harness module does for the
+>> run; empty means the tool on PATH. Each command writes its program literally
+>> because mlld refuses a command whose program comes from a variable.
+
+>> mlld reads only a few named environment variables, so these come from the shell.
+exe @shellPath() = cmd { printf '%s' "$PATH" }
+exe @piAgentDir() = cmd { printf '%s' "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" }
+exe @xdgDataHome() = cmd { printf '%s' "${XDG_DATA_HOME:-$HOME/.local/share}" }
+
+>> `command -v` runs nothing; it fails when the name isn't found.
+exe @onPath(name) = cmd { command -v "$name" }
+exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
+>> Fails when the variable is unset or empty; its value never enters mlld.
+exe @envSet(key) = cmd { printenv "$key" | grep -q . }
+
+>> The PATH a check runs with: "" for the tool on PATH, the bin's folder in front
+>> otherwise, or null when bin is not an absolute path to a runnable file called
+>> `name` (a `:` would split PATH).
+exe @checkPath(bin, name) = [
+  if !@bin || @bin == @name [
+    let @found = try @onPath(@name)
+    => @found.ok ? "" : null
+  ]
+  if !@bin.startsWith("/") || !@bin.endsWith(`/${@name}`) || @bin.includes(":") [ => null ]
+  let @found = try @isExecutable(@bin)
+  if !@found.ok [ => null ]
+  => `${@bin.slice(0, @bin.length - @name.length - 1)}:${@shellPath()}`
+]
+
+exe @claudeAuthStatus() = cmd { env -u CLAUDECODE claude auth status --json }
+exe @codexLoginStatus() = cmd { codex login status }
+exe @piAuthCheck(provider) = cmd { pi auth check --provider "$provider" --json }
+
 >> A check runs the tool itself, which may write its own state (pi locks its
 >> auth file), so it gets the same fence profile as that tool's harness; only
 >> `llm` definitions can declare one.
-llm @claudeStatus(bin) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = sh {
-  b="${bin:-claude}"
-  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
-  out=$(env -u CLAUDECODE "$b" auth status --json 2>/dev/null) || { printf 'not signed in'; exit 0; }
-  if printf '%s' "$out" | grep -q '"loggedIn"[[:space:]]*:[[:space:]]*true'; then printf 'ready'; else printf 'not signed in'; fi
-}
+llm @claudeStatus(bin) using { harness: { write: [".", "~/.claude", "~/.claude.json"], net: "open" } } = [
+  let @path = @checkPath(@bin, "claude")
+  if @path == null [ => "not installed" ]
+  let @out = match [
+    @path => try @claudeAuthStatus() using { env: { PATH: @path } }
+    * => try @claudeAuthStatus()
+  ]
+  if !@out.ok [ => "not signed in" ]
+  let @status = try @out.value | @parse
+  => @status.ok && @status.value.loggedIn == true ? "ready" : "not signed in"
+]
 
-llm @codexStatus(bin) using { harness: { write: [".", "~/.codex"], net: "open" } } = sh {
-  b="${bin:-codex}"
-  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
-  if "$b" login status >/dev/null 2>&1; then printf 'ready'; else printf 'not signed in'; fi
-}
+llm @codexStatus(bin) using { harness: { write: [".", "~/.codex"], net: "open" } } = [
+  let @path = @checkPath(@bin, "codex")
+  if @path == null [ => "not installed" ]
+  let @out = match [
+    @path => try @codexLoginStatus() using { env: { PATH: @path } }
+    * => try @codexLoginStatus()
+  ]
+  => @out.ok ? "ready" : "not signed in"
+]
 
 >> `pi auth check` needs a provider, so without config.provider this uses the
 >> defaultProvider from pi's own settings, as a pi run would.
-llm @piStatus(bin, provider) using { harness: { write: [".", "~/.pi/agent"], net: "open" } } = sh {
-  b="${bin:-pi}"
-  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
-  p="$provider"
-  if [ -z "$p" ]; then
-    settings="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/settings.json"
-    [ -f "$settings" ] && p=$(sed -n 's/.*"defaultProvider"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$settings" | head -n 1)
-  fi
-  [ -n "$p" ] || { printf 'not signed in (no provider set)'; exit 0; }
-  out=$("$b" auth check --provider "$p" --json 2>/dev/null)
-  if printf '%s' "$out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ready"'; then printf 'ready'; else printf 'not signed in'; fi
-}
+exe @piDefaultProvider() = [
+  let @settingsPath = `${@piAgentDir()}/settings.json`
+  let @settings = try <@settingsPath>
+  => @settings.ok && @settings.value.defaultProvider.isString() ? @settings.value.defaultProvider : ""
+]
+
+llm @piStatus(bin, provider) using { harness: { write: [".", "~/.pi/agent"], net: "open" } } = [
+  let @path = @checkPath(@bin, "pi")
+  if @path == null [ => "not installed" ]
+  let @p = @provider ? @provider : @piDefaultProvider()
+  if !@p [ => "not signed in (no provider set)" ]
+  let @out = match [
+    @path => try @piAuthCheck(@p) using { env: { PATH: @path } }
+    * => try @piAuthCheck(@p)
+  ]
+  if !@out.ok [ => "not signed in" ]
+  let @status = try @out.value | @parse
+  => @status.ok && @status.value.status == "ready" ? "ready" : "not signed in"
+]
 
 >> Reads opencode's auth file instead of running `opencode auth list`, so the
 >> check starts no opencode process. A <PROVIDER>_API_KEY variable also counts,
 >> since opencode reads those too.
-exe @opencodeStatus(bin, model, dataHome) = sh {
-  b="${bin:-opencode}"
-  command -v "$b" >/dev/null 2>&1 || { printf 'not installed'; exit 0; }
-  p="${model%%/*}"
-  auth="${dataHome:-${XDG_DATA_HOME:-$HOME/.local/share}}/opencode/auth.json"
-  if [ -f "$auth" ] && grep -q "\"$p\"[[:space:]]*:" "$auth"; then printf 'ready'; exit 0; fi
-  key="$(printf '%s' "$p" | tr 'a-z-' 'A-Z_')_API_KEY"
-  if [ -n "$(printenv "$key")" ]; then printf 'ready'; else printf 'not signed in'; fi
-}
+exe @opencodeStatus(bin, model, dataHome) = [
+  if @checkPath(@bin, "opencode") == null [ => "not installed" ]
+  let @p = @model.split("/")[0]
+  let @dataDir = @dataHome ? @dataHome : @xdgDataHome()
+  let @authPath = `${@dataDir}/opencode/auth.json`
+  let @auth = try <@authPath>
+  if @auth.ok && @auth.value[@p].isDefined() [ => "ready" ]
+  let @key = `${@p.toUpperCase().replaceAll("-", "_")}_API_KEY`
+  let @hasKey = try @envSet(@key)
+  => @hasKey.ok ? "ready" : "not signed in"
+]
 
 >> The tool config.harness names; for "auto" or no harness, the first ready one
 >> in the order claude, codex, pi, opencode, logged to stderr. Checks stop at the

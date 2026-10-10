@@ -1,0 +1,20 @@
+>> The sign-in checks under a policy with command rules: every program is written
+>> literally and each …Bin reaches its stub through the check's PATH, so none is
+>> refused.
+>> Run: mlld test multi-harness/tests/
+
+import { @pickHarness } from "../index.mld"
+
+policy @rules = { * { capabilities: { deny: ["cmd:rm"] } } }
+
+const @f = `${@root}/multi-harness/tests/fixtures/auto`
+const @none = "/nonexistent/bin"
+
+const @allReady = { claudeBin: `${@f}/claude-ready/claude`, codexBin: `${@f}/codex-ready/codex`, piBin: `${@f}/pi-ready/pi`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "stubprov/x", dataHome: `${@f}/opencode-data` }
+const @test_claude_check_under_policy = @pickHarness(@allReady) == "claude"
+
+const @piOnly = { claudeBin: `${@f}/claude-signed-out/claude`, codexBin: `${@f}/codex-signed-out/codex`, piBin: `${@f}/pi-ready/pi`, provider: "stubprov", opencodeBin: @none }
+const @test_pi_check_under_policy = @pickHarness(@piOnly) == "pi"
+
+const @opencodeOnly = { claudeBin: @none, codexBin: @none, piBin: `${@f}/pi-signed-out/pi`, provider: "stubprov", opencodeBin: `${@f}/opencode`, model: "stubprov/x", dataHome: `${@f}/opencode-data` }
+const @test_opencode_check_under_policy = @pickHarness(@opencodeOnly) == "opencode"

@@ -1,0 +1,13 @@
+XDG_DATA_HOME=
+XDG_STATE_HOME=
+OPENCODE_CONFIG_CONTENT=
+arg=run
+arg=--format
+arg=json
+arg=-s
+arg=ses_abc
+arg=line one
+line 'two' "q" $HOME
+
+
+end

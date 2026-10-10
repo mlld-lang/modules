@@ -2,10 +2,10 @@
 >> prints the directory it ran in, each argument, and its stdin. No model is called.
 >> Run: mlld test claude/tests/
 
-import { @claude, @runClaudeSh } from "../index.mld"
+import { @claude, @runClaude } from "../index.mld"
 
 const @fixtures = `${@root}/claude/tests/fixtures/run`
-const @stub = `${@fixtures}/claude-stub.sh`
+const @stub = `${@fixtures}/bin/claude`
 const @workdir = `${@fixtures}/workdir`
 const @sid = "3f2a1b4c-0000-4000-8000-abcdef000002"
 >> @claude normalizes a session id to uppercase before passing it on.
@@ -77,18 +77,18 @@ const @tricky = "a `backtick`, a \"quote\" and $(echo no) plus $HOME"
 const @echoed = @claude(@tricky, { claudeBin: @stub })
 const @test_prompt_unchanged_on_stdin = @stdinOf(@echoed) == @tricky
 
->> ── @runClaudeSh directly: flags @claude only sets from the tool bridge ──
+>> ── @runClaude directly: flags @claude only sets from the tool bridge ──
 
-const @tooled = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "", "", "", "/tmp/mcp config.json", "Read,Write Bash", "Edit", "", @stub)
+const @tooled = @runClaude("hi", "", "sonnet", "", "", "", "", "", "", "", "/tmp/mcp config.json", "Read,Write Bash", "Edit", "", @stub)
 const @test_mcp_allowed_disallowed = @argv(@tooled) == "-p|--model|sonnet|--mcp-config|/tmp/mcp config.json|--strict-mcp-config|--allowedTools|Read,Write Bash|--disallowedTools|Edit"
 
-const @emptyNative = @runClaudeSh("hi", "", "sonnet", "", "", "", "", "1", "", "", "", "", "", "", @stub)
+const @emptyNative = @runClaude("hi", "", "sonnet", "", "", "", "", "1", "", "", "", "", "", "", @stub)
 const @test_empty_native_tools_keeps_empty_value = @argv(@emptyNative) == "-p|--model|sonnet|--tools|"
 
-const @forkFlag = @runClaudeSh("hi", "", "sonnet", "1", "", "", "", "", @sid, "", "", "", "", "1", @stub)
+const @forkFlag = @runClaude("hi", "", "sonnet", "1", "", "", "", "", @sid, "", "", "", "", "1", @stub)
 const @test_fork_flag_follows_resume = @argv(@forkFlag) == `-p|--bare|--model|sonnet|--resume|${@sid}|--fork-session`
 
-const @missingDir = try @runClaudeSh("hi", `${@fixtures}/nonexistent`, "sonnet", "", "", "", "", "", "", "", "", "", "", "", @stub)
+const @missingDir = try @runClaude("hi", `${@fixtures}/nonexistent`, "sonnet", "", "", "", "", "", "", "", "", "", "", "", @stub)
 const @test_missing_dir_fails = !@missingDir.ok
 
 >> ── runtime continue: fork, never resume in place ──

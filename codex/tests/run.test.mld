@@ -1,8 +1,8 @@
->> Tests for the codex command line @codex and @runCodexSh build, against stub
+>> Tests for the codex command line @codex and @runCodex build, against stub
 >> codexes that print the arguments they were given. No model is called.
 >> Run: mlld test codex/tests/
 
-import { @codex, @parseCodexJsonl, @runCodexSh } from "../index.mld"
+import { @codex, @codexMcpConfigArg, @parseCodexJsonl, @runCodex } from "../index.mld"
 
 const @stub = `${@root}/codex/tests/fixtures/bin/codex`
 const @sid = "0c0ffee0-1234-4321-8abc-def012345678"
@@ -28,9 +28,9 @@ const @test_runtime_resume_without_fork_unchanged = @resumed == `stub codex: exe
 const @forkOutput = @parseCodexJsonl("{\"type\":\"thread.started\",\"thread_id\":\"0199a213-81c0-7800-8aa1-bbab2a035a53\"}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"ok\"}}\n")
 const @test_fork_reports_new_thread_id = @forkOutput.sessionId == "0199a213-81c0-7800-8aa1-bbab2a035a53" && @forkOutput.sessionId != @sid
 
->> ── @runCodexSh directly: the whole argument list ──
+>> ── @runCodex directly: the whole argument list ──
 
-const @argStub = `${@root}/codex/tests/fixtures/run/codex-stub.sh`
+const @argStub = `${@root}/codex/tests/fixtures/run/bin/codex`
 const @workdir = `${@root}/codex/tests/fixtures/run/workdir`
 
 >> The arguments the stub saw, joined with | so a whole command line compares at once.
@@ -39,22 +39,48 @@ exe @argv(out) = js {
 }
 
 >> codex 0.154 removed --full-auto; workspace-write is the sandbox it stood for.
-const @plain = @runCodexSh("hi", @workdir, "gpt-5.4", "", "", "", "", "", "", "", @argStub)
+const @plain = @runCodex("hi", @workdir, "gpt-5.4", "", "", "", "", "", "", "", @argStub)
 const @test_default_sandbox_line = @argv(@plain) == "exec|--json|--skip-git-repo-check|-s|workspace-write|-m|gpt-5.4|-"
 const @test_default_no_full_auto = !@argv(@plain).includes("--full-auto")
 
-const @readOnly = @runCodexSh("hi", @workdir, "gpt-5.4", "read-only", "", "", "", "", "", "", @argStub)
+const @readOnly = @runCodex("hi", @workdir, "gpt-5.4", "read-only", "", "", "", "", "", "", @argStub)
 const @test_read_only_line = @argv(@readOnly) == "exec|--json|--skip-git-repo-check|-s|read-only|-m|gpt-5.4|-"
 
-const @bypassed = @runCodexSh("hi", @workdir, "gpt-5.4", "", "", "1", "", "", "", "", @argStub)
+const @bypassed = @runCodex("hi", @workdir, "gpt-5.4", "", "", "1", "", "", "", "", @argStub)
 const @test_bypass_line = @argv(@bypassed) == "exec|--json|--skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox|-m|gpt-5.4|-"
 
 >> codex refuses a sandbox flag after the resume and fork subcommands.
-const @resumedDirect = @runCodexSh("hi", @workdir, "gpt-5.4", "", "", "", "", "1", @sid, "", @argStub)
+const @resumedDirect = @runCodex("hi", @workdir, "gpt-5.4", "", "", "", "", "1", @sid, "", @argStub)
 const @test_resume_sandbox_before_subcommand = @argv(@resumedDirect) == `exec|-s|workspace-write|resume|${@sid}|--json|--skip-git-repo-check|-m|gpt-5.4|-`
 
-const @resumedBypass = @runCodexSh("hi", @workdir, "gpt-5.4", "", "", "1", "", "1", @sid, "", @argStub)
+const @resumedBypass = @runCodex("hi", @workdir, "gpt-5.4", "", "", "1", "", "1", @sid, "", @argStub)
 const @test_resume_bypass_before_subcommand = @argv(@resumedBypass) == `exec|--dangerously-bypass-approvals-and-sandbox|resume|${@sid}|--json|--skip-git-repo-check|-m|gpt-5.4|-`
 
-const @forkedDirect = @runCodexSh("hi", @workdir, "gpt-5.4", "", "", "", "", "1", @sid, "1", @argStub)
+const @forkedDirect = @runCodex("hi", @workdir, "gpt-5.4", "", "", "", "", "1", @sid, "1", @argStub)
 const @test_fork_sandbox_before_subcommand = @argv(@forkedDirect) == `exec|-s|workspace-write|fork|${@sid}|--json|--skip-git-repo-check|-m|gpt-5.4|-`
+
+const @searched = @runCodex("hi", @workdir, "", "", "1", "", "", "", "", "", @argStub)
+const @test_search_without_model_line = @argv(@searched) == "exec|--json|--skip-git-repo-check|-s|workspace-write|--search|-"
+
+>> ── MCP servers: one -c argument carries all of them ──
+
+>> Two servers, with a space, a quote, a backslash and a $ that must arrive as
+>> written, an env key and a server name that are dropped, and a url server.
+const @mcpTwo = @codexMcpConfigArg(`${@root}/codex/tests/fixtures/run/mcp-two.json`)
+const @mcpTwoExpected = <@root/codex/tests/fixtures/run/mcp-two.expected>
+const @test_mcp_two_servers_one_table = @mcpTwo == @mcpTwoExpected
+const @test_mcp_missing_file_is_empty = @codexMcpConfigArg(`${@root}/codex/tests/fixtures/run/absent.json`) == ""
+
+const @mcpBypassed = @runCodex("hi", @workdir, "gpt-5.4", "", "", "1", @mcpTwo, "", "", "", @argStub)
+const @test_mcp_single_argument = @argv(@mcpBypassed) == `exec|--json|--skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox|-m|gpt-5.4|-c|${@mcpTwoExpected}|-`
+
+const @mcpForked = @runCodex("hi", @workdir, "gpt-5.4", "", "", "", @mcpTwo, "1", @sid, "1", @argStub)
+const @test_mcp_fork_line = @argv(@mcpForked) == `exec|-s|workspace-write|fork|${@sid}|--json|--skip-git-repo-check|-m|gpt-5.4|-c|${@mcpTwoExpected}|-`
+
+>> Through @codex: a tools collection makes the runtime's bridge config, which
+>> arrives as one -c holding the mlld_tools server.
+exe @greet(name) = js { return "hi " + name; }
+tools @greeting = { greet: { call: @greet } }
+const @bridged = @codex("hi", { codexBin: @argStub, bypass: true, tools: [@greeting] })
+const @bridgedArgs = @argv(@bridged).split("|")
+const @test_tools_bridge_one_c = @bridgedArgs.filter(@item == "-c").length == 1 && @argv(@bridged).includes("|-c|mcp_servers={ mlld_tools = { command = ")

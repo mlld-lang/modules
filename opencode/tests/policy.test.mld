@@ -1,0 +1,33 @@
+>> @opencode under a policy with command rules: the program is the literal
+>> `opencode`, and opencodeBin reaches its stub through the call's PATH, so
+>> neither is refused.
+>> Run: mlld test opencode/tests/
+
+import { @opencode } from "../index.mld"
+
+policy @rules = { * { capabilities: { deny: ["cmd:rm"] } } }
+
+const @stub = `${@root}/opencode/tests/fixtures/bin/opencode`
+
+const @out = @opencode("hi", { opencodeBin: @stub, dir: "/work" })
+const @test_stub_runs_under_policy = @out == "stub opencode: run --format json --dir /work -m openrouter/z-ai/glm-5.1 hi "
+
+>> Only a file named opencode can be put in front on PATH.
+const @misnamed = try @opencode("hi", { opencodeBin: `${@root}/opencode/tests/fixtures/bin` })
+const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.includes("config.opencodeBin must be an absolute path to a file named opencode")
+
+>> A missing file would otherwise fall through to the opencode on PATH.
+const @missing = try @opencode("hi", { opencodeBin: "/nonexistent/opencode" })
+const @test_missing_bin_refused = !@missing.ok && @missing.error.message.includes("config.opencodeBin is not an executable file")
+
+>> A folder named opencode (like ~/.config/opencode) would otherwise fall
+>> through to the opencode on PATH.
+const @folder = try @opencode("hi", { opencodeBin: `${@root}/opencode/tests/fixtures/folder/opencode` })
+const @test_folder_bin_refused = !@folder.ok && @folder.error.message.includes("config.opencodeBin is not an executable file")
+
+const @relative = try @opencode("hi", { opencodeBin: "opencode/tests/fixtures/bin/opencode" })
+const @test_relative_bin_refused = !@relative.ok && @relative.error.message.includes("must be an absolute path")
+
+>> A ':' splits the PATH entry, so the lookup would miss the folder.
+const @colon = try @opencode("hi", { opencodeBin: "/a:b/opencode" })
+const @test_colon_bin_refused = !@colon.ok && @colon.error.message.includes("must not contain ':'")

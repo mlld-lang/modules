@@ -61,7 +61,7 @@ This is the same pattern as the Claude and Opencode modules.
 | `model` | Model pattern or provider/id (default: provider default) |
 | `provider` | Provider name: google, anthropic, openai, etc. (default: google) |
 | `dir` | Working directory (default: @root) |
-| `system` | System prompt appended to default |
+| `system` | System prompt appended to default. pi reads it from a temporary file that `@pi` removes with `rm` afterwards, so a policy that denies `rm` refuses a call that sets it |
 | `tools` | Tool collection or array of tool references |
 | `noTools` | Boolean, disable all tools |
 | `thinking` | Thinking level: off, minimal, low, medium, high, xhigh |
@@ -69,6 +69,7 @@ This is the same pattern as the Claude and Opencode modules.
 | `session` | `false` to save nothing (see Sessions) |
 | `sessionId` | UUID naming the session; an existing one is continued (see Sessions) |
 | `agentDir` | pi agent directory whose `sessions/` folder saves go to (default `$PI_CODING_AGENT_DIR`, else `~/.pi/agent`); must be one the sandbox grants |
+| `piBin` | An absolute path to a file named `pi` to run instead of `pi` on PATH, for tests: its folder goes first on PATH for the call. Any other file name, a missing file, a relative path, or a path containing `:` is refused, because a command may not take its program from a variable |
 
 ## Sessions
 
@@ -90,7 +91,7 @@ const @id = "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
 @pi("Quick question", { session: false })
 ```
 
-`@runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, agentDir, forkId, piBin)` has optional trailing parameters. When `sessionId` is empty or left out it runs pi with `--no-session`, so direct callers passing eight arguments keep the earlier behaviour. An empty `agentDir` means pi's own. `@piSession(config)` picks the id and agent directory for a call, and `@piResult(value, session)` wraps a result with its session id.
+`@runPi(prompt, dir, provider, model, systemArg, noTools, native, mcpConfig, flags, thinking, mode, sessionId, agentDir, forkId, piBin)` runs pi with each flag as its own argument; an empty value leaves its flag off. `noTools`, `native` and `mcpConfig` are pi's `--no-tools`, `--tools` and `--mcp-config`, and `flags` is extra raw flags, split on spaces. When `sessionId` is empty it runs pi with `--no-session`. An empty `agentDir` means pi's own. `@piSession(config)` picks the id and agent directory for a call, and `@piResult(value, session)` wraps a result with its session id.
 
 ## Sandbox
 
@@ -119,7 +120,7 @@ These can be selectively enabled via the native tools list.
 | `@piStreamFormat` | Stream format adapter |
 | `@piBuiltInTools` | pi's built-in tool names, comma-separated |
 | `@isPiBuiltin(name)` | Whether a tool is one of pi's built-ins |
-| `@runPiSh(...)` | Shell wrapper that runs pi (see Sessions) |
+| `@runPi(...)` | Runs pi with flags given one by one (see Sessions) |
 | `@piSession(config)` | Session id and agent directory for a call |
 | `@piResult(value, session)` | Result with its session id attached |
 | `@conversation` | Find and read saved pi sessions (below) |

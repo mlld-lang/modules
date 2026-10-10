@@ -1,4 +1,4 @@
-needs { sh }
+needs { js: [], node: [] }
 
 >> ── Stream format adapter for Codex CLI JSONL output (codex exec --json) ──
 const @codexStreamFormat = {
@@ -157,120 +157,126 @@ exe @codexResult(inputValue, resume) = match [
 >>
 >> The runtime-generated MCP config at @mx.llm.config is a JSON file shaped like
 >> `{ mcpServers: { name: { command, args, env, url } } }` (Claude's format).
->> Codex consumes the same bridges via repeated `-c mcp_servers.<name>.*` TOML
->> overrides on the command line.
->>
->> We write each CLI argument on its own line to a temp file. The sh block below
->> reads the file into a bash array via `read -r`, so TOML string values (which
->> must contain literal `"`) survive without any shell-escaping collisions with
->> mlld's interpolation — see ticket m-8694 for the underlying bug where `cmd`
->> block interpolation mangles `"` when the command is argv-spawned.
-exe @codexMcpArgsFile(configPath) = node {
+>> Codex reads a `-c` value as TOML, so every server goes into one inline-table
+>> override, `-c 'mcp_servers={ name = { command = …, args = […] }, … }'`, which
+>> codex merges with the user's own [mcp_servers.*] rather than replacing them.
+>> One argument is what lets the `cmd` bodies below pass a variable number of
+>> servers; it reaches codex as a parameter, never parsed as command text, so its
+>> quotes and backslashes arrive intact. Returns "" when there are no servers.
+exe @codexMcpConfigArg(configPath) = node {
   if (!configPath) return "";
   const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
   if (!fs.existsSync(configPath)) return "";
   let parsed;
   try { parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { return ""; }
   const servers = parsed && parsed.mcpServers;
-  if (!servers || typeof servers !== 'object' || !Object.keys(servers).length) {
-    return "";
-  }
+  if (!servers || typeof servers !== 'object') return "";
 
   const tomlString = (s) =>
     '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
-  const args = [];
+  const tables = [];
   for (const [name, spec] of Object.entries(servers)) {
     if (!spec || typeof spec !== 'object') continue;
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) continue;
+    const fields = [];
     if (typeof spec.command === 'string') {
-      args.push('-c', `mcp_servers.${name}.command=${tomlString(spec.command)}`);
+      fields.push(`command = ${tomlString(spec.command)}`);
     }
     if (Array.isArray(spec.args)) {
-      args.push('-c', `mcp_servers.${name}.args=[${spec.args.map(tomlString).join(', ')}]`);
+      fields.push(`args = [${spec.args.map(tomlString).join(', ')}]`);
     }
     if (spec.env && typeof spec.env === 'object') {
       const entries = Object.entries(spec.env)
         .filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))
         .map(([k, v]) => `${k} = ${tomlString(v)}`)
         .join(', ');
-      if (entries) {
-        args.push('-c', `mcp_servers.${name}.env={ ${entries} }`);
-      }
+      if (entries) fields.push(`env = { ${entries} }`);
     }
     if (typeof spec.url === 'string') {
-      args.push('-c', `mcp_servers.${name}.url=${tomlString(spec.url)}`);
+      fields.push(`url = ${tomlString(spec.url)}`);
     }
+    if (fields.length) tables.push(`${name} = { ${fields.join(', ')} }`);
   }
-  if (!args.length) return "";
-  const suffix = Math.random().toString(36).slice(2, 8);
-  const file = path.join(
-    os.tmpdir(),
-    'mlld-codex-mcp-' + process.pid + '-' + Date.now() + '-' + suffix + '.args'
-  );
-  fs.writeFileSync(file, args.join('\n') + '\n', 'utf8');
-  return file;
+  if (!tables.length) return "";
+  return `mcp_servers={ ${tables.join(', ')} }`;
 }
 
->> ── Shell wrapper for codex exec ──
+>> ── codex exec ──
 >>
->> Flat positional params so BashExecutor injects each one as a distinct env var.
->> mlld cmd blocks would double-escape TOML double-quotes in mcpArgsFile entries;
->> routing through sh with env vars sidesteps that entirely (see ticket m-8694).
->> doFork branches resumeId (`codex exec fork`) instead of appending to it.
->> codexBin is last so tests can point it at a stub; empty runs `codex` from PATH.
-exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResume, resumeId, doFork, codexBin) = sh {
-  set -e
-  cd "$dir"
+>> codex refuses the sandbox flag after the fork and resume subcommands, and
+>> neither takes --search, so a continue and a fresh run are separate bodies with
+>> the sandbox flag in different places. Exactly one of sandbox and bypass is set.
+>> The program is written literally because mlld refuses a command whose program
+>> comes from a variable.
+exe @codexExecCmd(prompt, dir, model, sandbox, bypass, search, mcp) = cmd:@dir {
+  codex exec --json --skip-git-repo-check ${sandbox:+-s "$sandbox"} ${bypass:+--dangerously-bypass-approvals-and-sandbox} ${model:+-m "$model"} ${search:+--search} ${mcp:+-c "$mcp"} -
+} with { stdin: @prompt }
 
-  extra=()
-  if [ -n "$mcpArgsFile" ] && [ -f "$mcpArgsFile" ]; then
-    while IFS= read -r line || [ -n "$line" ]; do
-      extra+=("$line")
-    done < "$mcpArgsFile"
-  fi
+exe @codexContinueCmd(prompt, dir, model, sandbox, bypass, mcp, sub, resumeId) = cmd:@dir {
+  codex exec ${sandbox:+-s "$sandbox"} ${bypass:+--dangerously-bypass-approvals-and-sandbox} "$sub" "$resumeId" --json --skip-git-repo-check ${model:+-m "$model"} ${mcp:+-c "$mcp"} -
+} with { stdin: @prompt }
 
-  modelFlag=()
-  if [ -n "$model" ]; then
-    modelFlag=(-m "$model")
-  fi
+>> mlld reads only a few named environment variables, so the caller's PATH comes
+>> from the shell.
+exe @shellPath() = cmd { printf '%s' "$PATH" }
 
-  sandboxFlag=()
-  if [ -n "$sandbox" ]; then
-    sandboxFlag=(-s "$sandbox")
-  elif [ -n "$bypass" ]; then
-    sandboxFlag=(--dangerously-bypass-approvals-and-sandbox)
-  else
-    sandboxFlag=(-s workspace-write)
-  fi
-
-  # codex refuses the sandbox flag after the fork and resume subcommands, and
-  # neither takes --search.
-  if [ -n "$doFork" ]; then
-    printf '%s' "$prompt" | "${codexBin:-codex}" exec "${sandboxFlag[@]}" fork "$resumeId" --json --skip-git-repo-check "${modelFlag[@]}" "${extra[@]}" -
-    exit $?
-  fi
-
-  if [ -n "$doResume" ]; then
-    printf '%s' "$prompt" | "${codexBin:-codex}" exec "${sandboxFlag[@]}" resume "$resumeId" --json --skip-git-repo-check "${modelFlag[@]}" "${extra[@]}" -
-    exit $?
-  fi
-
-  searchFlag=()
-  if [ -n "$search" ]; then
-    searchFlag=(--search)
-  fi
-
-  printf '%s' "$prompt" | "${codexBin:-codex}" exec --json --skip-git-repo-check "${sandboxFlag[@]}" "${modelFlag[@]}" "${searchFlag[@]}" "${extra[@]}" -
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @codexBinError(message) = js {
+  throw new Error(`codex: config.codexBin ${message}`);
 }
+
+exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
+
+>> codexBin runs another codex (a test stub) by putting its folder first on the
+>> call's PATH, so the program stays the literal `codex`. Any path whose folder
+>> the PATH lookup would miss silently runs the codex already on PATH instead,
+>> so it is refused: another file name, a missing file, a relative path (the
+>> lookup resolves it from `dir`, the check from here), or a `:` (it splits PATH).
+exe @codexBinDir(codexBin) = [
+  if !@codexBin || @codexBin == "codex" [ => "" ]
+  if !@codexBin.endsWith("/codex") [ => @codexBinError(`must be a file named codex, got '${@codexBin}'`) ]
+  if !@codexBin.startsWith("/") [ => @codexBinError(`must be an absolute path, got '${@codexBin}'`) ]
+  if @codexBin.includes(":") [ => @codexBinError(`must not contain ':', got '${@codexBin}'`) ]
+  let @found = try @isExecutable(@codexBin)
+  if !@found.ok [ => @codexBinError(`is not an executable file: '${@codexBin}'`) ]
+  => @codexBin.slice(0, -6)
+]
+
+>> doFork branches resumeId (`codex exec fork`) instead of appending to it.
+>> mcp is the @codexMcpConfigArg string. codexBin is last so tests can point it
+>> at a stub; empty runs `codex` from PATH.
+exe @runCodex(prompt, dir, model, sandbox, search, bypass, mcp, doResume, resumeId, doFork, codexBin) = [
+  let @sandboxArg = match [
+    @sandbox => @sandbox
+    @bypass => ""
+    * => "workspace-write"
+  ]
+  let @bypassArg = @sandboxArg ? "" : "1"
+  let @sub = match [
+    @doFork => "fork"
+    @doResume => "resume"
+    * => ""
+  ]
+  let @binDir = @codexBinDir(@codexBin)
+  let @path = match [
+    @binDir => `${@binDir}:${@shellPath()}`
+    * => ""
+  ]
+  => match [
+    @path && @sub => @codexContinueCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @mcp, @sub, @resumeId) using { env: { PATH: @path } }
+    @sub => @codexContinueCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @mcp, @sub, @resumeId)
+    @path => @codexExecCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @search, @mcp) using { env: { PATH: @path } }
+    * => @codexExecCmd(@prompt, @dir, @model, @sandboxArg, @bypassArg, @search, @mcp)
+  ]
+]
 
 >> ── Core invocation ──
 >>
 >> @codex(prompt, config)
 >> config.model     - model name (codex default unless set)
 >> config.dir       - working directory
->> config.codexBin - the codex executable to run (default: codex on PATH)
+>> config.codexBin - absolute path to a file named `codex` to run instead of the one on
+>>                    PATH (a test stub); its folder goes first on the call's PATH
 >> config.sandbox   - read-only | workspace-write | danger-full-access
 >>                    (default: workspace-write)
 >> config.bypass    - boolean, opt into --dangerously-bypass-approvals-and-sandbox
@@ -296,8 +302,6 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
 >> - Always runs codex with `--json` so we can parse thread_id + final message
 >>   + usage regardless of streaming mode. In stream mode the stream adapter
 >>   consumes chunks as they arrive; @raw still holds the full JSONL.
->> - Uses a `sh { }` block instead of `cmd { }` so interpolated values flow as
->>   bash env vars and TOML `"` literals in MCP overrides survive unescaped.
 >> - A runtime resume carrying fork (a continue of a recorded conversation) never
 >>   resumes in place: it runs `codex exec fork <id>` and returns the new thread id
 >>   codex reports, so the runtime records the branch this call wrote.
@@ -308,13 +312,13 @@ llm @codex(prompt, config) using { harness: { write: [".", "~/.codex"], net: "op
   let @sandbox = @cfg.sandbox ? @cfg.sandbox : ""
   let @search = @cfg.search ? "1" : ""
   let @bypass = @cfg.bypass ? "1" : ""
-  let @mcpArgsFile = @mx.llm && @mx.llm.config ? @codexMcpArgsFile(@mx.llm.config) : ""
+  let @mcp = @mx.llm && @mx.llm.config ? @codexMcpConfigArg(@mx.llm.config) : ""
   let @finalPrompt = @cfg.system.isString() && @cfg.system != "" ? @prependSystemPrompt(@prompt, @cfg.system) : @prompt
   let @resume = @codexResume(@cfg)
   let @doResume = @resume.continue && @resume.sessionId ? "1" : ""
   let @resumeId = @resume.sessionId ? @resume.sessionId : ""
   let @doFork = @doResume && @resume.fork ? "1" : ""
-  let @raw = @runCodexSh(@finalPrompt, @dir, @model, @sandbox, @search, @bypass, @mcpArgsFile, @doResume, @resumeId, @doFork, @cfg.codexBin ?? "")
+  let @raw = @runCodex(@finalPrompt, @dir, @model, @sandbox, @search, @bypass, @mcp, @doResume, @resumeId, @doFork, @cfg.codexBin ?? "")
   let @parsed = @parseCodexJsonl(@raw)
   let @sessionId = @normalizeCodexSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
   let @value = match [
@@ -873,4 +877,4 @@ exe @conversationEmit(events, at) = node {
 
 const @conversation = { provider: "codex", locate: @conversationLocate, ingest: @conversationIngest, emit: @conversationEmit }
 
-export { @codex, @codexStreamFormat, @conversation, @parseCodexJsonl, @prependSystemPrompt, @normalizeCodexSessionId, @runCodexSh }
+export { @codex, @codexStreamFormat, @conversation, @parseCodexJsonl, @prependSystemPrompt, @normalizeCodexSessionId, @codexMcpConfigArg, @runCodex }
