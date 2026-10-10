@@ -10,7 +10,7 @@ license: CC0
 mlld-version: ">=2.2.0"
 ---
 
-needs { pi }
+needs { js: [], node: [] }
 
 import { @HOME, @PATH } from @input
 
@@ -194,11 +194,17 @@ exe @piCall(prompt, dir, noSession, sessionFile, forkSrc, sessionId, sessionDir,
   PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin" pi -p ${noSession:+--no-session} ${sessionFile:+--session "$sessionFile"} ${forkSrc:+--fork "$forkSrc" --session-id "$sessionId" --session-dir "$sessionDir"} ${provider:+--provider "$provider"} ${model:+--model "$model"} ${systemFile:+--append-system-prompt "$systemFile"} ${noTools:+--no-tools} ${native:+--tools "$native"} ${mcpConfig:+--mcp-config "$mcpConfig"} $flags ${thinking:+--thinking "$thinking"} ${mode:+--mode json}
 } with { stdin: @prompt }
 
+exe @piIsExecutable(file) = cmd { test -f "$file" -a -x "$file" }
+
 >> piBin must name a file called `pi`: a command may not take its program from a
->> variable, so the program stays `pi` and piBin's folder goes first on PATH.
-exe @piBinPath(piBin) = match [
-  @piBin.endsWith("/pi") => `${@piBin.slice(0, -3)}:${@PATH}`
-  * => @piFail(`@mlld/pi: piBin must be a file named pi, got ${@piBin}`)
+>> variable, so the program stays `pi` and piBin's folder goes first on PATH. A
+>> missing file would silently run the pi already on PATH, and a relative one is
+>> looked up from dir, so both are refused.
+exe @piBinPath(piBin) = [
+  if !@piBin.startsWith("/") || !@piBin.endsWith("/pi") [ => @piFail(`@mlld/pi: piBin must be an absolute path to a file named pi, got ${@piBin}`) ]
+  let @found = try @piIsExecutable(@piBin)
+  if !@found.ok [ => @piFail(`@mlld/pi: piBin is not an executable file: ${@piBin}`) ]
+  => `${@piBin.slice(0, -3)}:${@PATH}`
 ]
 
 exe @piCallWith(prompt, dir, session, sessionId, provider, model, systemFile, noTools, native, mcpConfig, flags, thinking, mode, piBin) = [

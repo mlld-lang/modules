@@ -71,7 +71,16 @@ const @test_tools_mcp_config = @hasPrefix(@viaTools, "arg=--mcp-config")
 
 >> piBin has to name a file called pi.
 const @wrongBin = try @pi("hi", { piBin: `${@fixtures}/pi-stub.sh`, session: false })
-const @test_pibin_other_name_refused = !@wrongBin.ok && @wrongBin.error.message.includes("piBin must be a file named pi")
+const @test_pibin_other_name_refused = !@wrongBin.ok && @wrongBin.error.message.includes("piBin must be an absolute path to a file named pi")
+
+>> A missing file, a folder named pi, or a relative path would each run the pi
+>> already on PATH, so each is refused.
+const @missingBin = try @pi("hi", { piBin: "/nonexistent/pi", session: false })
+const @test_pibin_missing_refused = !@missingBin.ok && @missingBin.error.message.includes("piBin is not an executable file")
+const @folderBin = try @pi("hi", { piBin: `${@root}/pi/tests/fixtures/run/stub`, session: false })
+const @test_pibin_folder_refused = !@folderBin.ok
+const @relativeBin = try @pi("hi", { piBin: "pi/tests/fixtures/run/stub/pi", dir: "/tmp", session: false })
+const @test_pibin_relative_refused = !@relativeBin.ok && @relativeBin.error.message.includes("must be an absolute path")
 
 >> ── session ──
 
