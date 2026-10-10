@@ -38,7 +38,7 @@ Runs `codex exec` and returns the final agent message. Output is parsed from `co
 | `model` | string | `"gpt-5.4"` | Codex model id |
 | `dir` | string | `@root` | Working directory for the run |
 | `system` | string | — | Prepended to the prompt. Codex has no `--append-system-prompt`, so this is the only per-call hook without clobbering `base_instructions`. |
-| `sandbox` | string | — | `read-only` \| `workspace-write` \| `danger-full-access`. When omitted defaults to `--full-auto` (or bypass if `config.bypass` is set). |
+| `sandbox` | string | — | `read-only` \| `workspace-write` \| `danger-full-access`. When omitted, `workspace-write` (or no sandbox if `config.bypass` is set). |
 | `bypass` | boolean | — | Opt into `--dangerously-bypass-approvals-and-sandbox`. **Required when `tools` is set** — codex's default on-request approval auto-cancels MCP tool calls in non-interactive exec mode and returns `user cancelled MCP tool call` as the tool result. Ignored when `sandbox` is explicit. |
 | `search` | boolean | — | Adds `--search` for live web search. |
 | `stream` | boolean | — | Stream chunks through `@codexStreamFormat`. The adapter also emits session id + token usage metadata. |

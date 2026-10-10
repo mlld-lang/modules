@@ -242,17 +242,18 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
   elif [ -n "$bypass" ]; then
     sandboxFlag=(--dangerously-bypass-approvals-and-sandbox)
   else
-    sandboxFlag=(--full-auto)
+    sandboxFlag=(-s workspace-write)
   fi
 
-  # codex refuses the sandbox flag after the fork subcommand, and fork has no --search.
+  # codex refuses the sandbox flag after the fork and resume subcommands, and
+  # neither takes --search.
   if [ -n "$doFork" ]; then
     printf '%s' "$prompt" | "${codexBin:-codex}" exec "${sandboxFlag[@]}" fork "$resumeId" --json --skip-git-repo-check "${modelFlag[@]}" "${extra[@]}" -
     exit $?
   fi
 
   if [ -n "$doResume" ]; then
-    printf '%s' "$prompt" | "${codexBin:-codex}" exec resume "$resumeId" --json --skip-git-repo-check "${sandboxFlag[@]}" "${modelFlag[@]}" "${extra[@]}" -
+    printf '%s' "$prompt" | "${codexBin:-codex}" exec "${sandboxFlag[@]}" resume "$resumeId" --json --skip-git-repo-check "${modelFlag[@]}" "${extra[@]}" -
     exit $?
   fi
 
@@ -271,7 +272,7 @@ exe @runCodexSh(prompt, dir, model, sandbox, search, bypass, mcpArgsFile, doResu
 >> config.dir       - working directory
 >> config.codexBin - the codex executable to run (default: codex on PATH)
 >> config.sandbox   - read-only | workspace-write | danger-full-access
->>                    (defaults to --full-auto convenience alias)
+>>                    (default: workspace-write)
 >> config.bypass    - boolean, opt into --dangerously-bypass-approvals-and-sandbox
 >>                    REQUIRED when `config.tools` is set, because codex's default
 >>                    on-request approval auto-cancels MCP tool calls in
@@ -872,4 +873,4 @@ exe @conversationEmit(events, at) = node {
 
 const @conversation = { provider: "codex", locate: @conversationLocate, ingest: @conversationIngest, emit: @conversationEmit }
 
-export { @codex, @codexStreamFormat, @conversation, @parseCodexJsonl, @prependSystemPrompt, @normalizeCodexSessionId }
+export { @codex, @codexStreamFormat, @conversation, @parseCodexJsonl, @prependSystemPrompt, @normalizeCodexSessionId, @runCodexSh }
