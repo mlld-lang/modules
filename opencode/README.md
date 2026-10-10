@@ -46,6 +46,7 @@ Runs `opencode run --format json` and returns the final agent message. Session i
 | `resume` | string | — | Explicit resume session id. Equivalent to `opencode run -s <id>`. |
 | `tools` | array | — | Standard mlld `llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config`; this module translates it into opencode's `{ mcp: { name: { type: "local", command, environment } } }` config and exposes it via a shadow `XDG_CONFIG_HOME`. Opencode has no per-tool gating, so `@mx.llm.native` is informational only. |
 | `mcpTimeoutMs` | number | — | Optional per-request timeout (ms) opencode applies to MCP tool calls. Maps to opencode's `experimental.mcp_timeout`. When omitted, opencode's built-in default applies. Only takes effect when an inline MCP config is emitted (i.e. when `tools` is set or the runtime has bridged tools). Set this only when you have a specific reason to override opencode's default — for example, when long tool calls indicate planner failure rather than legitimate slow work, a short value lets the planner LLM see failures faster and exit cleanly via a terminal call instead of consuming wall budget. |
+| `opencodeBin` | string | `opencode` on PATH | Path to a file named `opencode` to run instead, e.g. a stub in tests. Its folder goes first on PATH for the call, so a policy's command rules still see the program as `opencode`. Any other file name, or a missing file, is refused. |
 
 ```mlld
 >> Simple call

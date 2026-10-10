@@ -2,7 +2,7 @@
 >> whose reply text holds the arguments it was given. No model is called.
 >> Run: mlld test opencode/tests/
 
-import { @opencode, @parseOpencodeJsonl } from "../index.mld"
+import { @opencode, @parseOpencodeJsonl, @runOpencode } from "../index.mld"
 
 const @stub = `${@root}/opencode/tests/fixtures/bin/opencode`
 const @sid = "ses_f32dab56cffemtZGIZ407tXu7U"
@@ -26,3 +26,25 @@ const @test_runtime_resume_without_fork_unchanged = @resumed == `stub opencode: 
 >> A fork answers with the branch's sessionID, which @opencode returns over the resumed one.
 const @forkOutput = @parseOpencodeJsonl("{\"type\":\"step_start\",\"sessionID\":\"ses_branch0000000000000000000\"}\n{\"type\":\"text\",\"sessionID\":\"ses_branch0000000000000000000\",\"part\":{\"text\":\"ok\"}}\n")
 const @test_fork_reports_new_session_id = @forkOutput.sessionId == "ses_branch0000000000000000000" && @forkOutput.sessionId != @sid
+
+>> ── @runOpencode directly: the variables and the whole argument list ──
+>> Each expected file is what the earlier sh version printed for the same call,
+>> through a stub that prints the three variables and then one argument a line.
+
+const @argStub = `${@root}/opencode/tests/fixtures/run/bin/opencode`
+const @multi = "line one\r\nline 'two' \"q\" $HOME\n\n\nend\n"
+const @cfgJson = "{\"agent\":{\"x\":{\"permission\":{\"*\":\"deny\"}}},\"s\":\"a b $HOME\"}"
+
+const @plain = @runOpencode("hi", "/work", "openrouter/z-ai/glm-5.1", "", "", "", "", "", "", "", "", "", "1", "", @argStub)
+const @test_plain_line = @plain == <@root/opencode/tests/fixtures/run/expected/plain.txt>
+
+>> Every flag, values with spaces, quotes and $, and the prompt folded onto one line.
+const @everyFlag = @runOpencode(@multi, "/work dir", "m/x", "build", "high", "1", @cfgJson, "", "", "/tmp/data home", "/tmp/state", "1", "1", "", @argStub)
+const @test_every_flag_line = @everyFlag == <@root/opencode/tests/fixtures/run/expected/every-flag.txt>
+
+>> Without escapePrompt the prompt keeps its carriage return and newlines.
+const @resumedUnfolded = @runOpencode(@multi, "", "", "", "", "", "", "1", "ses_abc", "", "", "", "", "", @argStub)
+const @test_resume_unfolded_line = @resumedUnfolded == <@root/opencode/tests/fixtures/run/expected/resume-unfolded.txt>
+
+const @forkedDirect = @runOpencode("hi", "/work", "m", "", "", "", "", "1", "ses_abc", "", "", "", "1", "1", @argStub)
+const @test_fork_line = @forkedDirect == <@root/opencode/tests/fixtures/run/expected/fork.txt>

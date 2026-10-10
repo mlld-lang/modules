@@ -362,13 +362,44 @@ exe @opencodeRunCmd(prompt, dir, model, agent, variant, bypass, inlineConfig, re
   XDG_DATA_HOME="${dataHome:-$XDG_DATA_HOME}" XDG_STATE_HOME="${stateHome:-$XDG_STATE_HOME}" OPENCODE_CONFIG_CONTENT="${inlineConfig:-$OPENCODE_CONFIG_CONTENT}" opencode run ${pure:+--pure} --format json ${dir:+--dir "$dir"} ${model:+-m "$model"} ${agent:+--agent "$agent"} ${variant:+--variant "$variant"} ${bypass:+--dangerously-skip-permissions} ${resumeId:+-s "$resumeId"} ${doFork:+--fork} "$prompt"
 }
 
+>> mlld reads only a few named environment variables, so the caller's PATH comes
+>> from the shell.
+exe @shellPath() = cmd { printf '%s' "$PATH" }
+
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @opencodeBinError(message) = js {
+  throw new Error(`opencode: config.opencodeBin ${message}`);
+}
+
+exe @isExecutable(file) = cmd { test -x "$file" }
+
+>> opencodeBin runs another opencode (a test stub) by putting its folder first on
+>> the call's PATH, so the program stays the literal `opencode`. A file with
+>> another name can't be reached that way, and a missing one would silently run
+>> the opencode already on PATH, so both are refused.
+exe @opencodeBinDir(opencodeBin) = [
+  if !@opencodeBin || @opencodeBin == "opencode" [ => "" ]
+  if !@opencodeBin.endsWith("/opencode") [ => @opencodeBinError(`must be a file named opencode, got '${@opencodeBin}'`) ]
+  let @found = try @isExecutable(@opencodeBin)
+  if !@found.ok [ => @opencodeBinError(`is not an executable file: '${@opencodeBin}'`) ]
+  => @opencodeBin.slice(0, -9)
+]
+
 >> doFork branches resumeId (--fork) instead of appending to it. escapePrompt
 >> folds the prompt onto one line. opencodeBin is last so tests can point it at a
 >> stub; empty runs `opencode` from PATH.
 exe @runOpencode(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt, doFork, opencodeBin) = [
   let @promptArg = @escapePrompt ? @prompt.replaceAll(/\r/, "").replaceAll(/\n+/, " ") : @prompt
   let @sessionId = @doResume || @doFork ? @resumeId : ""
-  => @opencodeRunCmd(@promptArg, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @sessionId, @dataHome, @stateHome, @pure, @doFork)
+  let @binDir = @opencodeBinDir(@opencodeBin)
+  let @path = match [
+    @binDir => `${@binDir}:${@shellPath()}`
+    * => ""
+  ]
+  => match [
+    @path => @opencodeRunCmd(@promptArg, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @sessionId, @dataHome, @stateHome, @pure, @doFork) using { env: { PATH: @path } }
+    * => @opencodeRunCmd(@promptArg, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @sessionId, @dataHome, @stateHome, @pure, @doFork)
+  ]
 ]
 
 >> ── Core invocation ──
@@ -376,7 +407,8 @@ exe @runOpencode(prompt, dir, model, agent, variant, bypass, inlineConfig, doRes
 >> @opencode(prompt, config)
 >> config.model     - provider/model string, e.g. "anthropic/claude-sonnet-4-5"
 >> config.dir       - working directory (passed via --dir)
->> config.opencodeBin - the opencode executable to run (default: opencode on PATH)
+>> config.opencodeBin - path to a file named `opencode` to run instead of the one
+>>                    on PATH (a test stub); its folder goes first on the call's PATH
 >> config.agent     - opencode agent name (--agent)
 >> config.variant   - reasoning variant: "minimal" | "high" | "max" (--variant)
 >> config.bypass    - boolean, passes --dangerously-skip-permissions

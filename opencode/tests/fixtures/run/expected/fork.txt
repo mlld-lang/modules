@@ -1,0 +1,14 @@
+XDG_DATA_HOME=
+XDG_STATE_HOME=
+OPENCODE_CONFIG_CONTENT=
+arg=run
+arg=--format
+arg=json
+arg=--dir
+arg=/work
+arg=-m
+arg=m
+arg=-s
+arg=ses_abc
+arg=--fork
+arg=hi

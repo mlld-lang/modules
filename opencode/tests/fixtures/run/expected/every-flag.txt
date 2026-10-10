@@ -1,0 +1,17 @@
+XDG_DATA_HOME=/tmp/data home
+XDG_STATE_HOME=/tmp/state
+OPENCODE_CONFIG_CONTENT={"agent":{"x":{"permission":{"*":"deny"}}},"s":"a b $HOME"}
+arg=run
+arg=--pure
+arg=--format
+arg=json
+arg=--dir
+arg=/work dir
+arg=-m
+arg=m/x
+arg=--agent
+arg=build
+arg=--variant
+arg=high
+arg=--dangerously-skip-permissions
+arg=line one line 'two' "q" $HOME end
