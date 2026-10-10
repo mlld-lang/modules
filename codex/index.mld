@@ -228,13 +228,15 @@ exe @codexBinError(message) = js {
 exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
 
 >> codexBin runs another codex (a test stub) by putting its folder first on the
->> call's PATH, so the program stays the literal `codex`. A file with another
->> name can't be reached that way, a missing one would silently run the codex
->> already on PATH, and a relative one is looked up from dir, so all three are
->> refused.
+>> call's PATH, so the program stays the literal `codex`. Any path whose folder
+>> the PATH lookup would miss silently runs the codex already on PATH instead,
+>> so it is refused: another file name, a missing file, a relative path (the
+>> lookup resolves it from `dir`, the check from here), or a `:` (it splits PATH).
 exe @codexBinDir(codexBin) = [
   if !@codexBin || @codexBin == "codex" [ => "" ]
-  if !@codexBin.startsWith("/") || !@codexBin.endsWith("/codex") [ => @codexBinError(`must be an absolute path to a file named codex, got '${@codexBin}'`) ]
+  if !@codexBin.endsWith("/codex") [ => @codexBinError(`must be a file named codex, got '${@codexBin}'`) ]
+  if !@codexBin.startsWith("/") [ => @codexBinError(`must be an absolute path, got '${@codexBin}'`) ]
+  if @codexBin.includes(":") [ => @codexBinError(`must not contain ':', got '${@codexBin}'`) ]
   let @found = try @isExecutable(@codexBin)
   if !@found.ok [ => @codexBinError(`is not an executable file: '${@codexBin}'`) ]
   => @codexBin.slice(0, -6)
@@ -273,7 +275,7 @@ exe @runCodex(prompt, dir, model, sandbox, search, bypass, mcp, doResume, resume
 >> @codex(prompt, config)
 >> config.model     - model name (codex default unless set)
 >> config.dir       - working directory
->> config.codexBin - path to a file named `codex` to run instead of the one on
+>> config.codexBin - absolute path to a file named `codex` to run instead of the one on
 >>                    PATH (a test stub); its folder goes first on the call's PATH
 >> config.sandbox   - read-only | workspace-write | danger-full-access
 >>                    (default: workspace-write)
