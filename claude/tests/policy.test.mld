@@ -1,0 +1,38 @@
+>> @claude under a policy with command rules: the program is the literal
+>> `claude`, and claudeBin reaches its stub through the call's PATH, so neither
+>> is refused.
+>> Run: mlld test claude/tests/
+
+import { @claude } from "../index.mld"
+
+policy @rules = { * { capabilities: { deny: ["cmd:rm"] } } }
+
+const @stub = `${@root}/claude/tests/fixtures/run/bin/claude`
+
+exe @callStub() = [
+  let @r = @claude("hi", { claudeBin: @stub })
+  => `${@r}`
+]
+const @out = @callStub()
+const @test_stub_runs_under_policy = @out.includes("arg=-p") && @out.includes("stdin=hi")
+
+>> Only a file named claude can be put in front on PATH.
+const @misnamed = try @claude("hi", { claudeBin: `${@root}/claude/tests/fixtures/run/bin` })
+const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.includes("config.claudeBin must be a file named claude")
+
+>> A missing file would otherwise fall through to the claude on PATH.
+const @missing = try @claude("hi", { claudeBin: "/nonexistent/claude" })
+const @test_missing_bin_refused = !@missing.ok && @missing.error.message.includes("config.claudeBin is not an executable file")
+
+>> So would a folder named claude, like ~/.config/claude.
+const @folder = try @claude("hi", { claudeBin: `${@root}/claude/tests/fixtures/folder/claude` })
+const @test_folder_bin_refused = !@folder.ok && @folder.error.message.includes("config.claudeBin is not an executable file")
+
+>> A relative path is checked from here but looked up from dir, so with a dir it
+>> would miss and run the claude on PATH.
+const @relative = try @claude("hi", { claudeBin: "claude/tests/fixtures/run/bin/claude", dir: "/tmp" })
+const @test_relative_bin_refused = !@relative.ok && @relative.error.message.includes("config.claudeBin must be an absolute path")
+
+>> A ':' splits the PATH entry, so the lookup would miss the folder.
+const @colon = try @claude("hi", { claudeBin: "/a:b/claude" })
+const @test_colon_bin_refused = !@colon.ok && @colon.error.message.includes("config.claudeBin must not contain ':'")

@@ -7,7 +7,7 @@ const @r = @root
 
 >> ── @agent dispatch ──
 
-const @claudeOut = @agent("hi claude", { harness: "claude", claudeBin: `${@r}/claude/tests/fixtures/run/claude-stub.sh`, model: "m-claude" })
+const @claudeOut = @agent("hi claude", { harness: "claude", claudeBin: `${@r}/claude/tests/fixtures/run/bin/claude`, model: "m-claude" })
 const @test_claude_ran = @claudeOut.includes("stdin=hi claude") && @claudeOut.includes("arg=m-claude")
 
 const @codexOut = @agent("hi codex", { harness: "codex", codexBin: `${@r}/codex/tests/fixtures/bin/codex`, model: "m-codex" })

@@ -1,4 +1,4 @@
-needs { claude }
+needs { js: [], node: [] }
 
 >> ── Constants ──
 
@@ -177,7 +177,7 @@ exe @claudeResult(inputValue, resume) = match [
 >> with spaces or quotes as one argument. `--tools ""` is written out in its own
 >> bodies because macOS /bin/sh (bash 3.2) drops an empty argument inside `${v:+…}`.
 >> `claude` is written literally because a policy refuses a command whose program
->> comes from a variable; the `$claudeBin` bodies exist only so tests can run a stub.
+>> comes from a variable; claudeBin reaches a stub through PATH instead.
 >> The prompt goes in on stdin.
 exe @claudeCmd(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork) = cmd:@dir {
   env -u CLAUDECODE claude -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" ${nativeTools:+--tools "$nativeTools"} ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
@@ -187,23 +187,48 @@ exe @claudeCmdNoTools(prompt, dir, model, bare, sessionId, outputFormat, resumeI
   env -u CLAUDECODE claude -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" --tools "" ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
 } with { stdin: @prompt }
 
-exe @claudeBinCmd(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = cmd:@dir {
-  env -u CLAUDECODE "$claudeBin" -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" ${nativeTools:+--tools "$nativeTools"} ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
-} with { stdin: @prompt }
+>> mlld reads only a few named environment variables, so the caller's PATH comes
+>> from the shell.
+exe @shellPath() = cmd { printf '%s' "$PATH" }
 
-exe @claudeBinCmdNoTools(prompt, dir, model, bare, sessionId, outputFormat, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = cmd:@dir {
-  env -u CLAUDECODE "$claudeBin" -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" --tools "" ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
-} with { stdin: @prompt }
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @claudeBinError(message) = js {
+  throw new Error(`claude: config.claudeBin ${message}`);
+}
+
+exe @isExecutable(file) = cmd { test -f "$file" -a -x "$file" }
+
+>> claudeBin runs another claude (a test stub) by putting its folder first on the
+>> call's PATH, so the program stays the literal `claude`. Any path whose folder
+>> the PATH lookup would miss silently runs the claude already on PATH instead,
+>> so it is refused: another file name, a missing file, a relative path (the
+>> lookup resolves it from `dir`, the check from here), or a `:` (it splits PATH).
+exe @claudeBinDir(claudeBin) = [
+  if !@claudeBin || @claudeBin == "claude" [ => "" ]
+  if !@claudeBin.endsWith("/claude") [ => @claudeBinError(`must be a file named claude, got '${@claudeBin}'`) ]
+  if !@claudeBin.startsWith("/") [ => @claudeBinError(`must be an absolute path, got '${@claudeBin}'`) ]
+  if @claudeBin.includes(":") [ => @claudeBinError(`must not contain ':', got '${@claudeBin}'`) ]
+  let @found = try @isExecutable(@claudeBin)
+  if !@found.ok [ => @claudeBinError(`is not an executable file: '${@claudeBin}'`) ]
+  => @claudeBin.slice(0, -7)
+]
 
 >> Parameters are positional; empty means "leave the flag off". emptyNativeTools
 >> passes `--tools ""` (no native tools) and is only set when nativeTools is empty.
 >> fork branches the resumed session (--fork-session) instead of appending to it.
 >> claudeBin is last so tests can point it at a stub; empty runs `claude` from PATH.
-exe @runClaude(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, emptyNativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = match [
-  @claudeBin && @emptyNativeTools => @claudeBinCmdNoTools(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork, @claudeBin)
-  @claudeBin => @claudeBinCmd(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @nativeTools, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork, @claudeBin)
-  @emptyNativeTools => @claudeCmdNoTools(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork)
-  * => @claudeCmd(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @nativeTools, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork)
+exe @runClaude(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, emptyNativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = [
+  let @binDir = @claudeBinDir(@claudeBin)
+  let @path = match [
+    @binDir => `${@binDir}:${@shellPath()}`
+    * => ""
+  ]
+  => match [
+    @path && @emptyNativeTools => @claudeCmdNoTools(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork) using { env: { PATH: @path } }
+    @emptyNativeTools => @claudeCmdNoTools(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork)
+    @path => @claudeCmd(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @nativeTools, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork) using { env: { PATH: @path } }
+    * => @claudeCmd(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @nativeTools, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork)
+  ]
 ]
 
 >> ── Core invocation ──
@@ -217,7 +242,8 @@ exe @runClaude(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, e
 >> config.sessionId - explicit session UUID for conversation tracking
 >> config.resume    - session UUID to resume (no tools, appends prompt to existing conversation)
 >> config.bare      - pass --bare
->> config.claudeBin - the claude executable to run (default: claude on PATH)
+>> config.claudeBin - absolute path to a file named `claude` to run instead of the
+>>                    one on PATH (a test stub); its folder goes first on the call's PATH
 >>
 >> Runtime notes:
 >> - Streaming mode keeps Claude's NDJSON output for the stream adapter above.
