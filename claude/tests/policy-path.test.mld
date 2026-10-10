@@ -1,7 +1,7 @@
 >> @claude with no claudeBin under an active policy runs `claude` from PATH. A policy
 >> refuses a command whose program comes from a variable, so this row fails if the
 >> default command line ever names its program through one.
->> Run: PATH="$PWD/claude/tests/fixtures/path:$PATH" mlld test claude/tests/policy-path.test.mld
+>> Run: PATH="$PWD/claude/tests/fixtures/run/bin:$PATH" mlld test claude/tests/policy-path.test.mld
 >> PATH set inside mlld does not reach @claude's command, so the stub has to be put
 >> on PATH from the shell. Without it the row calls nothing, so a plain run never
 >> reaches a real claude, and it passes without checking anything.
@@ -10,7 +10,7 @@ import { @claude } from "../index.mld"
 
 policy @onlyDenyRm = { * { capabilities: { deny: ["cmd:rm"] } } }
 
-const @stub = `${@root}/claude/tests/fixtures/path/claude`
+const @stub = `${@root}/claude/tests/fixtures/run/bin/claude`
 
 exe @whichClaude() = cmd { which claude }
 
