@@ -85,7 +85,7 @@ const @summary = @opencode("Call getOrders and summarise the results.", {
 `@opencode` returns a hidden `_mlld` envelope (`{ sessionId, provider: "opencode" }`) that the interpreter harvests. Two things fall out:
 
 1. **Public API.** Pass `config.sessionId` to seed a known id, or `config.resume` to resume explicitly. Opencode session ids are case-sensitive (`ses_<base36>`) and preserved verbatim.
-2. **Guard-driven resume.** When a guard retries, the runtime injects `config._mlld.resume = { sessionId, provider, continue }`. The module only honours it when `provider === "opencode"`, so a claude or codex session never leaks across providers.
+2. **Guard-driven resume.** When a guard retries, the runtime injects `config._mlld.resume = { sessionId, provider, continue }`. A continue of a recorded conversation adds `fork: true`, and the call branches the session instead of resuming it (see `@conversation`). The module only honours it when `provider === "opencode"`, so a claude or codex session never leaks across providers.
 
 ### MCP bridge via shadow XDG_CONFIG_HOME
 
@@ -109,7 +109,7 @@ Event types handled:
 
 ### `@conversation`: reading opencode sessions
 
-Reads a stored opencode session and turns it into IFT events, the event format of mlld's run tape. It is an object of two functions, with the same signatures as `@conversation` in `@mlld/claude`, `@mlld/codex` and `@mlld/pi`:
+Reads a stored opencode session and turns it into IFT events, the event format of mlld's run tape. It is an object of a provider name and three functions, with the same signatures as `@conversation` in `@mlld/claude`, `@mlld/codex` and `@mlld/pi`:
 
 ```mlld
 import { @conversation } from @mlld/opencode
@@ -140,6 +140,19 @@ The session id is the one `@opencode` returns (`ses_…`).
 - In `usage`, `output` includes reasoning tokens and `thinking` says how many of them were reasoning. opencode counts reasoning separately, so its `output` is lower than this one.
 - opencode has no ingester in fray, so the mapping is this module's own; the tests' expected outputs are written by hand from it (`tests/fixtures/conversation/README.md`).
 - It throws only when `text` is not a string or is not JSON. A part type it does not know prints one warning line to stderr and is skipped. A session with a pending revert prints a warning and is ingested in full.
+
+**`@conversation.provider`** is `"opencode"`, the name `@opencode` reports its sessions under. mlld's `@opencode.continue(@conv, { at?, prompt })` compares it with the provider a recorded conversation came from. When they match, the session is continued natively (below); otherwise the conversation is carried over as text through `emit`.
+
+**`@conversation.emit(events, at?)`** returns a recorded conversation as one plain-text transcript. mlld puts it in front of the new prompt when it cannot continue the session natively: for a conversation recorded by another harness, a cut before the last event, or a conversation with no session id.
+
+- `events` are the conversation lines of a run tape. `at`, when given, keeps only events `0` through `at`.
+- The transcript opens with a line naming the harness, session and date the conversation came from, alternates `User:` and `Assistant:` turns, and ends with `End of the carried conversation.`
+- User and assistant text is carried verbatim. A tool call becomes `[ran <tool>] <command or path>` and its result `[<tool> result] <content>` (`error` for a failure), cut to its first 2,000 characters. A call whose result falls after the cut is followed by `[no result recorded — session was interrupted here]`.
+- Thinking, and text the harness injected on its own (hook output, reminders, base instructions), are dropped. Compaction and branch summaries are kept, as `[carried summary] <text>`.
+- It reads no files and never throws. The same function is in `@mlld/claude`, `@mlld/codex`, `@mlld/pi` and `@mlld/opencode`, so a transcript reads the same whichever module renders it.
+- **The transcript is a record, not proof.** It repeats what the log says happened, so it is only as trustworthy as that log, and the tool output in it may be stale. Its opening line tells the model so.
+
+**Continuing natively.** When mlld continues a recorded opencode conversation in a new call, it calls `@opencode` with `config._mlld.resume = { sessionId, provider: "opencode", continue: true, fork: true }`. `@opencode` then it never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `opencode run -s <id> --fork`, and returns the session id on opencode's output, so the run's tape records the branch this call wrote.
 
 **Treat an ingested conversation as untrusted input.** The export is a plain file, and nothing in it proves opencode produced it.
 

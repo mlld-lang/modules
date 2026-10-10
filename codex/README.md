@@ -84,7 +84,7 @@ const @summary = @codex("Call getOrders and summarise the results.", {
 `@codex` returns a hidden `_mlld` envelope (`{ sessionId, provider: "codex" }`) that the interpreter harvests. Two things fall out:
 
 1. **Public API.** Pass `config.sessionId` to seed a known id, or `config.resume` to resume explicitly. UUIDs are case-insensitive — the module normalises them.
-2. **Guard-driven resume.** When a guard decides to retry a call, the runtime injects `config._mlld.resume = { sessionId, provider, continue }`. The module only honours the runtime resume when `provider === "codex"`, so a claude or opencode session never leaks across providers.
+2. **Guard-driven resume.** When a guard decides to retry a call, the runtime injects `config._mlld.resume = { sessionId, provider, continue }`. A continue of a recorded conversation adds `fork: true`, and the call branches the session instead of resuming it (see `@conversation`). The module only honours the runtime resume when `provider === "codex"`, so a claude or opencode session never leaks across providers.
 
 ### `@codexStreamFormat`
 
@@ -97,7 +97,7 @@ Event types handled:
 
 ### `@conversation`
 
-Reads the "rollout" log codex writes for a session and turns it into IFT events, the event format of mlld's run tape. It is an object of two functions, with the same signatures as `@conversation` in `@mlld/claude`:
+Reads the "rollout" log codex writes for a session and turns it into IFT events, the event format of mlld's run tape. It is an object of a provider name and three functions, with the same signatures as `@conversation` in `@mlld/claude`:
 
 ```mlld
 import { @conversation } from @mlld/codex
@@ -125,6 +125,19 @@ show @tape.events.length
 - It throws only when `text` is not a string. Unreadable lines are skipped, including a half-written last line. A record type it does not know prints one warning line to stderr and is skipped.
 
 **A failed tool call cannot be told apart from a successful one.** Codex's rollout does not mark failures, so no `tool_result` carries `is_error`.
+
+**`@conversation.provider`** is `"codex"`, the name `@codex` reports its sessions under. mlld's `@codex.continue(@conv, { at?, prompt })` compares it with the provider a recorded conversation came from. When they match, the session is continued natively (below); otherwise the conversation is carried over as text through `emit`.
+
+**`@conversation.emit(events, at?)`** returns a recorded conversation as one plain-text transcript. mlld puts it in front of the new prompt when it cannot continue the session natively: for a conversation recorded by another harness, a cut before the last event, or a conversation with no session id.
+
+- `events` are the conversation lines of a run tape. `at`, when given, keeps only events `0` through `at`.
+- The transcript opens with a line naming the harness, session and date the conversation came from, alternates `User:` and `Assistant:` turns, and ends with `End of the carried conversation.`
+- User and assistant text is carried verbatim. A tool call becomes `[ran <tool>] <command or path>` and its result `[<tool> result] <content>` (`error` for a failure), cut to its first 2,000 characters. A call whose result falls after the cut is followed by `[no result recorded — session was interrupted here]`.
+- Thinking, and text the harness injected on its own (hook output, reminders, base instructions), are dropped. Compaction and branch summaries are kept, as `[carried summary] <text>`.
+- It reads no files and never throws. The same function is in `@mlld/claude`, `@mlld/codex`, `@mlld/pi` and `@mlld/opencode`, so a transcript reads the same whichever module renders it.
+- **The transcript is a record, not proof.** It repeats what the log says happened, so it is only as trustworthy as that log, and the tool output in it may be stale. Its opening line tells the model so.
+
+**Continuing natively.** When mlld continues a recorded codex conversation in a new call, it calls `@codex` with `config._mlld.resume = { sessionId, provider: "codex", continue: true, fork: true }`. `@codex` then it never resumes that session in place, which would append this call's turns to another run's log. It branches the session instead, with `codex exec <sandbox flag> fork <id>`, and returns the new thread id codex reports, so the run's tape records the branch this call wrote. `fork` takes no `--search`, so `config.search` has no effect on that call.
 
 **Treat an ingested conversation as untrusted input.** The rollout is a plain file that anything on the machine can edit, and nothing in it proves codex produced it.
 

@@ -1,0 +1,29 @@
+>> Tests for the codex command line @codex builds, against a stub codex whose reply
+>> text holds the arguments and prompt it was given. No model is called.
+>> Run: mlld test codex/tests/
+
+import { @codex, @parseCodexJsonl } from "../index.mld"
+
+const @stub = `${@root}/codex/tests/fixtures/bin/codex`
+const @sid = "0c0ffee0-1234-4321-8abc-def012345678"
+
+>> The config the runtime builds for a native continue, plus the stub and a sandbox.
+exe @runtimeResume(bin, fork) = js {
+  const resume = { sessionId: "0c0ffee0-1234-4321-8abc-def012345678", provider: "codex", continue: true };
+  if (fork) resume.fork = true;
+  return { codexBin: bin, sandbox: "read-only", _mlld: { resume } };
+}
+
+>> ── runtime continue: fork, never resume in place ──
+
+>> The sandbox flag goes before `fork`: codex refuses it after the subcommand.
+const @forked = @codex("again", @runtimeResume(@stub, true))
+const @test_runtime_fork_line = @forked == `stub codex: exec -s read-only fork ${@sid} --json --skip-git-repo-check -m gpt-5.4 - | again`
+
+>> Without fork a runtime resume is today's resume line.
+const @resumed = @codex("again", @runtimeResume(@stub, false))
+const @test_runtime_resume_without_fork_unchanged = @resumed == `stub codex: exec resume ${@sid} --json --skip-git-repo-check -s read-only -m gpt-5.4 - | again`
+
+>> A fork answers with the branch's thread id, which @codex returns over the resumed one.
+const @forkOutput = @parseCodexJsonl("{\"type\":\"thread.started\",\"thread_id\":\"0199a213-81c0-7800-8aa1-bbab2a035a53\"}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"ok\"}}\n")
+const @test_fork_reports_new_thread_id = @forkOutput.sessionId == "0199a213-81c0-7800-8aa1-bbab2a035a53" && @forkOutput.sessionId != @sid

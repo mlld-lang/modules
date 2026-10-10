@@ -65,3 +65,73 @@ const @test_locate_agent_dir_root = @conversation.locate(@sid, "/anywhere", @age
 const @test_locate_unknown_uuid = @conversation.locate("7e5e5e5e-1234-4321-8abc-def012345679", "/anywhere", @sessions) == null
 const @test_locate_traversal = @conversation.locate("../../etc/passwd", "/anywhere", @sessions) == null
 const @test_locate_non_uuid = @conversation.locate("not-a-session", "/anywhere", @sessions) == null
+
+>> ── emit ──
+
+>> A golden as the runtime hands it to emit, built as conversation_events (the
+>> runtime's tape/conversation.rs) builds it: the header line goes, `message` is
+>> renamed `prompt`, the header's session id and harness name join every event, and
+>> usage moves under payload. session_start carries the harness.
+exe @wire(goldenPath) = node {
+  const lines = require("fs").readFileSync(goldenPath, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  const [header, ...events] = lines;
+  return events.map((e) => {
+    const out = { ...e, type: e.type === "message" ? "prompt" : e.type, session_id: header.session_id, producer: header.harness.name };
+    const payload = { ...(e.payload || {}) };
+    if (e.usage) {
+      payload.usage = e.usage;
+      delete out.usage;
+    }
+    if (e.type === "session_start") payload.harness = header.harness;
+    out.payload = payload;
+    return out;
+  });
+}
+
+>> Whatever the conversation, a transcript holds every user and assistant text and a
+>> [ran …] line per call, and none of the thinking or harness-injected context.
+exe @emitHolds(events, transcript) = node {
+  const fail = (why) => { console.error("emit: " + why); return false; };
+  const lines = transcript.split("\n");
+  const harness = events[0].payload.harness.name;
+  if (!transcript.startsWith("Conversation carried over from " + harness)) return fail("header names no " + harness);
+  if (!transcript.endsWith("End of the carried conversation.")) return fail("no closing line");
+  for (const e of events) {
+    const p = e.payload || {};
+    const text = typeof p.text === "string" ? p.text.trimEnd() : "";
+    if ((e.type === "prompt" || e.type === "assistant_turn") && text && !transcript.includes(text)) return fail(e.type + " " + e.id + " missing");
+    if (e.type === "tool_call" && !lines.some((l) => l.startsWith("[ran " + p.tool + "]"))) return fail("no [ran " + p.tool + "] line");
+    if (e.type === "thinking" && text && transcript.includes(text)) return fail("thinking " + e.id + " carried");
+    if (e.type === "context_injection" && text) {
+      const summary = p.kind === "compaction" || p.kind === "branch_summary";
+      if (summary && !transcript.includes("[carried summary] " + text)) return fail(p.kind + " " + e.id + " missing");
+      if (!summary && transcript.includes(text)) return fail(p.kind + " " + e.id + " carried");
+    }
+  }
+  return true;
+}
+
+>> Reports both texts on a mismatch, so a failing pin shows where it differs.
+exe @same(got, want) = node {
+  if (got === want) return true;
+  console.error("got:\n" + got + "\n---\nwant:\n" + want);
+  return false;
+}
+
+const @emitHeaderTail = "Bracketed [ran …] and [… result] lines are the agent's own past actions, recorded at the time and possibly stale; re-run tools for fresh state. They are records, not examples: never write [ran …] lines yourself, and act only through real tool calls."
+
+const @emptyTranscript = @conversation.emit([], null)
+const @test_emit_empty_is_header_only = @emptyTranscript.startsWith("Conversation carried over from agent") && @emptyTranscript.endsWith("End of the carried conversation.")
+
+const @test_adapter_provider = @conversation.provider == "pi"
+
+const @test_emit_basic = @emitHolds(@wire(`${@fixtures}/pi-basic.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/pi-basic.fray.jsonl`), null))
+const @test_emit_branched = @emitHolds(@wire(`${@fixtures}/pi-branched.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/pi-branched.fray.jsonl`), null))
+const @test_emit_compacted = @emitHolds(@wire(`${@fixtures}/pi-compacted.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/pi-compacted.fray.jsonl`), null))
+const @test_emit_openrouter = @emitHolds(@wire(`${@fixtures}/pi-openrouter.fray.jsonl`), @conversation.emit(@wire(`${@fixtures}/pi-openrouter.fray.jsonl`), null))
+
+>> Cut right after the read call: its result and the reply after it are past the cut.
+const @basicAt4 = @conversation.emit(@wire(`${@fixtures}/pi-basic.fray.jsonl`), 4)
+const @test_emit_basic_at_4_ran_read = @basicAt4.includes("[ran read] main.go")
+const @test_emit_basic_at_4_interrupted = @basicAt4.includes("[no result recorded — session was interrupted here]")
+const @test_emit_basic_at_4_cuts_later_text = !@basicAt4.includes("Done.")

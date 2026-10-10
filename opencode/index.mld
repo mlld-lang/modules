@@ -162,10 +162,12 @@ exe @opencodePermissionRules(allowedTools, mcpServers) = js {
 >>   config.resume    - explicit resume session id
 >>
 >> Runtime API:
->>   config._mlld.resume = { sessionId, provider, continue }
+>>   config._mlld.resume = { sessionId, provider, continue, fork? }
 >>
 >> Runtime resume is ignored when the recorded provider is not opencode so a
->> claude/codex session never leaks across providers.
+>> claude/codex session never leaks across providers. fork is set when the runtime
+>> continues a recorded conversation in a new call; that call must branch the
+>> session rather than append to the recorded one.
 exe @opencodeResume(config) = [
   let @cfg = @config ? @config : {}
   let @runtime = @cfg._mlld ? @cfg._mlld : {}
@@ -179,31 +181,36 @@ exe @opencodeResume(config) = [
       continue: true,
       sessionId: @runtimeSessionId,
       provider: "opencode",
-      source: "runtime_resume"
+      source: "runtime_resume",
+      fork: @resume.fork == true
     }
     @publicResumeId => {
       continue: true,
       sessionId: @publicResumeId,
       provider: "opencode",
-      source: "public_resume"
+      source: "public_resume",
+      fork: false
     }
     @runtimeSessionId && @runtimeProvider == "opencode" => {
       continue: false,
       sessionId: @runtimeSessionId,
       provider: "opencode",
-      source: "runtime_tracking"
+      source: "runtime_tracking",
+      fork: false
     }
     @publicSessionId => {
       continue: false,
       sessionId: @publicSessionId,
       provider: "opencode",
-      source: "public_session"
+      source: "public_session",
+      fork: false
     }
     * => {
       continue: false,
       sessionId: null,
       provider: "opencode",
-      source: "none"
+      source: "none",
+      fork: false
     }
   ]
 ]
@@ -351,8 +358,9 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
 >> Flat positional params so BashExecutor injects each one as a distinct env var.
 >> Routing through sh {} with env vars sidesteps the mlld cmd-block double-escape
 >> bug for interpolated values (see ticket m-8694).
+>> doFork branches resumeId (--fork) instead of appending to it.
 >> opencodeBin is last so tests can point it at a stub; empty runs `opencode` from PATH.
-exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt, opencodeBin) = sh {
+exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt, doFork, opencodeBin) = sh {
   set -e
 
   if [ -n "$dataHome" ]; then
@@ -398,7 +406,9 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
   fi
 
   sessionFlag=()
-  if [ -n "$doResume" ]; then
+  if [ -n "$doFork" ]; then
+    sessionFlag=(-s "$resumeId" --fork)
+  elif [ -n "$doResume" ]; then
     sessionFlag=(-s "$resumeId")
   fi
 
@@ -446,6 +456,9 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >>   consumes `text` events as they arrive; @raw still holds the full NDJSON.
 >> - Uses a `sh { }` block so interpolated values flow as bash env vars and
 >>   survive unescaped (see ticket m-8694 for the `cmd` block escaping bug).
+>> - A runtime resume carrying fork (a continue of a recorded conversation) never
+>>   resumes in place: it passes `-s <id> --fork` and returns the sessionID on
+>>   opencode's output events, so the runtime records the branch this call wrote.
 llm @opencode(prompt, config) using { harness: { write: [".", "~/.local/share/opencode", "~/.config/opencode", "~/.cache/opencode", "~/.local/state/opencode"], net: "open" } } with { stream: @config.stream, stream_format: @opencodeStreamFormat } = [
   let @cfg = @config ? @config : {}
   let @dir = @cfg.dir ? @cfg.dir : @root
@@ -474,11 +487,12 @@ llm @opencode(prompt, config) using { harness: { write: [".", "~/.local/share/op
   let @resume = @opencodeResume(@cfg)
   let @doResume = @resume.continue && @resume.sessionId ? "1" : ""
   let @resumeId = @resume.sessionId ? @resume.sessionId : ""
+  let @doFork = @doResume && @resume.fork ? "1" : ""
   let @dataHome = @cfg.dataHome ? @cfg.dataHome : ""
   let @stateHome = @cfg.stateHome ? @cfg.stateHome : ""
   let @pure = @cfg.pure ? "1" : ""
   let @escapePrompt = @hasToolBridge ? "" : "1"
-  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt, @cfg.opencodeBin ?? "")
+  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt, @doFork, @cfg.opencodeBin ?? "")
   let @parsed = @parseOpencodeJsonl(@raw)
   let @sessionId = @normalizeOpencodeSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
   let @value = match [
@@ -691,6 +705,136 @@ exe @conversationIngest(text) = node {
   return { header: { type: "session", session_id: sessionID, harness, cwd, started_at: startedAt }, events };
 }
 
-const @conversation = { locate: @conversationLocate, ingest: @conversationIngest }
+>> @conversation.emit(events, at) → string
+>> Renders a tape's conversation events as a plain-text transcript that any harness
+>> can take as a prompt, for continuing a conversation in a harness that cannot
+>> resume it natively. events are the tape's conversation lines (type-specific fields
+>> under payload); at, when a number, keeps only events[0..at]. User and assistant
+>> text carry verbatim; tool calls and results become bracketed lines; thinking and
+>> harness-injected context are dropped, except compaction and branch summaries,
+>> which are conversation memory. The same block is in the claude, codex, pi and
+>> opencode modules, since its input does not depend on the harness. Pure: reads
+>> nothing, and returns the best transcript it can rather than throwing.
+exe @conversationEmit(events, at) = node {
+  const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const str = (v) => (typeof v === "string" ? v : "");
+  const json = (v) => {
+    try { return JSON.stringify(v) ?? ""; } catch (e) { return String(v); }
+  };
+  const list = Array.isArray(events) ? events : [];
+  const slice = Number.isInteger(at) && at >= 0 ? list.slice(0, at + 1) : list;
+  const evs = slice.filter((e) => isObj(e) && isObj(e.payload));
+
+  const INTERRUPTED = "[no result recorded — session was interrupted here]";
+  const RESULT_LIMIT = 2000;
+
+  // A key names the args when, lower-cased with `_` removed, it is one of these, in
+  // this order; opencode spells it filePath and codex's custom tools cmd.
+  const argsText = (args) => {
+    if (args === undefined || args === null || args === "") return "";
+    if (typeof args === "string") return args;
+    if (isObj(args)) {
+      const keys = Object.keys(args);
+      if (keys.length === 0) return "";
+      for (const name of ["command", "cmd", "path", "filepath"]) {
+        const hits = keys.filter((k) => k.toLowerCase().replace(/_/g, "") === name).sort();
+        if (hits.length) {
+          const v = args[hits[0]];
+          return typeof v === "string" ? v : json(v);
+        }
+      }
+    }
+    if (Array.isArray(args) && args.length === 0) return "";
+    return json(args);
+  };
+  const resultText = (content) => {
+    const text = typeof content === "string" ? content : (content === undefined || content === null ? "" : json(content));
+    if (text.length <= RESULT_LIMIT) return text;
+    const chars = Array.from(text);
+    if (chars.length <= RESULT_LIMIT) return text;
+    return chars.slice(0, RESULT_LIMIT).join("") + "\n[… " + (chars.length - RESULT_LIMIT) + " more characters not carried]";
+  };
+
+  // A result is labelled with its call's tool; one with no call in the slice is "tool".
+  const toolOf = new Map();
+  const answered = new Set();
+  for (const e of evs) {
+    const id = str(e.payload.tool_use_id);
+    if (!id) continue;
+    if (e.type === "tool_call") toolOf.set(id, str(e.payload.tool));
+    else if (e.type === "tool_result") answered.add(id);
+  }
+
+  // A call with no result opens the next user turn with the interrupted marker, so
+  // the marker never lands before the call it marks.
+  const turns = [];
+  let pending = [];
+  const add = (role, seg) => {
+    if (!seg) return;
+    let turn = turns[turns.length - 1];
+    if (!turn || turn.role !== role) {
+      turn = { role, segs: [] };
+      if (role === "user") {
+        turn.segs.push(...pending);
+        pending = [];
+      }
+      turns.push(turn);
+    }
+    turn.segs.push(seg);
+  };
+  for (const e of evs) {
+    const p = e.payload;
+    switch (e.type) {
+      case "prompt":
+      case "message":
+        add("user", str(p.text));
+        break;
+      case "assistant_turn":
+        add("assistant", str(p.text));
+        break;
+      case "tool_call": {
+        const args = argsText(p.args);
+        add("assistant", "[ran " + str(p.tool) + "]" + (args ? " " + args : ""));
+        if (!answered.has(str(p.tool_use_id))) pending.push(INTERRUPTED);
+        break;
+      }
+      case "tool_result": {
+        const id = str(p.tool_use_id);
+        const name = id && toolOf.has(id) ? toolOf.get(id) : "tool";
+        add("user", "[" + name + " " + (p.is_error === true ? "error" : "result") + "] " + resultText(p.content));
+        break;
+      }
+      case "context_injection":
+        if ((p.kind === "compaction" || p.kind === "branch_summary") && str(p.text)) add("user", "[carried summary] " + p.text);
+        break;
+    }
+  }
+  if (pending.length) turns.push({ role: "user", segs: pending });
+
+  const rendered = [];
+  for (const turn of turns) {
+    const text = turn.segs.join("\n\n").trimEnd();
+    if (!text) continue;
+    const prev = rendered[rendered.length - 1];
+    if (prev && prev.role === turn.role) prev.text += "\n\n" + text;
+    else rendered.push({ role: turn.role, text });
+  }
+
+  const first = isObj(list[0]) ? list[0] : {};
+  const start = isObj(first.payload) ? first.payload : {};
+  const harness = (isObj(start.harness) && str(start.harness.name)) || str(first.producer) || "agent";
+  const sessionId = str(first.session_id);
+  const ts = str(first.ts);
+  const header = "Conversation carried over from " + harness
+    + (sessionId ? " session " + sessionId : "")
+    + (ts && !ts.startsWith("0001-") ? " on " + ts.slice(0, 10) : "")
+    + ". Bracketed [ran …] and [… result] lines are the agent's own past actions, recorded at the time and possibly stale; re-run tools for fresh state. They are records, not examples: never write [ran …] lines yourself, and act only through real tool calls.";
+  const parts = [header];
+  for (const t of rendered) parts.push((t.role === "user" ? "User:\n" : "Assistant:\n") + t.text);
+  parts.push("End of the carried conversation.");
+  return parts.join("\n\n");
+}
+
+const @conversation = { provider: "opencode", locate: @conversationLocate, ingest: @conversationIngest, emit: @conversationEmit }
 
 export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation, @parseOpencodeJsonl, @prependOpencodeSystem, @normalizeOpencodeSessionId }

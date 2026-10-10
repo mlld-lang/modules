@@ -36,3 +36,11 @@ const @test_on_envelope_keys = @keys(@onResult) == "_mlld,value"
 const @test_on_envelope_value = @onResult.value == "answer"
 const @test_on_envelope_session = @onResult._mlld.sessionId == "3c1f0b52-8e4d-4a7b-9f21-6d5e4c3b2a10"
 const @test_on_envelope_provider = @onResult._mlld.provider == "pi"
+
+>> ── runtime continue ──
+
+>> The runtime's continue config names the recorded session only under _mlld, so the
+>> call saves to a fresh id, the one @pi passes as the fork's --session-id and returns.
+const @forkCall = @piSession({ _mlld: { resume: { sessionId: "7e5e5e5e-1234-4321-8abc-def012345678", provider: "pi", continue: true, fork: true } } })
+const @test_fork_session_is_new = @isUuid(@forkCall.sessionId) && @forkCall.sessionId != "7e5e5e5e-1234-4321-8abc-def012345678"
+const @test_fork_result_returns_new_id = @piResult("answer", @forkCall)._mlld.sessionId == @forkCall.sessionId

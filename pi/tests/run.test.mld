@@ -23,31 +23,32 @@ exe @sessionFiles(agent) = sh { find "$agent/sessions" -type f -name '*.jsonl' |
 exe @baseName(path) = js { return path.split("/").pop(); }
 >> pi's rule for a cwd's folder name (session-manager.js getDefaultSessionDirPath).
 exe @encodeCwd(cwd) = js { return "--" + cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-") + "--"; }
+exe @isUuid(s) = js { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s); }
 exe @parentName(path) = js { const parts = path.split("/"); return parts[parts.length - 2]; }
 
 >> ── dir ──
 
-const @inDir = @runPiSh("hi", @workdir, "", "", "", "", "", "", "", "", @stub)
+const @inDir = @runPiSh("hi", @workdir, "", "", "", "", "", "", "", "", "", @stub)
 const @test_dir_is_pwd = @has(@inDir, `pwd=${@workdir}`)
 const @test_dir_not_a_flag = !@hasPrefix(@inDir, "arg=--dir")
 
-const @missingDir = try @runPiSh("hi", `${@fixtures}/nonexistent`, "", "", "", "", "", "", "", "", @stub)
+const @missingDir = try @runPiSh("hi", `${@fixtures}/nonexistent`, "", "", "", "", "", "", "", "", "", @stub)
 const @test_missing_dir_fails = !@missingDir.ok
 
 >> ── flags ──
 
-const @flagged = @runPiSh("hi", "", "", "", "", "--no-tools --no-context-files", "", "", "", "", @stub)
+const @flagged = @runPiSh("hi", "", "", "", "", "--no-tools --no-context-files", "", "", "", "", "", @stub)
 const @test_flags_reach_pi = @has(@flagged, "arg=--no-context-files")
 const @test_flags_word_split = @has(@flagged, "arg=--no-tools")
 
 >> ── session ──
 
-const @unsaved = @runPiSh("hi", "", "", "", "", "", "", "", "", "", @stub)
+const @unsaved = @runPiSh("hi", "", "", "", "", "", "", "", "", "", "", @stub)
 const @test_no_session_id_means_no_session = @has(@unsaved, "arg=--no-session")
 
 >> A session is saved in pi's own layout: <agent>/sessions/<encoded cwd>/<timestamp>_<id>.jsonl.
 const @agentDir = @emptyDir(`${@fixtures}/agent`)
-const @saved = @runPiSh("hi", @workdir, "", "", "", "", "", "", @sid, @agentDir, @stub)
+const @saved = @runPiSh("hi", @workdir, "", "", "", "", "", "", @sid, @agentDir, "", @stub)
 const @sessionFile = @sessionFiles(@agentDir).trim()
 const @test_one_session_file = @sessionFile != "" && !@sessionFile.includes("\n")
 const @test_session_file_passed = @argsAfter(@saved, "--session") == @sessionFile
@@ -60,7 +61,7 @@ const @test_header_type = @header.type == "session"
 const @test_header_cwd_is_dir = @header.cwd == @workdir
 
 >> The same id again continues the file it already has, from any directory.
-const @again = @runPiSh("hi", "", "", "", "", "", "", "", @sid, @agentDir, @stub)
+const @again = @runPiSh("hi", "", "", "", "", "", "", "", @sid, @agentDir, "", @stub)
 const @test_same_id_same_file = @argsAfter(@again, "--session") == @sessionFile
 const @test_same_id_no_second_file = @sessionFiles(@agentDir).trim() == @sessionFile
 
@@ -76,8 +77,45 @@ const @test_pi_stub_wrote_session = @readFile(@piSessionFile).includes('"type":"
 
 >> The text reaches pi through a file, unchanged, backticks and ${…} included.
 const @systemText = "Answer in `code` only, never ${literally}; say \"ok\"."
-const @withSystem = @runPiSh("hi", "", "", "", @systemText, "", "", "", "", "", @stub)
+const @withSystem = @runPiSh("hi", "", "", "", @systemText, "", "", "", "", "", "", @stub)
 const @systemArgValue = @argsAfter(@withSystem, "--append-system-prompt")
 const @test_system_passed_as_file = @systemArgValue.includes("pi-system-") && @systemArgValue != @systemText
 const @test_system_file_holds_text = @has(@withSystem, `system=${@systemText}`)
 const @test_no_system_no_flag = !@hasPrefix(@unsaved, "arg=--append-system-prompt")
+
+>> ── runtime continue: fork, never resume in place ──
+
+>> The config the runtime builds for a native continue, plus the stub, a working
+>> directory, and an agent dir standing in for ~/.pi/agent.
+exe @runtimeResume(bin, agent, dir, sessionId, fork) = js {
+  const resume = { sessionId, provider: "pi", continue: true };
+  if (fork) resume.fork = true;
+  return { piBin: bin, agentDir: agent, dir, _mlld: { resume } };
+}
+>> A scratch agent dir holding a copy of the conversation fixtures' saved session.
+exe @forkAgent(dir, home) = sh { rm -rf "$dir"; mkdir -p "$dir"; cp -R "$home/sessions" "$dir/sessions"; echo "$dir" }
+
+const @forkSid = "7e5e5e5e-1234-4321-8abc-def012345678"
+const @forkHome = @forkAgent(`${@fixtures}/fork-agent`, `${@root}/pi/tests/fixtures/conversation/home`)
+const @forkSource = `${@forkHome}/sessions/--tmp-proj--/2026-09-10T00-22-39-649Z_${@forkSid}.jsonl`
+const @forked = @pi("again", @runtimeResume(@stub, @forkHome, @workdir, @forkSid, true))
+const @test_fork_names_source = @argsAfter(@forked, "--fork") == @forkSource
+const @forkNewId = @argsAfter(@forked, "--session-id")
+const @test_fork_new_session_id = @isUuid(@forkNewId) && @forkNewId != @forkSid
+const @test_fork_session_dir_under_agent = @argsAfter(@forked, "--session-dir") == `${@forkHome}/sessions/${@encodeCwd(@workdir)}`
+const @test_fork_no_session_flag = !@has(@forked, "arg=--session") && !@has(@forked, "arg=--no-session")
+>> pi writes the branch itself and refuses an id that already has a file.
+const @test_fork_writes_no_file_first = @sessionFiles(@forkHome).trim() == @forkSource
+
+const @unknownFork = try @pi("again", @runtimeResume(@stub, @forkHome, @workdir, "7e5e5e5e-1234-4321-8abc-def012345679", true))
+const @test_fork_unknown_session_fails = !@unknownFork.ok
+const @test_fork_unknown_session_says_so = @unknownFork.error.message.includes("no saved session 7e5e5e5e-1234-4321-8abc-def012345679 to fork")
+
+const @badFork = try @pi("again", @runtimeResume(@stub, @forkHome, @workdir, "../../x", true))
+const @test_fork_non_uuid_fails = !@badFork.ok && @badFork.error.message.includes("must be a UUID")
+
+>> Without fork a runtime resume is ignored: today's fresh-session line.
+const @notForked = @pi("again", @runtimeResume(@stub, @forkHome, @workdir, @forkSid, false))
+const @freshFile = @argsAfter(@notForked, "--session")
+const @test_resume_without_fork_starts_fresh = @freshFile.startsWith(`${@forkHome}/sessions/${@encodeCwd(@workdir)}/`) && !@freshFile.endsWith(`_${@forkSid}.jsonl`)
+const @test_resume_without_fork_no_fork_flag = !@has(@notForked, "arg=--fork")
