@@ -1,4 +1,4 @@
-needs { codex, js: [], node: [] }
+needs { js: [], node: [] }
 
 >> ── Stream format adapter for Codex CLI JSONL output (codex exec --json) ──
 const @codexStreamFormat = {
