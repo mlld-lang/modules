@@ -226,4 +226,32 @@ ${@body.trim()}
 </observed>`
 ]
 
-export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render }
+>> ── Versions ──
+>>
+>> Core counts every applied write to a state slot in `<slot>.mx.version`, so the module
+>> only reads it. Versions count writes, not changes: an identical `upsert` bumps it.
+
+>> A slot's write count (0 if never written), or null for a family the shelf lacks.
+exe @version(st, family) = [
+  if !@slotNames(@st).includes(@family) [ => null ]
+  => @st[@family].mx.version
+]
+
+>> `{ <family>: <version> }` for each family of the shelf in `families` (default: all).
+exe @versions(st, families = null) = [
+  let @allowed = @allowedFamilies(@st, @families)
+  let @present = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
+  >> A `for` yielding `{ [key]: value }` collects into one object; with no keys it yields `[]`.
+  let @counts = for @f in @present => { [@f]: @st[@f].mx.version }
+  => match [ @present.length > 0 => @counts; * => {} ]
+]
+
+>> The families in `families` (default: all) written since `snapshot`, a `@versions`
+>> result. A family missing from the snapshot, or not counted as a number there, counts as 0.
+exe @changedSince(st, snapshot, families = null) = [
+  let @before = match [ @typeof(@snapshot) == "object" => @snapshot; * => {} ]
+  let @current = @versions(@st, @families)
+  => for @f, @v in @current if @v > match [ @typeof(@before[@f]) == "number" => @before[@f]; * => 0 ] => @f
+]
+
+export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @version, @versions, @changedSince }

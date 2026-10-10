@@ -151,6 +151,23 @@ llm .role:planner @planner(prompt, config) = …
 show @planner("Plan the next step", { fyi: @shelfView })
 ```
 
+### Versions: `@version`, `@versions`, `@changedSince`
+
+Core counts every write applied to a slot (`upsert`, `append`, `set`, `remove`, `clear`) and these read that count. Versions count writes, not changes: an `upsert` of a record identical to the stored one still bumps it. Use `@put`'s `redundant` to detect writes that changed nothing.
+
+- `@version(st, family)`: the slot's write count, `0` if never written; `null` for a family the shelf lacks.
+- `@versions(st, families?)`: `{ <family>: <count> }` for each family (default: every slot). A plain object the caller can keep as a snapshot.
+- `@changedSince(st, snapshot, families?)`: the families whose count is higher than in `snapshot`. A family missing from `snapshot` counts as `0`.
+
+```mlld
+const @before = @versions(@st)
+exe .role:worker @fileAll(s, rs) = @observe(@s, @rs)
+const @w = @fileAll(@st, [@mkContact("c3", "Cy")])
+show @changedSince(@st, @before)   >> ["contact"]
+```
+
+Migrating from a shelf declared `with { versioned: true }`: delete that option and read versions with `@version`. The counter is always on.
+
 ## License
 
 CC0 - Public Domain

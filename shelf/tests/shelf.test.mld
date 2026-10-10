@@ -1,7 +1,7 @@
 >> Tests for @mlld/shelf: address lookup and {ref} resolution.
 >> Run: mlld test shelf/tests/
 
-import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render } from "../index.mld"
+import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @version, @versions, @changedSince } from "../index.mld"
 
 record @contact [
   key id
@@ -249,6 +249,73 @@ llm .role:admin @adminAgent(prompt, config) = `${@config.system}`
 const @plannerSaw = @plannerAgent("go", { system: "P", fyi: @shelfView })
 const @adminSaw = @adminAgent("go", { system: "A", fyi: @shelfView })
 const @test_render_fyi_follows_reader = @plannerSaw.includes(`"fields":{"name":"Ada"}`) && !@plannerSaw.includes("555-1234") && @adminSaw.includes("555-1234")
+
+>> ── versions ──
+>> Each operation runs in its own exe so the version can be read before and after it.
+record @tick [
+  key id
+  id: string [ kind "tick" ]
+  n: number
+  * { read: [id, n] }
+  .role:worker { write: { state: [upsert, clear, remove] } }
+]
+record @tock [
+  key id
+  id: string [ kind "tock" ]
+  * { read: [id] }
+  .role:worker { write: { state: [upsert] } }
+]
+exe @mkTick(i, n) = { id: @i, n: @n } => tick
+exe @mkTock(i) = { id: @i } => tock
+const @vrecs = { tick: @tick, tock: @tock }
+state @vs from @vrecs
+exe .role:worker @tickUpsert(s, r) = @s.upsert("tick", @r)
+exe .role:worker @tickAppend(s, r) = @s.append("tick", @r)
+exe .role:worker @tickRemove(s, r) = @s.remove("tick", @r)
+exe .role:worker @tickSet(s, r) = @s.set({ tick: [@r] })
+exe .role:worker @tickClear(s) = @s.clear("tick")
+
+const @v0 = @version(@vs, "tick")
+const @test_version_starts_at_zero = @v0 == 0 && @version(@vs, "tock") == 0
+const @w1 = @tickUpsert(@vs, @mkTick("t1", 1))
+const @v1 = @version(@vs, "tick")
+const @test_version_upsert_bumps = @v1 > @v0
+const @w2 = @tickUpsert(@vs, @mkTick("t1", 1))
+const @v2 = @version(@vs, "tick")
+>> Versions count writes, not changes.
+const @test_version_identical_upsert_bumps = @v2 > @v1
+const @w3 = @tickAppend(@vs, @mkTick("t2", 2))
+const @v3 = @version(@vs, "tick")
+const @test_version_append_bumps = @v3 > @v2
+const @w4 = @tickRemove(@vs, @mkTick("t2", 2))
+const @v4 = @version(@vs, "tick")
+const @test_version_remove_bumps = @v4 > @v3
+const @w5 = @tickSet(@vs, @mkTick("t3", 3))
+const @v5 = @version(@vs, "tick")
+const @test_version_set_bumps = @v5 > @v4
+const @w6 = @tickClear(@vs)
+const @v6 = @version(@vs, "tick")
+const @test_version_clear_bumps = @v6 > @v5
+const @test_version_other_slot_untouched = @version(@vs, "tock") == 0
+const @test_version_unknown_family = @version(@vs, "nope") == null && @version(@vs, null) == null && @version("x", "tick") == null
+
+const @snap = @versions(@vs)
+const @test_versions_snapshot = @snap.tick == @v6 && @snap.tock == 0 && @snap.mx.keys.length == 2
+const @test_versions_families = @versions(@vs, ["tock", "nope"]).mx.keys.length == 1 && @versions(@vs, []).mx.keys.length == 0
+const @o6 = @observeAs(@vs, [@mkTock("k1")])
+const @test_changedSince_only_touched = @changedSince(@vs, @snap) == ["tock"]
+const @snap2 = @versions(@vs)
+const @o7 = @observeAs(@vs, [@mkTick("t9", 9)])
+const @test_changedSince_second_observe = @changedSince(@vs, @snap2) == ["tick"]
+const @test_changedSince_families = @changedSince(@vs, @snap, ["tick"]) == ["tick"]
+const @test_changedSince_missing_is_zero = @changedSince(@vs, { tick: @snap2.tick }) == ["tick", "tock"]
+const @test_changedSince_bad_snapshot = @changedSince(@vs, "x") == ["tick", "tock"] && @changedSince(@vs, { tick: "9999", tock: 9999 }) == ["tick"]
+const @test_changedSince_none = @changedSince(@vs, @versions(@vs)) == []
+
+>> A record-typed slot of a plain state counts the same way.
+state @ps = { label: string?, tick: tick[] }
+const @pw = @tickUpsert(@ps, @mkTick("p1", 1))
+const @test_version_plain_state = @version(@ps, "tick") == 1 && @versions(@ps, ["tick"]).tick == 1
 
 >> ── no role labels ──
 >> An exe with a role label would run its writes as that role instead of the caller's.
