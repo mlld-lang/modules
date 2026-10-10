@@ -343,6 +343,41 @@ const @test_cache_twins_separate = @twinA.memo.mx.version == @twinB.memo.mx.vers
 const @r3 = @observeAs(@rs2, [@mkMemo("later", "after write")])
 const @other2 = @renderPlannerCached(@rs2, @ckey2)
 const @test_cache_write_shows = @other2.includes("after write") && @other2.includes("second state")
+>> A slot holding a `.secret` value caches too, and the cached text keeps `.secret`. The
+>> planner never sees the key; the admin does. A write between renders still shows.
+record @vault [
+  key id
+  id: string [ kind "vault" ]
+  label: string
+  key: string
+  .role:planner { read: [id, label, { omit: "key" }] }
+  .role:admin { read: [id, label, key] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkVault(i, l, k) = { id: @i, label: @l, key: @k } => vault
+const @vrecs2 = { vault: @vault }
+state @vaultSt from @vrecs2
+const .secret @apiKey = "sk-FAKE-123"
+exe .role:worker @vaultUpsert(s, r) = @s.upsert("vault", @r)
+const @vw1 = @vaultUpsert(@vaultSt, @mkVault("v1", "prod", @apiKey))
+const @vkey = @cacheFor(@vaultSt)
+const @vPlain = @renderAsPlanner(@vaultSt)
+const @vAdminPlain = @renderAsAdmin(@vaultSt)
+const @vp1 = @renderPlannerCached(@vaultSt, @vkey)
+const @vp2 = @renderPlannerCached(@vaultSt, @vkey)
+const @va1 = @renderAdminCached(@vaultSt, @vkey)
+const @va2 = @renderAdminCached(@vaultSt, @vkey)
+const @test_cache_secret_slot = @vp1 == @vPlain && @vp2 == @vPlain && @va1 == @vAdminPlain && @va2 == @vAdminPlain && !@vp2.includes("sk-FAKE") && @va2.includes("sk-FAKE-123")
+const @test_cache_secret_label_kept = @vAdminPlain.mx.labels.includes("secret") && @va2.mx.labels.includes("secret") && @va2.mx.labels.includes(".src:state:@renderCache.slots")
+const @vw2 = @vaultUpsert(@vaultSt, @mkVault("v2", "staging", @apiKey))
+const @vp3 = @renderPlannerCached(@vaultSt, @vkey)
+const @va3 = @renderAdminCached(@vaultSt, @vkey)
+const @test_cache_secret_write_shows = @vp3.includes("staging") && @va3.includes("staging") && @va3 == @renderAsAdmin(@vaultSt)
+
+>> A `.secret` entry in the cache does not label another state's cached render.
+const @cleanAfter = @renderPlannerCached(@rs, @ckey)
+const @test_cache_secret_not_spread = @cleanAfter == @plainPlanner && !@cleanAfter.mx.labels.includes("secret") && !@cleanAfter.mx.labels.includes(".src:state:@vaultSt.vault") && @cleanAfter.mx.labels.includes(".src:state:@renderCache.slots")
+
 >> No key, or a role not listed: rendered as before, nothing cached.
 exe .role:planner @renderNoKey(s) = @render(@s, null, { cache: @cacheRoles })
 exe .role:worker @renderUnlisted(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })

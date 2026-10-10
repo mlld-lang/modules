@@ -241,6 +241,7 @@ ${@e}
 >> next render of that slot replaces it. The state is the module's own, with no record
 >> type, so writing it needs no grant from the caller.
 state @renderCache = { counter: number?, slots: object? }
+@renderCache.set({ slots: {} })
 
 >> A cache key for one state. mlld shows no identity on a state (two modules may each
 >> declare `@s`), so the code that declares the state mints a key once and passes it to
@@ -271,16 +272,24 @@ exe @holdsHandle(text) = [
   => @handles.some(@item.isString() && @text.includes(@item))
 ]
 
+>> The cache write must not depend on a branch taken on the rendered data: an `if` or an
+>> early return on a value labeled `.secret` puts every later write under that label, and
+>> core refuses a write to an unlabeled state there. So the hit and the text are computed
+>> as values, and the entry is written on every call, a hit included.
+>>
+>> Entries are read straight from the state by key. A field read that way carries only its
+>> own labels; a copy of the whole object (through `match`, say) carries every entry's, and
+>> one `.secret` slot would then label every cached render.
 exe @cachedSlotText(st, slot, ctx) = [
   if @ctx == null [ => @slotText(@st, @slot) ]
   let @slotVersion = @st[@slot].mx.version
   let @entryKey = `${@ctx.id}|${@ctx.role}|${@slot}`
-  let @stored = match [ @typeof(@renderCache.slots) == "object" => @renderCache.slots; * => {} ]
-  let @hit = @stored[@entryKey]
-  if @typeof(@hit) == "object" && @hit.version == @slotVersion [ => @hit.text ]
-  let @text = @slotText(@st, @slot)
-  if @holdsHandle(@text) [ => @text ]
-  let @written = @renderCache.set({ slots: { ...@stored, [@entryKey]: { version: @slotVersion, text: @text } } })
+  let @hit = @renderCache.slots[@entryKey]
+  let @fresh = @typeof(@hit) == "object" && @hit.version == @slotVersion && @hit.cacheable == true
+  let @text = match [ @fresh => @hit.text; * => @slotText(@st, @slot) ]
+  let @cacheable = !@holdsHandle(@text)
+  let @kept = match [ @cacheable => @text; * => "" ]
+  let @written = @renderCache.set({ slots: { ...@renderCache.slots, [@entryKey]: { version: @slotVersion, text: @kept, cacheable: @cacheable } } })
   => @text
 ]
 
