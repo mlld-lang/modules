@@ -231,6 +231,51 @@ const @test_render_empty_family = @renderAsAdmin(@rs, []) == ""
 >> With no role active, the record's `*` rule decides: memo shows both fields, card none.
 const @test_render_no_role = @render(@rs).includes(@memoLine) && !@render(@rs).includes("Ada")
 
+>> A slot holding two record types renders each record by its own type's read rules: `kx`
+>> shows `f` to the planner, `ky` gives the planner only a handle to it.
+record @kx [
+  key id
+  id: string [ kind "k" ]
+  f: string
+  .role:planner { read: [id, f] }
+  .role:worker { write: { shelves: true } }
+]
+record @ky [
+  key id
+  id: string [ kind "k" ]
+  f: string
+  .role:planner { read: [id, { handle: "f" }] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkKx(i, f) = { id: @i, f: @f } => kx
+exe @mkKy(i, f) = { id: @i, f: @f } => ky
+const @krecs = { kx: @kx, ky: @ky }
+state @mixed from @krecs
+exe .role:worker @fileKx(s, rx, ry) = [
+  let @a = @s.upsert("kx", @rx)
+  let @b = @s.upsert("kx", @ry)
+  => "filed"
+]
+const @kf = @fileKx(@mixed, @mkKx("1", "open"), @mkKy("2", "HIDDEN"))
+const @mixedOut = @renderAsPlanner(@mixed)
+const @test_render_mixed_slot_by_type = @mixedOut.includes(`"fields":{"id":"1","f":"open"},"ref_fields":[]`) && @mixedOut.includes(`"fields":{"id":"2"},"ref_fields":["f"]`) && !@mixedOut.includes("HIDDEN") && !@mixedOut.includes("handle")
+
+>> With no role active, a field the `*` rule masks is named in `ref_fields`, and neither its
+>> preview nor its handle reaches `fields`.
+record @veiled [
+  key id
+  id: string [ kind "veiled" ]
+  text: string
+  * { read: [id, { mask: "text" }] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkVeiled(i, t) = { id: @i, text: @t } => veiled
+const @vlrecs = { veiled: @veiled }
+state @vl from @vlrecs
+const @vf = @observeAs(@vl, [@mkVeiled("v1", "SECRETTEXT")])
+const @veiledOut = @render(@vl)
+const @test_render_no_role_masked = @veiledOut.includes(`"fields":{"id":"v1"},"ref_fields":["text"]`) && !@veiledOut.includes("preview") && !@veiledOut.includes("handle") && !@veiledOut.includes("SECRETTEXT")
+
 >> A shelf past the recursion limit (64) renders every record, one line each.
 const @bigRecs = { memo: @memo }
 state @big from @bigRecs

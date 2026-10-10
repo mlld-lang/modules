@@ -187,18 +187,23 @@ exe @readModes(recordName) = [
 exe @slotLines(st, slot) = [
   let @stored = @st[@slot]
   if @stored.length == 0 [ => [] ]
-  let @modes = @readModes(@stored[0].mx.address.record)
-  let @hasModes = @modes.mx.keys.length > 0
-  let @shownByMode = for @f, @mode in @modes if @mode == "bare" || @mode == "value" => @f
-  let @citedByMode = for @f, @mode in @modes if @mode == "mask" || @mode == "handle" || @mode == "protected" => @f
+  >> A slot can hold records of more than one type, and each type has its own read rules.
+  let @names = for @rec in @stored => @rec.mx.address.record
+  let @types = for @t in @names if @names.indexOf(@t) == @t.mx.index => @t
+  let @modesByType = for @t in @types => { [@t]: @readModes(@t) }
   => for @rec in @stored [
+    let @modes = @modesByType[@rec.mx.address.record]
+    let @hasModes = @modes.mx.keys.length > 0
     let @view = @project(@rec)
     let @wrapped = for @f, @v in @view if @typeof(@v) == "object" && @v.mx.keys.includes("handle") && @v.mx.keys.every(@item == "handle" || @item == "preview") => @f
     let @shown = match [
-      @hasModes => @shownByMode;
+      @hasModes => for @f, @mode in @modes if @mode == "bare" || @mode == "value" => @f;
       * => for @f, @v in @view if !@wrapped.includes(@f) => @f
     ]
-    let @cited = match [ @hasModes => @citedByMode; * => @wrapped ]
+    let @cited = match [
+      @hasModes => for @f, @mode in @modes if @mode == "mask" || @mode == "handle" || @mode == "protected" => @f;
+      * => @wrapped
+    ]
     >> A `for` yielding `{ [key]: value }` collects into one object; with no keys it yields `[]`.
     let @picked = for @f in @shown => { [@f]: @view[@f] }
     let @fields = match [ @shown.length > 0 => @picked; * => {} ]
