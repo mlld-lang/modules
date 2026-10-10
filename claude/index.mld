@@ -1,4 +1,4 @@
-needs { sh }
+needs { claude }
 
 >> ── Constants ──
 
@@ -60,18 +60,12 @@ const @claudeStreamFormat = {
 }
 
 >> Returns the subset of native tools to disallow (all minus the ones the user selected)
-exe @computeDisallowed(native, all) = sh {
-  if [ -z "$native" ]; then
-    printf '%s' "$all"
-  else
-    printf '%s' "$all" | tr ',' '\n' | while IFS= read -r tool; do
-      case ",$native," in
-        *",$tool,"*) ;;
-        *) printf '%s,' "$tool" ;;
-      esac
-    done | sed 's/,$//'
-  fi
-}
+exe @computeDisallowed(native, all) = [
+  let @picked = @native ? @native.split(",") : []
+  let @tools = @all.split(",")
+  let @rest = for @tool in @tools if !@picked.includes(@tool) => @tool
+  => @rest.join(",")
+]
 
 >> ── Session / resume helpers ──
 
@@ -179,31 +173,38 @@ exe @claudeResult(inputValue, resume) = match [
 
 >> ── Command line ──
 
->> sh because each optional flag has to be its own argument: a value pasted into a
->> cmd body is split on spaces, and a flag string holding quotes is refused there.
->> Every argument is appended to "$@", so a value with spaces stays one argument and
->> `--tools ""` keeps its empty value. The prompt goes in on stdin.
->> Parameters are positional; empty means "leave the flag off". fork branches the
->> resumed session (--fork-session) instead of appending to it. claudeBin is last so
->> tests can point it at a stub; empty runs `claude` from PATH.
-exe @runClaudeSh(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, emptyNativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = sh {
-  set -e
-  if [ -n "$dir" ]; then cd "$dir" || exit 1; fi
-  set -- -p
-  if [ -n "$bare" ]; then set -- "$@" --bare; fi
-  if [ -n "$sessionId" ]; then set -- "$@" --session-id "$sessionId"; fi
-  if [ -n "$outputFormat" ]; then set -- "$@" --output-format "$outputFormat"; fi
-  set -- "$@" --model "$model"
-  if [ -n "$nativeTools" ]; then set -- "$@" --tools "$nativeTools"; fi
-  if [ -n "$emptyNativeTools" ]; then set -- "$@" --tools ""; fi
-  if [ -n "$resumeId" ]; then set -- "$@" --resume "$resumeId"; fi
-  if [ -n "$fork" ]; then set -- "$@" --fork-session; fi
-  if [ -n "$system" ]; then set -- "$@" --append-system-prompt "$system"; fi
-  if [ -n "$mcpConfig" ]; then set -- "$@" --mcp-config "$mcpConfig" --strict-mcp-config; fi
-  if [ -n "$allowed" ]; then set -- "$@" --allowedTools "$allowed"; fi
-  if [ -n "$disallowed" ]; then set -- "$@" --disallowedTools "$disallowed"; fi
-  printf '%s' "$prompt" | env -u CLAUDECODE "${claudeBin:-claude}" "$@"
-}
+>> Each `${v:+--flag "$v"}` adds the flag only when v is non-empty and keeps a value
+>> with spaces or quotes as one argument. `--tools ""` is written out in its own
+>> bodies because macOS /bin/sh (bash 3.2) drops an empty argument inside `${v:+…}`.
+>> `claude` is written literally because a policy refuses a command whose program
+>> comes from a variable; the `$claudeBin` bodies exist only so tests can run a stub.
+>> The prompt goes in on stdin.
+exe @claudeCmd(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork) = cmd:@dir {
+  env -u CLAUDECODE claude -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" ${nativeTools:+--tools "$nativeTools"} ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
+} with { stdin: @prompt }
+
+exe @claudeCmdNoTools(prompt, dir, model, bare, sessionId, outputFormat, resumeId, system, mcpConfig, allowed, disallowed, fork) = cmd:@dir {
+  env -u CLAUDECODE claude -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" --tools "" ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
+} with { stdin: @prompt }
+
+exe @claudeBinCmd(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = cmd:@dir {
+  env -u CLAUDECODE "$claudeBin" -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" ${nativeTools:+--tools "$nativeTools"} ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
+} with { stdin: @prompt }
+
+exe @claudeBinCmdNoTools(prompt, dir, model, bare, sessionId, outputFormat, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = cmd:@dir {
+  env -u CLAUDECODE "$claudeBin" -p ${bare:+--bare} ${sessionId:+--session-id "$sessionId"} ${outputFormat:+--output-format "$outputFormat"} --model "$model" --tools "" ${resumeId:+--resume "$resumeId"} ${fork:+--fork-session} ${system:+--append-system-prompt "$system"} ${mcpConfig:+--mcp-config "$mcpConfig" --strict-mcp-config} ${allowed:+--allowedTools "$allowed"} ${disallowed:+--disallowedTools "$disallowed"}
+} with { stdin: @prompt }
+
+>> Parameters are positional; empty means "leave the flag off". emptyNativeTools
+>> passes `--tools ""` (no native tools) and is only set when nativeTools is empty.
+>> fork branches the resumed session (--fork-session) instead of appending to it.
+>> claudeBin is last so tests can point it at a stub; empty runs `claude` from PATH.
+exe @runClaude(prompt, dir, model, bare, sessionId, outputFormat, nativeTools, emptyNativeTools, resumeId, system, mcpConfig, allowed, disallowed, fork, claudeBin) = match [
+  @claudeBin && @emptyNativeTools => @claudeBinCmdNoTools(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork, @claudeBin)
+  @claudeBin => @claudeBinCmd(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @nativeTools, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork, @claudeBin)
+  @emptyNativeTools => @claudeCmdNoTools(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork)
+  * => @claudeCmd(@prompt, @dir, @model, @bare, @sessionId, @outputFormat, @nativeTools, @resumeId, @system, @mcpConfig, @allowed, @disallowed, @fork)
+]
 
 >> ── Core invocation ──
 
@@ -258,7 +259,7 @@ llm @claude(prompt, config) using { harness: { write: [".", "~/.claude", "~/.cla
   let @nativeArg = !@resuming && @toolContext && @llm.native ? @llm.native : ""
   let @emptyNativeArg = !@resuming && @llm.hasTools && !@llm.native ? "1" : ""
   let @dis = @llm.hasTools ? @computeDisallowed(@llm.native, @ccNativeTools) : ""
-  let @raw = @runClaudeSh(
+  let @raw = @runClaude(
     @prompt,
     @dir,
     @model,
@@ -758,4 +759,4 @@ exe @conversationEmit(events, at) = node {
 
 const @conversation = { provider: "claude", locate: @conversationLocate, ingest: @conversationIngest, emit: @conversationEmit }
 
-export { @claude, @haiku, @sonnet, @opus, @claudeStreamFormat, @claudeStreamSession, @conversation, @runClaudeSh }
+export { @claude, @haiku, @sonnet, @opus, @claudeStreamFormat, @claudeStreamSession, @conversation, @runClaude }
