@@ -7,3 +7,4 @@ license: CC0
 repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"
 mlldVersion: ">=2.2.0"
+needs: []
