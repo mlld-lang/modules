@@ -138,6 +138,15 @@ Records holding a `.secret` value are filed and keep the label, given one at a t
 state .secret @st from @recs
 ```
 
+This has a cost: everything read from a `.secret` shelf is labeled `.secret`, including records that hold no secret, and so is the text `@render` and `@find` return from it. Under a policy that blocks secrets from leaving (such as `@noSecretExfil`, see the mlld security guide), all of it is then treated as a secret. To keep that cost to the records that need it, give the secret-holding record types their own `.secret` shelf and keep the rest in a plain one:
+
+```mlld
+const @secretRecs = { vault: @vault }
+const @plainRecs = { contact: @contact }
+state .secret @vaults from @secretRecs
+state @contacts from @plainRecs
+```
+
 ### `@render(st, families?, options?)`
 
 The stored records in `families` (default: every slot), as the role active where `@render` is called may see them: one JSON line per record, in slot order then storage order, inside `<observed>` tags. `""` when no record is stored there.
