@@ -1,4 +1,4 @@
-needs { opencode, js: [], node: [] }
+needs { js: [], node: [] }
 
 >> ── Stream format adapter for Opencode CLI NDJSON events (opencode run --format json) ──
 >>
