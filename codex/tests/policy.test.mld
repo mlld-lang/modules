@@ -18,3 +18,17 @@ const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.incl
 >> A missing file would otherwise fall through to the codex on PATH.
 const @missing = try @codex("hi", { codexBin: "/nonexistent/codex" })
 const @test_missing_bin_refused = !@missing.ok && @missing.error.message.includes("config.codexBin is not an executable file")
+
+>> A folder named codex would otherwise fall
+>> through to the codex on PATH.
+const @folder = try @codex("hi", { codexBin: `${@root}/codex/tests/fixtures/folder/codex` })
+const @test_folder_bin_refused = !@folder.ok && @folder.error.message.includes("config.codexBin is not an executable file")
+
+>> A relative path is checked from here but looked up from dir, so with a dir it
+>> would miss and run the codex on PATH.
+const @relative = try @codex("hi", { codexBin: "codex/tests/fixtures/bin/codex", dir: "/tmp" })
+const @test_relative_bin_refused = !@relative.ok && @relative.error.message.includes("config.codexBin must be an absolute path")
+
+>> A ':' splits the PATH entry, so the lookup would miss the folder.
+const @colon = try @codex("hi", { codexBin: "/a:b/codex" })
+const @test_colon_bin_refused = !@colon.ok && @colon.error.message.includes("config.codexBin must not contain ':'")
