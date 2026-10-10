@@ -23,11 +23,12 @@ exe @familyOf(address) = [
   => @address.slice(0, @i)
 ]
 
->> The families a shelf holds, from its slot names. Exports with a `families` parameter
->> call `@slotNames` because the parameter shadows `@families` inside them.
+>> The families a shelf holds: its record slots. A plain state can also have ordinary
+>> slots (`label: string?`), whose `.mx.version` reads null. Exports with a `families`
+>> parameter call `@slotNames` because the parameter shadows `@families` inside them.
 exe @slotNames(st) = [
   if @typeof(@st) != "object" [ => [] ]
-  => for @k, @slot in @st => @k
+  => for @k, @slot in @st if @st[@k].mx.version != null => @k
 ]
 exe @families(st) = @slotNames(@st)
 

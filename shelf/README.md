@@ -44,7 +44,7 @@ show @familyOf("contact")      >> null
 
 ### `@families(st)`
 
-The names of the shelf's slots, as a list.
+The names of the shelf's record slots, as a list. A plain state such as `state @s = { label: string?, contact: contact[] }` also has ordinary slots; they are not families, so no export lists, renders or counts them.
 
 ```mlld
 show @families(@st)   >> ["contact"]

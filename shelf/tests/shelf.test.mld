@@ -357,10 +357,17 @@ const @test_changedSince_missing_is_zero = @changedSince(@vs, { tick: @snap2.tic
 const @test_changedSince_bad_snapshot = @changedSince(@vs, "x") == ["tick", "tock"] && @changedSince(@vs, { tick: "9999", tock: 9999 }) == ["tick"]
 const @test_changedSince_none = @changedSince(@vs, @versions(@vs)) == []
 
->> A record-typed slot of a plain state counts the same way.
-state @ps = { label: string?, tick: tick[] }
+>> A record-typed slot of a plain state counts the same way. Its ordinary slots are not
+>> families: they have no version, and no export lists, renders or counts them.
+state @ps = { label: string?, count: number?, items: array?, tick: tick[] }
+exe .role:worker @setLabel(s) = @s.set({ label: "x", count: 2 })
+const @pl = @setLabel(@ps)
+const @snapPs = @versions(@ps)
 const @pw = @tickUpsert(@ps, @mkTick("p1", 1))
 const @test_version_plain_state = @version(@ps, "tick") == 1 && @versions(@ps, ["tick"]).tick == 1
+const @test_version_plain_state_mixed = @families(@ps) == ["tick"] && @versions(@ps) == { tick: 1 } && @version(@ps, "label") == null && @version(@ps, "items") == null
+const @test_changedSince_plain_state_mixed = @changedSince(@ps, @snapPs) == ["tick"] && @changedSince(@ps, {}) == ["tick"]
+const @test_render_plain_state_mixed = @renderAsAdmin(@ps).includes(`"fields":{"id":"p1","n":1}`) && !@renderAsAdmin(@ps).includes("label")
 
 >> ── no role labels ──
 >> An exe with a role label would run its writes as that role instead of the caller's.
