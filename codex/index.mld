@@ -221,18 +221,22 @@ exe @codexContinueCmd(prompt, dir, model, sandbox, bypass, mcp, sub, resumeId) =
 exe @shellPath() = cmd { printf '%s' "$PATH" }
 
 >> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
-exe @codexBinError(codexBin) = js {
-  throw new Error(`codex: config.codexBin must be a file named codex, got '${codexBin}'`);
+exe @codexBinError(message) = js {
+  throw new Error(`codex: config.codexBin ${message}`);
 }
 
+exe @isExecutable(file) = cmd { test -x "$file" }
+
 >> codexBin runs another codex (a test stub) by putting its folder first on the
->> call's PATH, so the program stays the literal `codex`; a file with another
->> name can't be reached that way and is refused.
-exe @codexBinDir(codexBin) = match [
-  !@codexBin => ""
-  @codexBin == "codex" => ""
-  @codexBin.endsWith("/codex") => @codexBin.slice(0, -6)
-  * => @codexBinError(@codexBin)
+>> call's PATH, so the program stays the literal `codex`. A file with another
+>> name can't be reached that way, and a missing one would silently run the
+>> codex already on PATH, so both are refused.
+exe @codexBinDir(codexBin) = [
+  if !@codexBin || @codexBin == "codex" [ => "" ]
+  if !@codexBin.endsWith("/codex") [ => @codexBinError(`must be a file named codex, got '${@codexBin}'`) ]
+  let @found = try @isExecutable(@codexBin)
+  if !@found.ok [ => @codexBinError(`is not an executable file: '${@codexBin}'`) ]
+  => @codexBin.slice(0, -6)
 ]
 
 >> doFork branches resumeId (`codex exec fork`) instead of appending to it.
