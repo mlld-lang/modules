@@ -132,6 +132,12 @@ exe .role:worker @fileAll(s, rs) = @observe(@s, @rs)
 show @fileAll(@st, [@mkContact("c1", "Ann")]).redundant   >> true
 ```
 
+Records holding a `.secret` value are filed and keep the label, given one at a time or as a list written out in place. A list that an exe returned is different: if one of its records holds a `.secret` value, core runs every write in the loop under `.secret`, and refuses to write a state that does not carry that label ("Cannot write … this write runs under conditions labeled .secret"). Tool results usually arrive that way. Until core resolves it (mlld ticket #m-318f), declare the shelf `.secret` when it will hold secret data:
+
+```mlld
+state .secret @st from @recs
+```
+
 ### `@render(st, families?, options?)`
 
 The stored records in `families` (default: every slot), as the role active where `@render` is called may see them: one JSON line per record, in slot order then storage order, inside `<observed>` tags. `""` when no record is stored there.
