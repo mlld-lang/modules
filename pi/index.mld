@@ -1,7 +1,7 @@
 ---
 name: pi
 author: mlld
-version: 1.2.0
+version: 2.0.0
 about: Pi adapter for mlld
 bugs: https://github.com/mlld-lang/modules/issues
 repo: https://github.com/mlld-lang/modules
@@ -10,7 +10,9 @@ license: CC0
 mlld-version: ">=2.2.0"
 ---
 
-needs { sh }
+needs { pi }
+
+import { @HOME, @PATH } from @input
 
 >> Stream format adapter for Pi CLI JSONL output (pi --mode json)
 >> Maps pi's AgentEvent types to mlld's stream format conventions
@@ -64,100 +66,180 @@ exe @isPiBuiltin(name) = [
   => @piBuiltInTools.split(",").includes(`${@name}`)
 ]
 
->> ── Shell wrapper for pi ──
->>
->> Flat positional params so BashExecutor injects each one as a distinct env var.
->> Parameters are passed positionally, not by name, so order matters.
->> sessionId and agentDir come last so 8-argument callers keep --no-session.
->> An empty agentDir means pi's own: $PI_CODING_AGENT_DIR, else ~/.pi/agent.
->> forkId names a saved session to branch into sessionId instead of starting fresh.
->> piBin is last so tests can point it at a stub; empty runs `pi` from PATH.
-exe @runPiSh(prompt, dir, provider, model, systemArg, toolArg, thinking, mode, sessionId, agentDir, forkId, piBin) = sh {
-  set -e
-  export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin"
+>> ── Running pi ──
 
-  # Build flags
-  # `dir` is the working directory pi runs in, which is also the directory its
-  # file tools see. pi has no --dir flag; changing directory is what bounds them.
-  if [ -n "$dir" ]; then cd "$dir" || exit 1; fi
+>> js because mlld has no other way to raise an error a caller's `try` can read.
+exe @piFail(message) = js { throw new Error(message) }
 
-  providerFlag=()
-  if [ -n "$provider" ]; then providerFlag=(--provider "$provider"); fi
+exe @piPhysicalCwd(dir) = cmd:@dir { pwd -P }
+exe @piDefaultAgentDir() = cmd { printf '%s' "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" }
+exe @piFindSessionFiles(sessions, id) = cmd { find "$sessions" -maxdepth 2 -type f -name "*_$id.jsonl" }
+exe @piTempFile() = cmd { mktemp "${TMPDIR:-/tmp}/pi-system-XXXXXX" }
+exe @piRemoveFile(path) = cmd { rm -f "$path" }
+exe @piMakeDir(dir) = cmd { mkdir -p "$dir" }
+>> A command rather than `output`, so the file is written where pi, a separate
+>> process, reads it, and under the same fence the pi call runs in.
+exe @piWriteFile(path, text) = cmd { tee "$path" } with { stdin: @text }
 
-  modelFlag=()
-  if [ -n "$model" ]; then modelFlag=(--model "$model"); fi
+exe @piIsUuid(id) = [
+  let @m = @id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  => @m ? true : false
+]
 
-  # systemArg is the prompt text. It goes to pi as a file because pi reads a value
-  # that names an existing file as that file. It lives in the scratch TMPDIR of the run.
-  systemFlag=()
-  if [ -n "$systemArg" ]; then
-    systemFile=$(mktemp "${TMPDIR:-/tmp}/pi-system-XXXXXX")
-    trap 'rm -f "$systemFile"' EXIT
-    printf '%s' "$systemArg" > "$systemFile"
-    systemFlag=(--append-system-prompt "$systemFile")
-  fi
+>> pi's rule for a cwd's folder name (session-manager.js getDefaultSessionDirPath).
+exe @piEncodeCwd(cwd) = [
+  let @trimmed = @cwd.replace(/^[\x2f\\]/, "")
+  let @dashed = @trimmed.replaceAll(/[\x2f\\:]/g, "-")
+  => `--${@dashed}--`
+]
 
-  # Tool flags can be multiple args (e.g., --tools "read,bash" --mcp-config "/path")
-  # Pass through as-is since bash will word-split correctly
-  toolFlag=()
-  if [ -n "$toolArg" ]; then toolFlag=($toolArg); fi
+>> config.agentDir, else $PI_CODING_AGENT_DIR, else ~/.pi/agent, with a leading ~
+>> expanded.
+exe @piAgentDir(agentDir) = [
+  let @fromEnv = match [
+    @agentDir => ""
+    * => @piDefaultAgentDir()
+  ]
+  let @agent = @agentDir ? @agentDir : `${@fromEnv}`
+  => match [
+    @agent == "~" => @HOME
+    @agent.startsWith("~/") => `${@HOME}/${@agent.slice(2)}`
+    * => @agent
+  ]
+]
 
-  thinkingFlag=()
-  if [ -n "$thinking" ]; then thinkingFlag=(--thinking "$thinking"); fi
+>> The first saved file for an id. A saved session lies in sessions/ or one folder
+>> below it, as locate searches. A missing sessions/ holds none.
+exe @piFindSession(agent, id) = [
+  let @found = try @piFindSessionFiles(`${@agent}/sessions`, @id)
+  let @text = @found.ok ? `${@found.value}` : ""
+  let @lines = @text.split("\n")
+  let @files = for @line in @lines if @line != "" => @line
+  let @sorted = @files.sort()
+  => @sorted.length > 0 ? @sorted[0] : ""
+]
 
-  modeFlag=()
-  if [ -n "$mode" ]; then modeFlag=(--mode json); fi
+>> A new <timestamp>_<id>.jsonl holding only pi's header line. Given such a file pi
+>> takes the id from the header and appends to it, so writing the header first makes
+>> pi keep the id @pi reports. pi runs its tools in the cwd the header names.
+exe @piNewSessionFile(dir, cwd, sessionId) = [
+  let @time = @now
+  let @stamp = `${@time.slice(0, 19)}.000Z`
+  >> pi names a file <timestamp>_<id>.jsonl, with : and . in the timestamp as -.
+  let @fileStamp = @stamp.replaceAll({":": "-", ".": "-"})
+  let @path = `${@dir}/${@fileStamp}_${@sessionId}.jsonl`
+  let @cwdJson = @cwd.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")
+  let @header = `{"type":"session","version":3,"id":"${@sessionId}","timestamp":"${@stamp}","cwd":"${@cwdJson}"}
+`
+  let @made = @piMakeDir(@dir)
+  let @written = @piWriteFile(@path, @header)
+  => @path
+]
 
-  # Sessions go where pi keeps its own, so pi /resume lists them and
-  # @conversation.locate finds them without being told where to look.
-  sessionFlag=(--no-session)
-  agent="$agentDir"
-  if [ -z "$agent" ]; then agent="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"; fi
-  case "$agent" in "~") agent="$HOME" ;; "~/"*) agent="$HOME/${agent#??}" ;; esac
-  # pi takes the physical cwd (process.cwd()) and encodes it into a folder name
-  # as session-manager.js getDefaultSessionDirPath does.
-  cwd=$(pwd -P)
-  encoded="--$(printf '%s' "$cwd" | sed -e 's|^[/\\]||' -e 's|[/\\:]|-|g')--"
-  if [ -n "$forkId" ]; then
-    # The id is matched against file names, so anything but a UUID is refused.
-    forkId=$(printf '%s' "$forkId" | tr 'A-F' 'a-f')
-    if ! printf '%s' "$forkId" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
-      printf '@mlld/pi: session to fork must be a UUID, got %s\n' "$forkId" >&2
-      exit 1
-    fi
-    if [ -z "$sessionId" ]; then
-      printf '@mlld/pi: forking %s needs a session to save to; session: false turns saving off\n' "$forkId" >&2
-      exit 1
-    fi
-    src=$(find "$agent/sessions" -maxdepth 2 -type f -name "*_$forkId.jsonl" 2>/dev/null | sort | head -n 1)
-    if [ -z "$src" ]; then
-      printf '@mlld/pi: no saved session %s to fork under %s/sessions\n' "$forkId" "$agent" >&2
-      exit 1
-    fi
-    # pi copies the source into a new <timestamp>_<sessionId>.jsonl in the session
-    # dir and refuses an id that already has a file, so no header is written first.
-    sessionFlag=(--fork "$src" --session-id "$sessionId" --session-dir "$agent/sessions/$encoded")
-  elif [ -n "$sessionId" ]; then
-    # A saved session lies in sessions/ or one folder below it, as locate searches.
-    sessionFile=$(find "$agent/sessions" -maxdepth 2 -type f -name "*_$sessionId.jsonl" 2>/dev/null | sort | head -n 1)
-    if [ -z "$sessionFile" ]; then
-      mkdir -p "$agent/sessions/$encoded"
-      stamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
-      # pi names a file <timestamp>_<id>.jsonl, with : and . in the timestamp as -.
-      sessionFile="$agent/sessions/$encoded/$(printf '%s' "$stamp" | tr ':.' '--')_$sessionId.jsonl"
-      # Given an existing file holding only its header line, pi takes the id from
-      # the header and appends to that file, so writing the header first makes pi
-      # keep the id @pi reports. pi runs its tools in the cwd the header names.
-      cwdJson=$(printf '%s' "$cwd" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
-      printf '{"type":"session","version":3,"id":"%s","timestamp":"%s","cwd":"%s"}\n' \
-        "$sessionId" "$stamp" "$cwdJson" > "$sessionFile"
-    fi
-    sessionFlag=(--session "$sessionFile")
-  fi
+>> pi copies the source into a new <timestamp>_<sessionId>.jsonl in the session dir
+>> and refuses an id that already has a file, so no header is written first.
+exe @piForkArgs(agent, dir, sessionId, forkId) = [
+  let @id = @forkId.replaceAll({"A": "a", "B": "b", "C": "c", "D": "d", "E": "e", "F": "f"})
+  >> The id is matched against file names, so anything but a UUID is refused.
+  let @valid = @piIsUuid(@id)
+  let @src = match [
+    @valid && @sessionId => @piFindSession(@agent, @id)
+    * => ""
+  ]
+  => match [
+    !@valid => @piFail(`@mlld/pi: session to fork must be a UUID, got ${@id}`)
+    !@sessionId => @piFail(`@mlld/pi: forking ${@id} needs a session to save to; session: false turns saving off`)
+    !@src => @piFail(`@mlld/pi: no saved session ${@id} to fork under ${@agent}/sessions`)
+    * => { noSession: "", sessionFile: "", forkSrc: @src, sessionDir: @dir }
+  ]
+]
 
-  # Run pi
-  printf '%s' "$prompt" | "${piBin:-pi}" -p "${sessionFlag[@]}" "${providerFlag[@]}" "${modelFlag[@]}" "${systemFlag[@]}" "${toolFlag[@]}" "${thinkingFlag[@]}" "${modeFlag[@]}"
-}
+exe @piSaveArgs(agent, dir, cwd, sessionId) = [
+  let @found = @piFindSession(@agent, @sessionId)
+  let @file = match [
+    @found => @found
+    * => @piNewSessionFile(@dir, @cwd, @sessionId)
+  ]
+  => { noSession: "", sessionFile: @file, forkSrc: "", sessionDir: "" }
+]
+
+>> Sessions go where pi keeps its own, so pi /resume lists them and
+>> @conversation.locate finds them without being told where to look.
+exe @piSessionArgs(agentDir, cwd, sessionId, forkId) = [
+  let @agent = @piAgentDir(@agentDir)
+  let @dir = `${@agent}/sessions/${@piEncodeCwd(@cwd)}`
+  => match [
+    @forkId => @piForkArgs(@agent, @dir, @sessionId, @forkId)
+    @sessionId => @piSaveArgs(@agent, @dir, @cwd, @sessionId)
+    * => { noSession: "1", sessionFile: "", forkSrc: "", sessionDir: "" }
+  ]
+]
+
+>> pi reads a value that names an existing file as that file, so the system prompt
+>> goes to pi as a file in the command's scratch TMPDIR.
+exe @piWriteSystemFile(text) = [
+  let @made = @piTempFile()
+  let @madeText = `${@made}`
+  let @path = @madeText.trim()
+  let @written = @piWriteFile(@path, @text)
+  => @path
+]
+
+>> `dir` is the working directory pi runs in, which is also the directory its file
+>> tools see. pi has no --dir flag; changing directory is what bounds them.
+>> Each `${v:+--flag "$v"}` adds the flag only when v is non-empty and keeps the value
+>> one argument. `$flags` is left unquoted because config.flags is a free-form flag
+>> string that is meant to be word-split.
+exe @piCall(prompt, dir, noSession, sessionFile, forkSrc, sessionId, sessionDir, provider, model, systemFile, noTools, native, mcpConfig, flags, thinking, mode) = cmd:@dir {
+  PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.pi/agent/bin" pi -p ${noSession:+--no-session} ${sessionFile:+--session "$sessionFile"} ${forkSrc:+--fork "$forkSrc" --session-id "$sessionId" --session-dir "$sessionDir"} ${provider:+--provider "$provider"} ${model:+--model "$model"} ${systemFile:+--append-system-prompt "$systemFile"} ${noTools:+--no-tools} ${native:+--tools "$native"} ${mcpConfig:+--mcp-config "$mcpConfig"} $flags ${thinking:+--thinking "$thinking"} ${mode:+--mode json}
+} with { stdin: @prompt }
+
+>> piBin must name a file called `pi`: a command may not take its program from a
+>> variable, so the program stays `pi` and piBin's folder goes first on PATH.
+exe @piBinPath(piBin) = match [
+  @piBin.endsWith("/pi") => `${@piBin.slice(0, -3)}:${@PATH}`
+  * => @piFail(`@mlld/pi: piBin must be a file named pi, got ${@piBin}`)
+]
+
+exe @piCallWith(prompt, dir, session, sessionId, provider, model, systemFile, noTools, native, mcpConfig, flags, thinking, mode, piBin) = [
+  let @binPath = match [
+    @piBin => @piBinPath(@piBin)
+    * => ""
+  ]
+  => match [
+    @piBin => @piCall(@prompt, @dir, @session.noSession, @session.sessionFile, @session.forkSrc, @sessionId, @session.sessionDir, @provider, @model, @systemFile, @noTools, @native, @mcpConfig, @flags, @thinking, @mode) using { env: { PATH: @binPath } }
+    * => @piCall(@prompt, @dir, @session.noSession, @session.sessionFile, @session.forkSrc, @sessionId, @session.sessionDir, @provider, @model, @systemFile, @noTools, @native, @mcpConfig, @flags, @thinking, @mode)
+  ]
+]
+
+>> Parameters are positional; empty means "leave the flag off". noTools, native and
+>> mcpConfig are pi's --no-tools, --tools and --mcp-config; flags is extra raw pi
+>> flags, word-split. An empty sessionId runs pi with --no-session. An empty agentDir
+>> means pi's own: $PI_CODING_AGENT_DIR, else ~/.pi/agent. forkId names a saved
+>> session to branch into sessionId instead of starting fresh. piBin is last so tests
+>> can point it at a stub named pi; empty runs `pi` from PATH.
+exe @runPi(prompt, dir, provider, model, systemArg, noTools, native, mcpConfig, flags, thinking, mode, sessionId, agentDir, forkId, piBin) = [
+  >> Fails, as a cd would, when dir does not exist.
+  let @cwdOut = @piPhysicalCwd(@dir)
+  let @cwdText = `${@cwdOut}`
+  let @cwd = @cwdText.trim()
+  let @session = @piSessionArgs(@agentDir, @cwd, @sessionId, @forkId)
+  let @systemFile = match [
+    @systemArg => @piWriteSystemFile(@systemArg)
+    * => ""
+  ]
+  let @ran = try @piCallWith(@prompt, @dir, @session, @sessionId, @provider, @model, @systemFile, @noTools, @native, @mcpConfig, @flags, @thinking, @mode, @piBin)
+  >> Removed whether pi failed or not. A policy that denies `rm` refuses this step,
+  >> so under one a call with a system prompt fails.
+  let @removed = match [
+    @systemFile => try @piRemoveFile(@systemFile)
+    * => null
+  ]
+  => match [
+    @ran.ok => @ran.value
+    * => @piFail(@ran.error.message)
+  ]
+]
 
 >> Picks the session a @pi call saves to: a fresh UUID per call unless
 >> config.sessionId names one (the same id again continues that conversation).
@@ -197,7 +279,7 @@ exe @piResult(inputValue, session) = match [
 >> config.model    - model pattern or provider/id
 >> config.provider - provider name (default: google)
 >> config.dir      - working directory pi runs in; also bounds its file tools
->> config.piBin    - the pi executable to run (default: pi on PATH)
+>> config.piBin    - a file named pi to run instead of pi on PATH (a test hook)
 >> config.system   - system prompt
 >> config.tools    - tool collection (triggers @mx.llm context)
 >> config.noTools  - boolean, disable all tools
@@ -236,25 +318,24 @@ llm @pi(prompt, config) using { harness: { write: [".", "~/.pi/agent"], net: "op
   let @llmNative = @mx.llm && @mx.llm.native ? @mx.llm.native : ""
   let @llmHasTools = @mx.llm && @mx.llm.hasTools ? true : false
 
-  >> Build tool argument string
+  >> Tool flags, each its own argument
   let @extraFlags = @cfg.flags ? @cfg.flags : ""
-  let @toolArg = match [
-    @cfg.noTools => `--no-tools ${@extraFlags}`
-    @llmHasTools && @llmConfig && @llmNative => `--tools "${@llmNative}" --mcp-config "${@llmConfig}" ${@extraFlags}`
-    @llmHasTools && @llmConfig => `--no-tools --mcp-config "${@llmConfig}" ${@extraFlags}`
-    @llmHasTools && @llmNative => `--tools "${@llmNative}" ${@extraFlags}`
-    @llmHasTools => `--no-tools ${@extraFlags}`
-    * => @extraFlags
+  let @toolFlags = match [
+    @cfg.noTools => { noTools: "1", native: "", mcpConfig: "" }
+    @llmHasTools && @llmConfig && @llmNative => { noTools: "", native: @llmNative, mcpConfig: @llmConfig }
+    @llmHasTools && @llmConfig => { noTools: "1", native: "", mcpConfig: @llmConfig }
+    @llmHasTools && @llmNative => { noTools: "", native: @llmNative, mcpConfig: "" }
+    @llmHasTools => { noTools: "1", native: "", mcpConfig: "" }
+    * => { noTools: "", native: "", mcpConfig: "" }
   ]
 
   let @systemArg = @cfg.system.isString() ? @cfg.system : ""
 
-  >> Invoke pi CLI via shell wrapper
   >> Note: Requires pi-mcp-adapter installed: pi install npm:pi-mcp-adapter
   let @session = @piSession(@cfg)
   let @resume = @cfg._mlld && @cfg._mlld.resume ? @cfg._mlld.resume : {}
   let @forkId = @resume.continue && @resume.fork && @resume.sessionId && @resume.provider == "pi" ? @resume.sessionId : ""
-  let @raw = @runPiSh(@prompt, @dir, @provider, @model, @systemArg, @toolArg, @thinking, @mode, @session.sessionId, @session.agentDir, @forkId, @cfg.piBin ?? "")
+  let @raw = @runPi(@prompt, @dir, @provider, @model, @systemArg, @toolFlags.noTools, @toolFlags.native, @toolFlags.mcpConfig, @extraFlags, @thinking, @mode, @session.sessionId, @session.agentDir, @forkId, @cfg.piBin ?? "")
 
   => @piResult(@raw, @session)
 ]
@@ -751,7 +832,7 @@ export {
   @piStreamFormat,
   @piBuiltInTools,
   @isPiBuiltin,
-  @runPiSh,
+  @runPi,
   @piSession,
   @piResult,
   @conversation

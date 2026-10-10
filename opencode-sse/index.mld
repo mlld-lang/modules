@@ -1,4 +1,4 @@
-needs { sh }
+needs { opencode, node: [] }
 
 >> ── Stream format: mirrors @mlld/claude's shape so downstream consumers work unchanged. ──
 >>

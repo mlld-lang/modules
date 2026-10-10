@@ -19,3 +19,8 @@ const @test_misnamed_bin_refused = !@misnamed.ok && @misnamed.error.message.incl
 >> A missing file would otherwise fall through to the opencode on PATH.
 const @missing = try @opencode("hi", { opencodeBin: "/nonexistent/opencode" })
 const @test_missing_bin_refused = !@missing.ok && @missing.error.message.includes("config.opencodeBin is not an executable file")
+
+>> A folder named opencode (like ~/.config/opencode) would otherwise fall
+>> through to the opencode on PATH.
+const @folder = try @opencode("hi", { opencodeBin: `${@root}/opencode/tests/fixtures/folder/opencode` })
+const @test_folder_bin_refused = !@folder.ok && @folder.error.message.includes("config.opencodeBin is not an executable file")
