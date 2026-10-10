@@ -1,7 +1,7 @@
 >> Tests for @mlld/shelf: address lookup and {ref} resolution.
 >> Run: mlld test shelf/tests/
 
-import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe } from "../index.mld"
+import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render } from "../index.mld"
 
 record @contact [
   key id
@@ -180,6 +180,64 @@ const @test_put_keyed_upserts = @ws.person.length == 2 && @ws.person[1].phone ==
 const @e1 = @putAs(@ws, @mkEvent("party"))
 const @e2 = @putAs(@ws, @mkEvent("party"))
 const @test_put_keyless_appends = @ws.event.length == 2 && !@e1.redundant && @e2.redundant
+
+>> ── render ──
+>> `.role:planner` sees the name, may cite the email (handle) and phone (mask), and is not
+>> told `secret` exists (omit). `.role:admin` reads every field.
+record @card [
+  key email
+  email: string [ kind "email" ]
+  name: string
+  phone: string
+  secret: string
+  .role:planner { read: [name, { handle: "email" }, { mask: "phone" }, { omit: "secret" }] }
+  .role:admin { read: [email, name, phone, secret] }
+  .role:worker { write: { shelves: true } }
+]
+record @memo [
+  key id
+  id: string [ kind "memo" ]
+  text: string
+  * { read: [id, text] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkCard(e, n, p, x) = { email: @e, name: @n, phone: @p, secret: @x } => card
+exe @mkMemo(i, t) = { id: @i, text: @t } => memo
+const @rrecs = { card: @card, memo: @memo }
+state @rs from @rrecs
+state @empty from @rrecs
+const @r1 = @observeAs(@rs, [@mkCard("ada@x.com", "Ada", "555-1234", "S3CRET"), @mkMemo("m1", "hi")])
+const @adaAddr = @rs.card[0].mx.address.string
+const @memoLine = `{"address":"${@rs.memo[0].mx.address.string}","fields":{"id":"m1","text":"hi"},"ref_fields":[]}`
+
+exe .role:planner @renderAsPlanner(s, fams = null) = @render(@s, @fams)
+exe .role:admin @renderAsAdmin(s, fams = null) = @render(@s, @fams)
+
+const @asPlanner = @renderAsPlanner(@rs, ["card"])
+const @asAdmin = @renderAsAdmin(@rs, ["card"])
+const @test_render_hides_by_role = @asPlanner == `<observed>
+{"address":"${@adaAddr}","fields":{"name":"Ada"},"ref_fields":["email","phone"]}
+</observed>`
+const @test_render_hidden_value_absent = !@asPlanner.includes("ada@x.com") && !@asPlanner.includes("1234") && !@asPlanner.includes("handle")
+const @test_render_omit_in_neither = !@asPlanner.includes("secret") && !@asPlanner.includes("S3CRET")
+const @test_render_shows_reader_role = @asAdmin == `<observed>
+{"address":"${@adaAddr}","fields":{"email":"ada@x.com","name":"Ada","phone":"555-1234","secret":"S3CRET"},"ref_fields":[]}
+</observed>`
+const @test_render_slot_order = @renderAsAdmin(@rs).endsWith(`${@memoLine}
+</observed>`)
+const @test_render_family_excluded = !@renderAsAdmin(@rs, ["memo"]).includes("card:") && @renderAsAdmin(@rs, ["memo"]).includes(@memoLine)
+const @test_render_empty_state = @renderAsAdmin(@empty) == ""
+const @test_render_empty_family = @renderAsAdmin(@rs, []) == ""
+>> With no role active, the record's `*` rule decides: memo shows both fields, card none.
+const @test_render_no_role = @render(@rs).includes(@memoLine) && !@render(@rs).includes("Ada")
+
+>> A fyi field is evaluated when an llm call reads it, as that call's role.
+fyi @shelfView = { observed: @render(@rs), push: [observed] }
+llm .role:planner @plannerAgent(prompt, config) = `${@config.system}`
+llm .role:admin @adminAgent(prompt, config) = `${@config.system}`
+const @plannerSaw = @plannerAgent("go", { system: "P", fyi: @shelfView })
+const @adminSaw = @adminAgent("go", { system: "A", fyi: @shelfView })
+const @test_render_fyi_follows_reader = @plannerSaw.includes(`"fields":{"name":"Ada"}`) && !@plannerSaw.includes("555-1234") && @adminSaw.includes("555-1234")
 
 >> ── no role labels ──
 >> An exe with a role label would run its writes as that role instead of the caller's.

@@ -159,4 +159,82 @@ exe @observe(st, records, families = null) = [
   => { addresses: @addresses, written: @done.length, redundant: @done.length > 0 && @fresh.length == 0 }
 ]
 
-export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe }
+>> ── Rendering ──
+>>
+>> `@render` shows only the view of the role active where it is called. It takes no role
+>> argument: `@project(@rec, <role>)` would answer another role's view, and the rendered
+>> string carries nothing that would re-project it, so a role argument would let a caller
+>> widen its own view.
+
+>> The active role's read modes for one record type, `{ field: mode }`. `@mx.actors` holds
+>> the current actor only, and drops `omit` fields.
+exe @readModes(recordName) = [
+  let @maps = for @role, @actor in @mx.actors => @actor.records[@recordName]
+  let @found = for @m in @maps if @typeof(@m) == "object" => @m
+  => match [ @found.length > 0 => @found[0]; * => {} ]
+]
+
+>> A new object holding `keys` of `obj`, in the order of `keys`.
+exe @pick(obj, keys) = [
+  if @keys.length == 0 [ => {} ]
+  let @k = @keys[0]
+  let @rest = @pick(@obj, @keys.slice(1))
+  => { [@k]: @obj[@k], ...@rest }
+]
+
+>> True for the `{ preview, handle }` / `{ handle }` wrapper `@project` puts in place of a
+>> masked or handle-only field.
+exe @isWrapper(v) = [
+  if @typeof(@v) != "object" [ => false ]
+  let @keys = for @k, @x in @v => @k
+  let @others = for @k in @keys if @k != "handle" && @k != "preview" => @k
+  => @keys.includes("handle") && @others.length == 0
+]
+
+>> One `<observed>` entry. Fields the role may see go in `fields`; fields it may cite but
+>> not see (`mask`, `handle`, `protected`) are named in `ref_fields`. With a role active, the
+>> read modes decide, and values are taken from the projection only for `bare`/`value`
+>> fields. With none, `@mx.actors` is empty and the projection follows the record's `*`
+>> rule: its plain values are shown and its wrappers named. A wrapper never reaches the
+>> output either way.
+exe @entry(rec) = [
+  let @modes = @readModes(@rec.mx.address.record)
+  let @view = @project(@rec)
+  let @hasModes = @modes.mx.keys.length > 0
+  let @seen = match [
+    @hasModes => for @f, @mode in @modes if @mode == "bare" || @mode == "value" => @f;
+    * => for @f, @v in @view if !@isWrapper(@v) => @f
+  ]
+  let @refFields = match [
+    @hasModes => for @f, @mode in @modes if @mode == "mask" || @mode == "handle" || @mode == "protected" => @f;
+    * => for @f, @v in @view if @isWrapper(@v) => @f
+  ]
+  => { address: @rec.mx.address.string, fields: @pick(@view, @seen), ref_fields: @refFields }
+]
+
+>> Entries as compact JSON, one per line. Joined by recursion through a template because a
+>> JSON-looking string collected by `for` is read back as an object, and `.join` would
+>> print that as `[object Object]`.
+exe @jsonLines(entries) = [
+  if @entries.length == 0 [ => "" ]
+  let @head = `${@entries[0]}`
+  if @entries.length == 1 [ => @head ]
+  let @tail = @jsonLines(@entries.slice(1))
+  => `${@head}
+${@tail}`
+]
+
+>> Every record stored in `families` (default: all slots), one JSON line each, in slot
+>> order then storage order, inside `<observed>` tags; "" when there are none.
+exe @render(st, families = null) = [
+  let @allowed = @allowedFamilies(@st, @families)
+  let @slots = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
+  let @groups = for @f in @slots => for @rec in @st[@f] => @entry(@rec)
+  let @entries = @groups.flat()
+  if @entries.length == 0 [ => "" ]
+  => `<observed>
+${@jsonLines(@entries)}
+</observed>`
+]
+
+export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render }
