@@ -1,4 +1,4 @@
-needs { sh }
+needs { opencode, js: [], node: [] }
 
 >> ── Stream format adapter for Opencode CLI NDJSON events (opencode run --format json) ──
 >>
@@ -353,79 +353,62 @@ exe @opencodeInlineConfig(configPath, allowedTools, requestedAgent, hasToolSurfa
   return JSON.stringify(base);
 }
 
->> ── Shell wrapper for opencode run ──
+>> ── opencode run ──
 >>
->> Flat positional params so BashExecutor injects each one as a distinct env var.
->> Routing through sh {} with env vars sidesteps the mlld cmd-block double-escape
->> bug for interpolated values (see ticket m-8694).
->> doFork branches resumeId (--fork) instead of appending to it.
->> opencodeBin is last so tests can point it at a stub; empty runs `opencode` from PATH.
-exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt, doFork, opencodeBin) = sh {
-  set -e
-
-  if [ -n "$dataHome" ]; then
-    export XDG_DATA_HOME="$dataHome"
-  fi
-
-  if [ -n "$stateHome" ]; then
-    export XDG_STATE_HOME="$stateHome"
-  fi
-
-  if [ -n "$inlineConfig" ]; then
-    export OPENCODE_CONFIG_CONTENT="$inlineConfig"
-  fi
-
-  dirFlag=()
-  if [ -n "$dir" ]; then
-    dirFlag=(--dir "$dir")
-  fi
-
-  modelFlag=()
-  if [ -n "$model" ]; then
-    modelFlag=(-m "$model")
-  fi
-
-  agentFlag=()
-  if [ -n "$agent" ]; then
-    agentFlag=(--agent "$agent")
-  fi
-
-  variantFlag=()
-  if [ -n "$variant" ]; then
-    variantFlag=(--variant "$variant")
-  fi
-
-  bypassFlag=()
-  if [ -n "$bypass" ]; then
-    bypassFlag=(--dangerously-skip-permissions)
-  fi
-
-  pureFlag=()
-  if [ -n "$pure" ]; then
-    pureFlag=(--pure)
-  fi
-
-  sessionFlag=()
-  if [ -n "$doFork" ]; then
-    sessionFlag=(-s "$resumeId" --fork)
-  elif [ -n "$doResume" ]; then
-    sessionFlag=(-s "$resumeId")
-  fi
-
-  promptArg="$prompt"
-  if [ -n "$escapePrompt" ]; then
-    promptArg=$(printf '%s' "$prompt" | perl -0pe 's/\r//g; s/\n+/ /g')
-  fi
-
-  "${opencodeBin:-opencode}" run "${pureFlag[@]}" --format json "${dirFlag[@]}" "${modelFlag[@]}" "${agentFlag[@]}" "${variantFlag[@]}" "${bypassFlag[@]}" "${sessionFlag[@]}" "$promptArg"
+>> Each variable falls back to the value the caller already exported, so a module
+>> override never blanks the user's own; opencode treats an empty one as unset.
+>> Leading assignments keep `opencode` as the program a policy's command rules see.
+exe @opencodeRunCmd(prompt, dir, model, agent, variant, bypass, inlineConfig, resumeId, dataHome, stateHome, pure, doFork) = cmd {
+  XDG_DATA_HOME="${dataHome:-$XDG_DATA_HOME}" XDG_STATE_HOME="${stateHome:-$XDG_STATE_HOME}" OPENCODE_CONFIG_CONTENT="${inlineConfig:-$OPENCODE_CONFIG_CONTENT}" opencode run ${pure:+--pure} --format json ${dir:+--dir "$dir"} ${model:+-m "$model"} ${agent:+--agent "$agent"} ${variant:+--variant "$variant"} ${bypass:+--dangerously-skip-permissions} ${resumeId:+-s "$resumeId"} ${doFork:+--fork} "$prompt"
 }
+
+>> mlld reads only a few named environment variables, so the caller's PATH comes
+>> from the shell.
+exe @shellPath() = cmd { printf '%s' "$PATH" }
+
+>> js because mlld has no throw; a thrown error is what lets callers catch it with `try`.
+exe @opencodeBinError(message) = js {
+  throw new Error(`opencode: config.opencodeBin ${message}`);
+}
+
+exe @isExecutable(file) = cmd { test -x "$file" }
+
+>> opencodeBin runs another opencode (a test stub) by putting its folder first on
+>> the call's PATH, so the program stays the literal `opencode`. A file with
+>> another name can't be reached that way, and a missing one would silently run
+>> the opencode already on PATH, so both are refused.
+exe @opencodeBinDir(opencodeBin) = [
+  if !@opencodeBin || @opencodeBin == "opencode" [ => "" ]
+  if !@opencodeBin.endsWith("/opencode") [ => @opencodeBinError(`must be a file named opencode, got '${@opencodeBin}'`) ]
+  let @found = try @isExecutable(@opencodeBin)
+  if !@found.ok [ => @opencodeBinError(`is not an executable file: '${@opencodeBin}'`) ]
+  => @opencodeBin.slice(0, -9)
+]
+
+>> doFork branches resumeId (--fork) instead of appending to it. escapePrompt
+>> folds the prompt onto one line. opencodeBin is last so tests can point it at a
+>> stub; empty runs `opencode` from PATH.
+exe @runOpencode(prompt, dir, model, agent, variant, bypass, inlineConfig, doResume, resumeId, dataHome, stateHome, pure, escapePrompt, doFork, opencodeBin) = [
+  let @promptArg = @escapePrompt ? @prompt.replaceAll(/\r/, "").replaceAll(/\n+/, " ") : @prompt
+  let @sessionId = @doResume || @doFork ? @resumeId : ""
+  let @binDir = @opencodeBinDir(@opencodeBin)
+  let @path = match [
+    @binDir => `${@binDir}:${@shellPath()}`
+    * => ""
+  ]
+  => match [
+    @path => @opencodeRunCmd(@promptArg, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @sessionId, @dataHome, @stateHome, @pure, @doFork) using { env: { PATH: @path } }
+    * => @opencodeRunCmd(@promptArg, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @sessionId, @dataHome, @stateHome, @pure, @doFork)
+  ]
+]
 
 >> ── Core invocation ──
 >>
 >> @opencode(prompt, config)
 >> config.model     - provider/model string, e.g. "anthropic/claude-sonnet-4-5"
 >> config.dir       - working directory (passed via --dir)
->> config.opencodeBin - the opencode executable to run (default: opencode on PATH)
+>> config.opencodeBin - path to a file named `opencode` to run instead of the one
+>>                    on PATH (a test stub); its folder goes first on the call's PATH
 >> config.agent     - opencode agent name (--agent)
 >> config.variant   - reasoning variant: "minimal" | "high" | "max" (--variant)
 >> config.bypass    - boolean, passes --dangerously-skip-permissions
@@ -454,8 +437,6 @@ exe @runOpencodeSh(prompt, dir, model, agent, variant, bypass, inlineConfig, doR
 >> - Always runs `opencode run --format json` so we can parse sessionID + text
 >>   + usage regardless of streaming mode. In stream mode the stream adapter
 >>   consumes `text` events as they arrive; @raw still holds the full NDJSON.
->> - Uses a `sh { }` block so interpolated values flow as bash env vars and
->>   survive unescaped (see ticket m-8694 for the `cmd` block escaping bug).
 >> - A runtime resume carrying fork (a continue of a recorded conversation) never
 >>   resumes in place: it passes `-s <id> --fork` and returns the sessionID on
 >>   opencode's output events, so the runtime records the branch this call wrote.
@@ -492,7 +473,7 @@ llm @opencode(prompt, config) using { harness: { write: [".", "~/.local/share/op
   let @stateHome = @cfg.stateHome ? @cfg.stateHome : ""
   let @pure = @cfg.pure ? "1" : ""
   let @escapePrompt = @hasToolBridge ? "" : "1"
-  let @raw = @runOpencodeSh(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt, @doFork, @cfg.opencodeBin ?? "")
+  let @raw = @runOpencode(@finalPrompt, @dir, @model, @agent, @variant, @bypass, @inlineConfig, @doResume, @resumeId, @dataHome, @stateHome, @pure, @escapePrompt, @doFork, @cfg.opencodeBin ?? "")
   let @parsed = @parseOpencodeJsonl(@raw)
   let @sessionId = @normalizeOpencodeSessionId(@parsed.sessionId ?? @resume.sessionId ?? null)
   let @value = match [
@@ -837,4 +818,4 @@ exe @conversationEmit(events, at) = node {
 
 const @conversation = { provider: "opencode", locate: @conversationLocate, ingest: @conversationIngest, emit: @conversationEmit }
 
-export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation, @parseOpencodeJsonl, @prependOpencodeSystem, @normalizeOpencodeSessionId }
+export { @opencode, @opencodeStreamFormat, @opencodeToolAgentName, @opencodePermissionRules, @conversation, @parseOpencodeJsonl, @prependOpencodeSystem, @normalizeOpencodeSessionId, @runOpencode }

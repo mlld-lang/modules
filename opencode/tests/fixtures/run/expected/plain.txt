@@ -1,0 +1,11 @@
+XDG_DATA_HOME=
+XDG_STATE_HOME=
+OPENCODE_CONFIG_CONTENT=
+arg=run
+arg=--format
+arg=json
+arg=--dir
+arg=/work
+arg=-m
+arg=openrouter/z-ai/glm-5.1
+arg=hi

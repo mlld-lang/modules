@@ -44,7 +44,8 @@ Runs `codex exec` and returns the final agent message. Output is parsed from `co
 | `stream` | boolean | — | Stream chunks through `@codexStreamFormat`. The adapter also emits session id + token usage metadata. |
 | `sessionId` | string | — | Explicit conversation tracking id (UUID, any case). Captured on the first call so the interpreter can persist it into subsequent resumes. |
 | `resume` | string | — | Explicit resume session id. Equivalent to `codex exec resume <id>`. |
-| `tools` | array | — | Standard mlld `llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config` and this module translates it into codex `-c mcp_servers.*` overrides. Requires `bypass: true`. Codex cannot selectively gate its native tools, so `@mx.llm.native` is informational only. |
+| `tools` | array | — | Standard mlld `llm` tools convention. The runtime builds an MCP bridge at `@mx.llm.config` and this module passes every server to codex as one `-c 'mcp_servers={ … }'` override, which codex adds to the servers in your own `config.toml`. Requires `bypass: true`. Codex cannot selectively gate its native tools, so `@mx.llm.native` is informational only. |
+| `codexBin` | string | `codex` on PATH | Path to a file named `codex` to run instead, e.g. a stub in tests. Its folder goes first on PATH for the call, so a policy's command rules still see the program as `codex`. Any other file name, or a missing file, is refused. |
 
 ```mlld
 >> Simple call

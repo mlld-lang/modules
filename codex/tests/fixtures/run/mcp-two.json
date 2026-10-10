@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "aa": {
+      "command": "echo",
+      "args": ["x y", "q\"z", "back\\slash", "$HOME"],
+      "env": { "K": "v$HOME", "bad-key": "dropped" }
+    },
+    "bb": { "url": "http://localhost:1/mcp" },
+    "bad name": { "command": "dropped" }
+  }
+}
