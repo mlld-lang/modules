@@ -1,7 +1,7 @@
 >> Tests for @mlld/shelf: address lookup and {ref} resolution.
 >> Run: mlld test shelf/tests/
 
-import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved } from "../index.mld"
+import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe } from "../index.mld"
 
 record @contact [
   key id
@@ -22,14 +22,14 @@ exe @mkNote(i, t) = { id: @i, text: @t } => note
 const @recs = { contact: @contact, note: @note }
 state @st from @recs
 
-exe .role:worker @put(s, slot, r) = [
+exe .role:worker @store(s, slot, r) = [
   let @w = @s.upsert(@slot, @r)
   => "stored"
 ]
 const @ann = @mkContact("c1", "Ann")
 const @memo = @mkNote("n1", "call Ann")
-const @s1 = @put(@st, "contact", @ann)
-const @s2 = @put(@st, "note", @memo)
+const @s1 = @store(@st, "contact", @ann)
+const @s2 = @store(@st, "note", @memo)
 const @annAddr = @st.contact[0].mx.address.string
 const @memoAddr = @st.note[0].mx.address.string
 
@@ -109,6 +109,77 @@ const @test_security_find_null = @found.every(@item == null)
 const @resolved = for @a in @hostile => @resolveRef({ ref: { address: @a, field: "name" } }, @st)
 const @test_security_resolveRef_null = @resolved.every(@item == null)
 const @test_security_long_is_long = @hostile[3].length == 10000
+
+>> ── writes ──
+>> A separate shelf: `person` is keyed (upserts), `event` is keyless (appends). Writes run
+>> as the caller's role, so each goes through an exe labelled with the granted role.
+record @person [
+  key id
+  id: string [ kind "person" ]
+  name: string
+  phone: string?
+  tags: array?
+  info: object?
+  * { read: [id, name, phone, tags, info] }
+  .role:worker { write: { shelves: { upsert: true } } }
+]
+record @event [
+  title: string
+  * { read: [title] }
+  .role:worker { write: { shelves: { upsert: true } } }
+]
+exe @mkPerson(i, n, p, t, info) = { id: @i, name: @n, phone: @p, tags: @t, info: @info } => person
+exe @mkEvent(t) = { title: @t } => event
+const @wrecs = { person: @person, event: @event }
+state @ws from @wrecs
+
+exe .role:worker @observeAs(s, recs, fams = null) = @observe(@s, @recs, @fams)
+exe .role:worker @putAs(s, rec, fams = null) = @put(@s, @rec, @fams)
+
+>> observe-then-redundant
+const @bo = @mkPerson("p1", "Bo", "555", ["a", "b"], { city: "Oslo", zip: [1, 2] })
+const @o1 = @observeAs(@ws, @bo)
+const @test_observe_first_writes = @o1.written == 1 && !@o1.redundant && @o1.addresses[0] == @bo.mx.address.string
+const @o2 = @observeAs(@ws, [@bo])
+const @test_observe_same_again_redundant = @o2.written == 1 && @o2.redundant
+const @o3 = @observeAs(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2] }))
+const @test_observe_changed_field_adds = @o3.written == 1 && !@o3.redundant
+const @test_observe_keyed_upserts = @ws.person.length == 1 && @ws.person[0].phone == "556"
+const @o4 = @observeAs(@ws, [])
+const @test_observe_empty_not_redundant = @o4.written == 0 && !@o4.redundant
+const @o5 = @observeAs(@ws, [{ title: "plain" }, "x", null])
+const @test_observe_no_valid_records = @o5.written == 0 && !@o5.redundant && @o5.addresses.length == 0
+
+>> addsData: the stored person is p1 / Bo / 556 / [a, b] / { city: Oslo, zip: [1, 2] }
+const @test_addsData_same_is_false = !@addsData(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_nested_object = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 3] }))
+const @test_addsData_nested_key = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2], floor: 3 }))
+const @test_addsData_array_order = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["b", "a"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_array_length = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["a"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_null_field_ignored = !@addsData(@ws, @mkPerson("p1", "Bo", null, null, null))
+const @test_addsData_new_address = @addsData(@ws, @mkPerson("p2", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_not_record = !@addsData(@ws, { id: "p1", name: "Cy" }) && !@addsData(@ws, "p1") && !@addsData(@ws, null)
+>> `mx` is metadata, not a field: a stored record's own metadata differs from a fresh
+>> copy's (sources, coercion id), and the copy still adds nothing.
+const @test_addsData_mx_ignored = !@addsData(@ws, @ws.person[0])
+
+>> put: refusals write nothing
+const @before = @ws.person.length
+const @p1 = @putAs(@ws, @mkPerson("p9", "Di", null, null, null), ["event"])
+const @test_put_family_not_allowed = !@p1.written && @ws.person.length == @before
+const @p2 = @putAs(@ws, { id: "p9", name: "Di" })
+const @test_put_no_address = !@p2.written && @p2.address == null && @ws.person.length == @before
+const @p3 = @putAs(@st, @mkPerson("p9", "Di", null, null, null))
+const @test_put_unknown_family = !@p3.written && @p3.family == "person" && @st.contact.length == 1 && @st.note.length == 1
+const @p4 = @putAs(@ws, @mkPerson("p9", "Di", null, null, null), "not a list")
+const @test_put_result = @p4.written && !@p4.redundant && @p4.family == "person" && @p4.address == @ws.person[1].mx.address.string
+
+>> keyed upserts, keyless appends
+const @k1 = @putAs(@ws, @mkPerson("p9", "Di", "1", null, null))
+const @test_put_keyed_upserts = @ws.person.length == 2 && @ws.person[1].phone == "1"
+const @e1 = @putAs(@ws, @mkEvent("party"))
+const @e2 = @putAs(@ws, @mkEvent("party"))
+const @test_put_keyless_appends = @ws.event.length == 2 && !@e1.redundant && @e2.redundant
 
 >> ── no role labels ──
 >> An exe with a role label would run its writes as that role instead of the caller's.

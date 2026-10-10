@@ -91,4 +91,72 @@ exe @firstUnresolved(args, st, families = null) = [
   => match [ @hits.length > 0 => @hits[0]; * => null ]
 ]
 
-export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved }
+>> ── Writes ──
+>>
+>> Writes go through the state the caller passes, as the caller's role: core checks the
+>> record's write grant against that role and ends the run on a refusal.
+
+>> Structural equality: same type, scalars `==`, arrays element by element in order,
+>> objects with the same keys and equal values.
+exe @same(a, b) = [
+  let @ta = @typeof(@a)
+  if @ta != @typeof(@b) [ => false ]
+  if @ta == "array" [
+    if @a.length != @b.length [ => false ]
+    let @diffs = for @x in @a if !@same(@x, @b[@x.mx.index]) => 1
+    => @diffs.length == 0
+  ]
+  if @ta == "object" [
+    let @ka = for @k, @v in @a => @k
+    let @kb = for @k, @v in @b => @k
+    if @ka.length != @kb.length [ => false ]
+    let @diffs = for @k, @v in @a if !@kb.includes(@k) || !@same(@v, @b[@k]) => 1
+    => @diffs.length == 0
+  ]
+  => @a == @b
+]
+
+>> The address a record would be stored at, or null for anything that is not a record.
+exe @addressOf(record) = [
+  if @typeof(@record) != "object" [ => null ]
+  let @addr = @record.mx.address
+  if @typeof(@addr) != "object" [ => null ]
+  => match [ @addr.string.isString() => @addr.string; * => null ]
+]
+
+>> True when writing `record` would change what the shelf holds: nothing is stored at its
+>> address, or one of its non-null fields is missing from the stored record or differs.
+exe @addsData(st, record) = [
+  let @address = @addressOf(@record)
+  if @address == null [ => false ]
+  let @stored = @find(@st, @address)
+  if @stored == null [ => true ]
+  let @storedFields = for @k, @v in @stored => @k
+  let @news = for @k, @v in @record if @v != null && (!@storedFields.includes(@k) || !@same(@v, @stored[@k])) => @k
+  => @news.length > 0
+]
+
+>> Files one record into the slot for its family. The slot's merge mode decides between
+>> replacing a stored record with the same key and appending.
+exe @put(st, record, families = null) = [
+  let @address = @addressOf(@record)
+  let @family = @familyOf(@address)
+  let @slots = @slotNames(@st)
+  let @ok = @family != null && @slots.includes(@family) && @allowedFamilies(@st, @families).includes(@family)
+  if !@ok [ => { address: @address, family: @family, written: false, redundant: false } ]
+  let @redundant = !@addsData(@st, @record)
+  let @w = @st.upsert(@family, @record)
+  => { address: @address, family: @family, written: true, redundant: @redundant }
+]
+
+>> `@put` over a list of records, or one record.
+exe @observe(st, records, families = null) = [
+  let @list = match [ @typeof(@records) == "array" => @records; * => ([@records]) ]
+  let @results = for @r in @list => @put(@st, @r, @families)
+  let @done = for @r in @results if @r.written => @r
+  let @fresh = for @r in @done if !@r.redundant => @r
+  let @addresses = for @r in @done => @r.address
+  => { addresses: @addresses, written: @done.length, redundant: @done.length > 0 && @fresh.length == 0 }
+]
+
+export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe }

@@ -1,6 +1,6 @@
 # @mlld/shelf
 
-A shelf is a mlld `state` built from records, with one slot per record family (`contact`, `note`, …). A program files tool results into it, and an agent cites what it has seen by address — `"contact:69d3c20c81180863"` — or by `{ ref: { address, field } }`. This module finds the record at an address and resolves a ref to the field value it names. A resolved value is the stored field itself, so it keeps its labels and proof, and can be used where proof is required, such as in a grant. This is the same resolution `@mlld/authorize` uses. Core mlld owns the state, its labels and its write permissions; the module only reads and organises.
+A shelf is a mlld `state` built from records, with one slot per record family (`contact`, `note`, …). A program files tool results into it with `@observe`, which also says whether a result added anything new, and an agent cites what it has seen by address — `"contact:69d3c20c81180863"` — or by `{ ref: { address, field } }`. This module finds the record at an address and resolves a ref to the field value it names. A resolved value is the stored field itself, so it keeps its labels and proof, and can be used where proof is required, such as in a grant. This is the same resolution `@mlld/authorize` uses. Core mlld owns the state, its labels and its write permissions; the module only organises the data.
 
 Every export takes untrusted input and answers `null` or `false` for anything malformed rather than throwing. Exports that take `families` limit lookups to those families; leave it out, or pass anything that is not a list, to allow every slot of the shelf.
 
@@ -87,6 +87,42 @@ Over an object of args, the first `{ arg, addr }` whose value is a ref that does
 ```mlld
 const @miss = @firstUnresolved({ to: { ref: { address: "contact:gone", field: "id" } } }, @st)
 show @miss   >> { "arg": "to", "addr": "contact:gone" }
+```
+
+### Writes and permissions
+
+`@put` and `@observe` carry no role label, so they write as whoever calls them. Core checks the record's write grant against the caller's role and ends the run on a refusal (`WRITE_DENIED_*`; `try` does not catch it). Call them from an exe labelled with a role the record grants, as `@file` does in the tldr above.
+
+The grant is spelled `.role:<name> { write: { shelves: { upsert: true } } }`. There is no separate `append` capability: appending to a keyless record's slot is checked against `upsert` too.
+
+### `@addsData(st, record)`
+
+`true` when writing `record` would change what the shelf holds: nothing is stored at its address, or one of its non-null fields is missing from the stored record or differs from it. Fields that are `null` on `record` don't count, and its metadata (`mx`) is ignored. Values are compared by structure: arrays element by element in order, objects by keys and values. `false` for anything that is not a record.
+
+```mlld
+show @addsData(@st, @mkContact("c1", "Ann"))   >> false, already stored
+show @addsData(@st, @mkContact("c1", "Anne"))  >> true, the name changed
+```
+
+### `@put(st, record, families?)`
+
+Writes `record` into the slot for its family and returns `{ address, family, written, redundant }`. `redundant` is `true` when the record added nothing, judged before the write. A record whose family is not allowed or not a slot of the shelf, or a value that is not a record, returns `written: false` and writes nothing.
+
+A record type that declares a `key` replaces the stored record with the same key; a keyless one is appended, so the same keyless record put twice is stored twice (the second put reports `redundant: true`).
+
+```mlld
+exe .role:worker @fileOne(s, r) = @put(@s, @r)
+show @fileOne(@st, @mkContact("c2", "Bo"))
+>> { "address": "contact:…", "family": "contact", "written": true, "redundant": false }
+```
+
+### `@observe(st, records, families?)`
+
+`@put` over a list of records, or a single record. Returns `{ addresses, written, redundant }`: the addresses written, how many, and whether the batch added nothing new. `redundant` is `true` only when at least one record was written and none of them added data, so a tool result that repeats what the shelf holds can be reported as such.
+
+```mlld
+exe .role:worker @fileAll(s, rs) = @observe(@s, @rs)
+show @fileAll(@st, [@mkContact("c1", "Ann")]).redundant   >> true
 ```
 
 ## License
