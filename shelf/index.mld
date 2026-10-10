@@ -186,7 +186,13 @@ exe @readModes(recordName) = [
 >> are shown and its `{ preview, handle }` / `{ handle }` wrappers named. A wrapper never
 >> reaches the output either way.
 exe @slotLines(st, slot) = [
-  let @stored = @st[@slot]
+  >> A single-record slot (`me: tick?`) holds a record or null rather than a list.
+  let @value = @st[@slot]
+  let @stored = match [
+    @typeof(@value) == "array" => @value;
+    @value == null => ([]);
+    * => ([@value])
+  ]
   if @stored.length == 0 [ => [] ]
   >> A slot can hold records of more than one type, and each type has its own read rules.
   let @names = for @rec in @stored => @rec.mx.address.record

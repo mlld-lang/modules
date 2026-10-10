@@ -374,6 +374,13 @@ const @test_version_plain_state = @version(@ps, "tick") == 1 && @versions(@ps, [
 const @test_version_plain_state_mixed = @families(@ps) == ["tick"] && @versions(@ps) == { tick: 1 } && @version(@ps, "label") == null && @version(@ps, "items") == null
 const @test_changedSince_plain_state_mixed = @changedSince(@ps, @snapPs) == ["tick"] && @changedSince(@ps, {}) == ["tick"]
 const @test_render_plain_state_mixed = @renderAsAdmin(@ps).includes(`"fields":{"id":"p1","n":1}`) && !@renderAsAdmin(@ps).includes("label")
+>> A single-record slot is a family too; rendering reads its one record, or none.
+state @one = { me: tick?, tick: tick[] }
+const @oneEmpty = @renderAsAdmin(@one)
+exe .role:worker @setMe(s, r) = @s.set({ me: @r })
+const @om = @setMe(@one, @mkTick("solo", 7))
+const @oneOut = @renderAsAdmin(@one)
+const @test_render_single_record_slot = @oneEmpty == "" && @families(@one) == ["me", "tick"] && @oneOut.includes(`"fields":{"id":"solo","n":7}`) && @oneOut.split("\n").length == 3
 
 >> ── no role labels ──
 >> An exe with a role label would run its writes as that role instead of the caller's.
