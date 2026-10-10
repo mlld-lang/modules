@@ -181,6 +181,29 @@ const @e1 = @putAs(@ws, @mkEvent("party"))
 const @e2 = @putAs(@ws, @mkEvent("party"))
 const @test_put_keyless_appends = @ws.event.length == 2 && !@e1.redundant && @e2.redundant
 
+>> A record holding a `.secret` value is filed by `@put` and `@observe`, and keeps the label.
+record @locker [
+  key id
+  id: string [ kind "locker" ]
+  label: string
+  key: string
+  * { read: [id, label, key] }
+  .role:worker { write: { state: [upsert] } }
+]
+exe @mkLocker(i, l, k) = { id: @i, label: @l, key: @k } => locker
+const @lrecs = { locker: @locker }
+state @lockers from @lrecs
+const .secret @lockerKey = "sk-LOCKER-1"
+const @lp1 = @putAs(@lockers, @mkLocker("l1", "prod", @lockerKey))
+const @lp2 = @putAs(@lockers, @mkLocker("l1", "prod", @lockerKey))
+const @lp3 = @putAs(@lockers, @mkLocker("l1", "staging", @lockerKey))
+const @lo1 = @observeAs(@lockers, [@mkLocker("l2", "dev", @lockerKey)])
+const @test_put_secret_written = @lp1.written && @lp1.address == @lockers.locker[0].mx.address.string
+const @test_put_secret_label_kept = @lockers.locker[0].key.mx.labels.includes(".secret")
+const @test_put_secret_redundant = @lp2.written && @lp2.redundant && @lp3.written && !@lp3.redundant
+const @test_observe_secret_written = @lo1.written == 1 && @lockers.locker.length == 2
+const @test_put_non_record_still_refused = !@putAs(@lockers, "x").written && !@putAs(@lockers, {}).written && !@putAs(@lockers, null).written
+
 >> ── render ──
 >> `.role:planner` sees the name, may cite the email (handle) and phone (mask), and is not
 >> told `secret` exists (omit). `.role:admin` reads every field.

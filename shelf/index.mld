@@ -139,9 +139,19 @@ exe @addsData(st, record) = [
 
 >> Files one record into the slot for its family. The slot's merge mode decides between
 >> replacing a stored record with the same key and appending.
+>>
+>> The address and family are read inline from `.mx.address`, which carries none of the
+>> record's labels. Through an exe that takes the record they would come back with them: a
+>> record with one `.secret` field is labeled `.secret` as a whole, and a write whose slot
+>> name or gating condition carries that label is refused by core.
 exe @put(st, record, families = null) = [
-  let @address = @addressOf(@record)
-  let @family = @familyOf(@address)
+  let @addr = @record.mx.address
+  let @address = match [ @typeof(@addr) == "object" && @addr.string.isString() => @addr.string; * => null ]
+  let @family = match [
+    @address == null => null;
+    @address.indexOf(":") < 1 => null;
+    * => @address.slice(0, @address.indexOf(":"))
+  ]
   let @slots = @slotNames(@st)
   let @ok = @family != null && @slots.includes(@family) && @allowedFamilies(@st, @families).includes(@family)
   if !@ok [ => { address: @address, family: @family, written: false, redundant: false } ]
