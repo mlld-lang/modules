@@ -202,6 +202,15 @@ const @test_put_secret_written = @lp1.written && @lp1.address == @lockers.locker
 const @test_put_secret_label_kept = @lockers.locker[0].key.mx.labels.includes(".secret")
 const @test_put_secret_redundant = @lp2.written && @lp2.redundant && @lp3.written && !@lp3.redundant
 const @test_observe_secret_written = @lo1.written == 1 && @lockers.locker.length == 2
+>> Into slots that hold nothing labeled yet: a list, a single record, and a two-record list.
+state @lockersA from @lrecs
+state @lockersB from @lrecs
+state @lockersC from @lrecs
+const @loA = @observeAs(@lockersA, [@mkLocker("a1", "x", @lockerKey)])
+const @loB = @observeAs(@lockersB, @mkLocker("b1", "y", @lockerKey))
+const @loC = @observeAs(@lockersC, [@mkLocker("c1", "z", @lockerKey), @mkLocker("c2", "w", @lockerKey)])
+const @test_observe_secret_fresh_slot = @loA.written == 1 && @loB.written == 1 && @loC.written == 2 && @lockersB.locker[0].key.mx.labels.includes(".secret")
+const @test_observe_single_and_empty = @observeAs(@lockersB, @mkLocker("b1", "y", @lockerKey)).redundant && @observeAs(@lockersB, []).written == 0
 const @test_put_non_record_still_refused = !@putAs(@lockers, "x").written && !@putAs(@lockers, {}).written && !@putAs(@lockers, null).written
 
 >> ── render ──

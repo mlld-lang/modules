@@ -160,14 +160,27 @@ exe @put(st, record, families = null) = [
   => { address: @address, family: @family, written: true, redundant: @redundant }
 ]
 
->> `@put` over a list of records, or one record.
-exe @observe(st, records, families = null) = [
-  let @list = match [ @typeof(@records) == "array" => @records; * => ([@records]) ]
-  let @results = for @r in @list => @put(@st, @r, @families)
+>> The `@observe` result for a list of `@put` results.
+exe @observed(results) = [
   let @done = for @r in @results if @r.written => @r
   let @fresh = for @r in @done if !@r.redundant => @r
   let @addresses = for @r in @done => @r.address
   => { addresses: @addresses, written: @done.length, redundant: @done.length > 0 && @fresh.length == 0 }
+]
+
+>> `@put` over a list of records, or one record.
+>>
+>> No write may depend on a test of a value labeled `.secret`: core refuses it. A record
+>> with a `.secret` field is labeled `.secret` as a whole, and so is its type. So `records`
+>> is first put as one record, before any test (a list is no record and writes nothing).
+>> Only then is its type tested; a list's type carries no label, so the loop that follows
+>> runs clean. `records` is iterated as given: a copied, flattened or `match`-chosen list
+>> carries its elements' labels, and a loop over it would run under them.
+exe @observe(st, records, families = null) = [
+  let @single = @put(@st, @records, @families)
+  if @typeof(@records) != "array" [ => @observed([@single]) ]
+  let @results = for @r in @records => @put(@st, @r, @families)
+  => @observed(@results)
 ]
 
 >> ── Rendering ──
