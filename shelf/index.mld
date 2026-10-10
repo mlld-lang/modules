@@ -263,28 +263,27 @@ ${@e}
 >> it was rendered; every write bumps the version, so a stale entry is never read, and the
 >> next render of that slot replaces it. The state is the module's own, with no record
 >> type, so writing it needs no grant from the caller.
-state @renderCache = { counter: number?, slots: object? }
+state @renderCache = { slots: object? }
 @renderCache.set({ slots: {} })
 
->> A cache key for one state. mlld shows no identity on a state (two modules may each
->> declare `@s`), so the code that declares the state mints a key once and passes it to
->> every cached `@render` of that state.
-exe @cacheFor(st) = [
-  let @bumped = @renderCache.increment("counter")
-  => { id: `shelf-cache-${@renderCache.counter}` }
-]
+>> A cache key for one state: its id. Kept so callers that pass `key: @cacheFor(@st)` keep
+>> working; `@render` keys by the same id when no key is passed.
+exe @cacheFor(st) = { id: @st.mx.id }
 
 >> `{ id, role }` when this call may use the cache: the options name the active role in
->> `cache` and carry a key from `@cacheFor`. Otherwise null, and nothing is cached.
-exe @cacheContext(options) = [
+>> `cache`. The id is `options.key.id` when a key is passed, otherwise the state's id, which
+>> is the same through a parameter or a `.readonly()` view and new for each call of a
+>> per-call state. Otherwise null, and nothing is cached.
+exe @cacheContext(st, options) = [
   if @typeof(@options) != "object" [ => null ]
   if @typeof(@options.cache) != "array" [ => null ]
-  if @typeof(@options.key) != "object" [ => null ]
-  if !@options.key.id.isString() [ => null ]
   let @roles = for @r, @actor in @mx.actors => @r
   if @roles.length != 1 [ => null ]
   if !@options.cache.includes(@roles[0]) [ => null ]
-  => { id: @options.key.id, role: @roles[0] }
+  let @keyed = @typeof(@options.key) == "object" && @options.key.id.isString()
+  let @id = match [ @keyed => @options.key.id; * => @st.mx.id ]
+  if !@id.isString() [ => null ]
+  => { id: @id, role: @roles[0] }
 ]
 
 >> True when `text` contains a handle visible in this bridge session. Rendered lines never
@@ -318,12 +317,12 @@ exe @cachedSlotText(st, slot, ctx) = [
 
 >> Every record stored in `families` (default: all slots), one JSON line each, in slot
 >> order then storage order, inside `<observed>` tags; "" when there are none.
->> `options.cache` lists the roles whose renders are cached, with `options.key` from
->> `@cacheFor`.
+>> `options.cache` lists the roles whose renders are cached, per state; `options.key`
+>> overrides the state's id as the cache key.
 exe @render(st, families = null, options = null) = [
   let @allowed = @allowedFamilies(@st, @families)
   let @slots = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
-  let @ctx = @cacheContext(@options)
+  let @ctx = @cacheContext(@st, @options)
   >> A template loop, because a JSON-looking string collected by `for` is read back as an
   >> object. Empty slots leave blank lines, which are dropped.
   let @body = `
