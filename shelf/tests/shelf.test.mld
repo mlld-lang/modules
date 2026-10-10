@@ -382,6 +382,16 @@ const @om = @setMe(@one, @mkTick("solo", 7))
 const @oneOut = @renderAsAdmin(@one)
 const @test_render_single_record_slot = @oneEmpty == "" && @families(@one) == ["me", "tick"] && @oneOut.includes(`"fields":{"id":"solo","n":7}`) && @oneOut.split("\n").length == 3
 
+>> A plain object in place of a state has no record slots, so every export answers empty.
+const @notState = { contact: [], label: "x" }
+const @nsRef = { ref: { address: "contact:c1", field: "name" } }
+const @test_plain_object_reads = @families(@notState) == [] && @find(@notState, "contact:c1") == null && @resolveRef(@nsRef, @notState) == null
+const @test_plain_object_render = @render(@notState) == "" && @renderAsAdmin(@notState) == ""
+const @test_plain_object_versions = @version(@notState, "contact") == null && @versions(@notState) == {} && @changedSince(@notState, {}) == []
+const @nsPut = @putAs(@notState, @mkContact("c9", "Zed"))
+const @nsObs = @observeAs(@notState, [@mkContact("c9", "Zed")])
+const @test_plain_object_writes = !@nsPut.written && @nsObs.written == 0 && @notState.contact == []
+
 >> ── no role labels ──
 >> An exe with a role label would run its writes as that role instead of the caller's.
 const @source = <../index.mld>
