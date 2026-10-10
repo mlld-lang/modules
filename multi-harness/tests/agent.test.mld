@@ -14,7 +14,7 @@ const @codexOut = @agent("hi codex", { harness: "codex", codexBin: `${@r}/codex/
 const @test_codex_ran = @codexOut.startsWith("stub codex: exec") && @codexOut.includes("-m m-codex") && @codexOut.includes("| hi codex")
 
 >> pi saves sessions under .llm/, which the default fence refuses, so saving is off.
-const @piOut = @agent("hi pi", { harness: "pi", piBin: `${@r}/pi/tests/fixtures/run/pi-stub.sh`, model: "m-pi", session: false })
+const @piOut = @agent("hi pi", { harness: "pi", piBin: `${@r}/pi/tests/fixtures/run/stub/pi`, model: "m-pi", session: false })
 const @test_pi_ran = @piOut.includes("arg=--no-session") && @piOut.includes("arg=m-pi")
 
 const @opencodeOut = @agent("hi opencode", { harness: "opencode", opencodeBin: `${@r}/opencode/tests/fixtures/bin/opencode`, model: "m-opencode" })
