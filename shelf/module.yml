@@ -1,0 +1,10 @@
+name: shelf
+author: mlld
+type: library
+about: "Record workspaces on core state: file tool results, cite them by address, render them for a prompt"
+version: 0.1.0
+license: CC0
+repo: "https://github.com/mlld-lang/modules"
+bugs: "https://github.com/mlld-lang/modules/issues"
+keywords: ["state", "records", "shelf", "ref", "address", "citation"]
+mlldVersion: ">=2.2.0"

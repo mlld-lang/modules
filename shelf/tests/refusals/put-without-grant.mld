@@ -1,0 +1,25 @@
+>> Expected: the run ends with WRITE_DENIED_NO_ROLE.
+>>
+>> `@put` has no role label, so its write is checked as the caller's role. The caller here
+>> runs as `.role:planner`, which the record's write grant does not name. Core ends the run
+>> on a write refusal (`try` cannot catch it), so this case lives outside `shelf.test.mld`,
+>> where the granted `.role:worker` case passes.
+>> Run: mlld shelf/tests/refusals/put-without-grant.mld
+
+import { @put } from "../../index.mld"
+
+record @person [
+  key id
+  id: string [ kind "person" ]
+  name: string
+  * { read: [id, name] }
+  .role:worker { write: { shelves: { upsert: true } } }
+]
+exe @mkPerson(i, n) = { id: @i, name: @n } => person
+const @recs = { person: @person }
+state @ws from @recs
+
+exe .role:planner @putAsPlanner(s, rec) = @put(@s, @rec)
+
+show @putAsPlanner(@ws, @mkPerson("p1", "Bo"))
+show "not reached"

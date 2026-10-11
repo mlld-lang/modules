@@ -1,0 +1,557 @@
+>> Tests for @mlld/shelf: address lookup and {ref} resolution.
+>> Run: mlld test shelf/tests/
+
+import { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @cacheFor, @version, @versions, @changedSince } from "../index.mld"
+
+record @contact [
+  key id
+  id: string [ kind "contact" ]
+  name: string
+  * { read: [id, name] }
+  .role:worker { write: { shelves: true } }
+]
+record @note [
+  key id
+  id: string [ kind "note" ]
+  text: string
+  * { read: [id, text] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkContact(i, n) = { id: @i, name: @n } => contact
+exe @mkNote(i, t) = { id: @i, text: @t } => note
+const @recs = { contact: @contact, note: @note }
+state @st from @recs
+
+exe .role:worker @store(s, slot, r) = [
+  let @w = @s.upsert(@slot, @r)
+  => "stored"
+]
+const @ann = @mkContact("c1", "Ann")
+const @memo = @mkNote("n1", "call Ann")
+const @s1 = @store(@st, "contact", @ann)
+const @s2 = @store(@st, "note", @memo)
+const @annAddr = @st.contact[0].mx.address.string
+const @memoAddr = @st.note[0].mx.address.string
+
+>> ── familyOf ──
+const @test_familyOf_prefix = @familyOf("contact:c1") == "contact"
+const @test_familyOf_first_colon = @familyOf("contact:a:b") == "contact"
+const @test_familyOf_no_colon = @familyOf("contact") == null
+const @test_familyOf_empty_family = @familyOf(":x") == null
+const @test_familyOf_empty = @familyOf("") == null
+const @test_familyOf_not_string = @familyOf(42) == null
+>> Core resolves a `{ handle }` argument before any exe body runs, and refuses an unknown
+>> handle there; either way no family comes back.
+const @handleTry = try @familyOf({ handle: "contact:c1" })
+const @test_familyOf_handle_object = !@handleTry.ok || @handleTry.value == null
+
+>> ── families ──
+const @test_families_slots = @families(@st).join(",") == "contact,note"
+const @test_families_not_state = @families("x").length == 0
+
+>> ── find ──
+const @test_find_record = @find(@st, @annAddr).name == "Ann"
+const @test_find_with_families = @find(@st, @memoAddr, ["note"]).text == "call Ann"
+const @test_find_family_not_allowed = @find(@st, @annAddr, ["note"]) == null
+const @test_find_non_list_families_defaults = @find(@st, @annAddr, "note").name == "Ann"
+const @test_find_missing = @find(@st, "contact:nobody") == null
+const @test_find_unknown_family = @find(@st, "nope:c1") == null
+const @test_find_allowed_but_no_slot = @find(@st, "nope:c1", ["nope"]) == null
+
+>> ── isRef ──
+const @test_isRef_ref = @isRef({ ref: { address: "contact:c1", field: "id" } })
+const @test_isRef_field_not_string = !@isRef({ ref: { address: "contact:c1", field: 1 } })
+const @test_isRef_no_field = !@isRef({ ref: { address: "contact:c1" } })
+const @test_isRef_ref_not_object = !@isRef({ ref: "contact:c1" })
+const @test_isRef_string = !@isRef("contact:c1")
+const @test_isRef_null = !@isRef(null)
+
+>> ── resolveRef ──
+const @annRef = { ref: { address: @annAddr, field: "name" } }
+const @test_resolveRef_value = @resolveRef(@annRef, @st) == "Ann"
+const @test_resolveRef_not_ref = @resolveRef("contact:c1", @st) == null
+const @test_resolveRef_no_record = @resolveRef({ ref: { address: "contact:nobody", field: "name" } }, @st) == null
+const @test_resolveRef_no_field = @resolveRef({ ref: { address: @annAddr, field: "phone" } }, @st) == null
+const @test_resolveRef_metadata_is_not_a_field = @resolveRef({ ref: { address: @annAddr, field: "mx" } }, @st) == null
+const @test_resolveRef_family_not_allowed = @resolveRef(@annRef, @st, ["note"]) == null
+
+>> ── firstUnresolved ──
+const @goodArgs = { to: @annRef, subject: "hi" }
+const @badArgs = { to: @annRef, cc: { ref: { address: "contact:nobody", field: "name" } }, bcc: { ref: { address: "contact:gone", field: "name" } } }
+const @test_firstUnresolved_all_resolve = @firstUnresolved(@goodArgs, @st) == null
+const @miss = @firstUnresolved(@badArgs, @st)
+const @test_firstUnresolved_first_miss = @miss.arg == "cc" && @miss.addr == "contact:nobody"
+const @test_firstUnresolved_family_not_allowed = @firstUnresolved(@goodArgs, @st, ["note"]).arg == "to"
+const @test_firstUnresolved_not_object = @firstUnresolved("x", @st) == null
+
+>> ── ref-resolves-with-proof ──
+>> The contact's `id` is a fact. Resolved through a ref it keeps its proof, so it mints a
+>> grant on a tool whose input field accepts any fact. The same text typed by hand carries
+>> no proof and is refused.
+record @sendInputs [ to: string [ kind "to"; accepts .fact:* ]; validate "strict" ]
+exe .op:tool:w @send(to) = `sent:${@to}`
+tools @T = { send: { mlld: @send, inputs: @sendInputs, labels: [.op:tool:w] } }
+policy @pol = { .role:planner { can_authorize: ["send"] } }
+
+const @granted = { args: { to: @resolveRef({ ref: { address: @annAddr, field: "id" } }, @st) } } as grant for @send
+const @test_ref_resolves_with_proof = @granted.tool.name == "send"
+
+const @typed = try { args: { to: "c1" } } as grant for @send
+const @test_ref_typed_by_hand_refused = !@typed.ok && @typed.error.message.includes("carries no proof")
+
+>> ── security row ──
+>> Attacker-shaped addresses never throw and never reach a record, of any family.
+const @x = "x"
+const @long = `contact:${@x.repeat(9992)}`
+const @hostile = ["../x", "contact:", ":", @long, 42, null, {}]
+const @found = for @a in @hostile => @find(@st, @a)
+const @test_security_find_null = @found.every(@item == null)
+const @resolved = for @a in @hostile => @resolveRef({ ref: { address: @a, field: "name" } }, @st)
+const @test_security_resolveRef_null = @resolved.every(@item == null)
+const @test_security_long_is_long = @hostile[3].length == 10000
+
+>> ── writes ──
+>> A separate shelf: `person` is keyed (upserts), `event` is keyless (appends). Writes run
+>> as the caller's role, so each goes through an exe labelled with the granted role.
+record @person [
+  key id
+  id: string [ kind "person" ]
+  name: string
+  phone: string?
+  tags: array?
+  info: object?
+  * { read: [id, name, phone, tags, info] }
+  .role:worker { write: { shelves: { upsert: true } } }
+]
+record @event [
+  title: string
+  * { read: [title] }
+  .role:worker { write: { shelves: { upsert: true } } }
+]
+exe @mkPerson(i, n, p, t, info) = { id: @i, name: @n, phone: @p, tags: @t, info: @info } => person
+exe @mkEvent(t) = { title: @t } => event
+const @wrecs = { person: @person, event: @event }
+state @ws from @wrecs
+
+exe .role:worker @observeAs(s, recs, fams = null) = @observe(@s, @recs, @fams)
+exe .role:worker @putAs(s, rec, fams = null) = @put(@s, @rec, @fams)
+
+>> observe-then-redundant
+const @bo = @mkPerson("p1", "Bo", "555", ["a", "b"], { city: "Oslo", zip: [1, 2] })
+const @o1 = @observeAs(@ws, @bo)
+const @test_observe_first_writes = @o1.written == 1 && !@o1.redundant && @o1.addresses[0] == @bo.mx.address.string
+const @o2 = @observeAs(@ws, [@bo])
+const @test_observe_same_again_redundant = @o2.written == 1 && @o2.redundant
+const @o3 = @observeAs(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2] }))
+const @test_observe_changed_field_adds = @o3.written == 1 && !@o3.redundant
+const @test_observe_keyed_upserts = @ws.person.length == 1 && @ws.person[0].phone == "556"
+const @o4 = @observeAs(@ws, [])
+const @test_observe_empty_not_redundant = @o4.written == 0 && !@o4.redundant
+const @o5 = @observeAs(@ws, [{ title: "plain" }, "x", null])
+const @test_observe_no_valid_records = @o5.written == 0 && !@o5.redundant && @o5.addresses.length == 0
+
+>> addsData: the stored person is p1 / Bo / 556 / [a, b] / { city: Oslo, zip: [1, 2] }
+const @test_addsData_same_is_false = !@addsData(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_nested_object = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 3] }))
+const @test_addsData_nested_key = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2], floor: 3 }))
+const @test_addsData_array_order = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["b", "a"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_array_length = @addsData(@ws, @mkPerson("p1", "Bo", "556", ["a"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_null_field_ignored = !@addsData(@ws, @mkPerson("p1", "Bo", null, null, null))
+const @test_addsData_new_address = @addsData(@ws, @mkPerson("p2", "Bo", "556", ["a", "b"], { city: "Oslo", zip: [1, 2] }))
+const @test_addsData_not_record = !@addsData(@ws, { id: "p1", name: "Cy" }) && !@addsData(@ws, "p1") && !@addsData(@ws, null)
+>> `mx` is metadata, not a field: a stored record's own metadata differs from a fresh
+>> copy's (sources, coercion id), and the copy still adds nothing.
+const @test_addsData_mx_ignored = !@addsData(@ws, @ws.person[0])
+
+>> put: refusals write nothing
+const @before = @ws.person.length
+const @p1 = @putAs(@ws, @mkPerson("p9", "Di", null, null, null), ["event"])
+const @test_put_family_not_allowed = !@p1.written && @ws.person.length == @before
+const @p2 = @putAs(@ws, { id: "p9", name: "Di" })
+const @test_put_no_address = !@p2.written && @p2.address == null && @ws.person.length == @before
+const @p3 = @putAs(@st, @mkPerson("p9", "Di", null, null, null))
+const @test_put_unknown_family = !@p3.written && @p3.family == "person" && @st.contact.length == 1 && @st.note.length == 1
+const @p4 = @putAs(@ws, @mkPerson("p9", "Di", null, null, null), "not a list")
+const @test_put_result = @p4.written && !@p4.redundant && @p4.family == "person" && @p4.address == @ws.person[1].mx.address.string
+
+>> keyed upserts, keyless appends
+const @k1 = @putAs(@ws, @mkPerson("p9", "Di", "1", null, null))
+const @test_put_keyed_upserts = @ws.person.length == 2 && @ws.person[1].phone == "1"
+const @e1 = @putAs(@ws, @mkEvent("party"))
+const @e2 = @putAs(@ws, @mkEvent("party"))
+const @test_put_keyless_appends = @ws.event.length == 2 && !@e1.redundant && @e2.redundant
+
+>> A record holding a `.secret` value is filed by `@put` and `@observe`, and keeps the label.
+record @locker [
+  key id
+  id: string [ kind "locker" ]
+  label: string
+  key: string
+  * { read: [id, label, key] }
+  .role:worker { write: { state: [upsert] } }
+]
+exe @mkLocker(i, l, k) = { id: @i, label: @l, key: @k } => locker
+const @lrecs = { locker: @locker }
+state @lockers from @lrecs
+const .secret @lockerKey = "sk-LOCKER-1"
+const @lp1 = @putAs(@lockers, @mkLocker("l1", "prod", @lockerKey))
+const @lp2 = @putAs(@lockers, @mkLocker("l1", "prod", @lockerKey))
+const @lp3 = @putAs(@lockers, @mkLocker("l1", "staging", @lockerKey))
+const @lo1 = @observeAs(@lockers, [@mkLocker("l2", "dev", @lockerKey)])
+const @test_put_secret_written = @lp1.written && @lp1.address == @lockers.locker[0].mx.address.string
+const @test_put_secret_label_kept = @lockers.locker[0].key.mx.labels.includes(".secret")
+const @test_put_secret_redundant = @lp2.written && @lp2.redundant && @lp3.written && !@lp3.redundant
+const @test_observe_secret_written = @lo1.written == 1 && @lockers.locker.length == 2
+>> Into slots that hold nothing labeled yet: a list, a single record, and a two-record list.
+state @lockersA from @lrecs
+state @lockersB from @lrecs
+state @lockersC from @lrecs
+const @loA = @observeAs(@lockersA, [@mkLocker("a1", "x", @lockerKey)])
+const @loB = @observeAs(@lockersB, @mkLocker("b1", "y", @lockerKey))
+const @loC = @observeAs(@lockersC, [@mkLocker("c1", "z", @lockerKey), @mkLocker("c2", "w", @lockerKey)])
+const @test_observe_secret_fresh_slot = @loA.written == 1 && @loB.written == 1 && @loC.written == 2 && @lockersB.locker[0].key.mx.labels.includes(".secret")
+const @test_observe_single_and_empty = @observeAs(@lockersB, @mkLocker("b1", "y", @lockerKey)).redundant && @observeAs(@lockersB, []).written == 0
+>> A list an exe returned, holding a `.secret` record, is filed into a plain state and into
+>> a state declared `.secret`, and keeps the label.
+exe @lockerList(k) = [
+  => [@mkLocker("s1", "one", @k), @mkLocker("s2", "two", @k)]
+]
+state .secret @secretLockers from @lrecs
+const @loS = @observeAs(@secretLockers, @lockerList(@lockerKey))
+const @test_observe_exe_list_into_secret_state = @loS.written == 2 && @secretLockers.locker.length == 2
+state @plainLockers from @lrecs
+const @loP = @observeAs(@plainLockers, @lockerList(@lockerKey))
+const @test_observe_exe_list_into_plain_state = @loP.written == 2 && @plainLockers.locker.length == 2 && @plainLockers.locker[0].key.mx.labels.includes(".secret")
+const @test_put_non_record_still_refused = !@putAs(@lockers, "x").written && !@putAs(@lockers, {}).written && !@putAs(@lockers, null).written
+
+>> ── render ──
+>> `.role:planner` sees the name, may cite the email (handle) and phone (mask), and is not
+>> told `secret` exists (omit). `.role:admin` reads every field.
+record @card [
+  key email
+  email: string [ kind "email" ]
+  name: string
+  phone: string
+  secret: string
+  .role:planner { read: [name, { handle: "email" }, { mask: "phone" }, { omit: "secret" }] }
+  .role:admin { read: [email, name, phone, secret] }
+  .role:worker { write: { shelves: true } }
+]
+record @memo [
+  key id
+  id: string [ kind "memo" ]
+  text: string
+  * { read: [id, text] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkCard(e, n, p, x) = { email: @e, name: @n, phone: @p, secret: @x } => card
+exe @mkMemo(i, t) = { id: @i, text: @t } => memo
+const @rrecs = { card: @card, memo: @memo }
+state @rs from @rrecs
+state @empty from @rrecs
+const @r1 = @observeAs(@rs, [@mkCard("ada@x.com", "Ada", "555-1234", "S3CRET"), @mkMemo("m1", "hi")])
+const @adaAddr = @rs.card[0].mx.address.string
+const @memoLine = `{"address":"${@rs.memo[0].mx.address.string}","fields":{"id":"m1","text":"hi"},"ref_fields":[]}`
+
+exe .role:planner @renderAsPlanner(s, fams = null) = @render(@s, @fams)
+exe .role:admin @renderAsAdmin(s, fams = null) = @render(@s, @fams)
+
+const @asPlanner = @renderAsPlanner(@rs, ["card"])
+const @asAdmin = @renderAsAdmin(@rs, ["card"])
+const @test_render_hides_by_role = @asPlanner == `<observed>
+{"address":"${@adaAddr}","fields":{"name":"Ada"},"ref_fields":["email","phone"]}
+</observed>`
+const @test_render_hidden_value_absent = !@asPlanner.includes("ada@x.com") && !@asPlanner.includes("1234") && !@asPlanner.includes("handle")
+const @test_render_omit_in_neither = !@asPlanner.includes("secret") && !@asPlanner.includes("S3CRET")
+const @test_render_shows_reader_role = @asAdmin == `<observed>
+{"address":"${@adaAddr}","fields":{"email":"ada@x.com","name":"Ada","phone":"555-1234","secret":"S3CRET"},"ref_fields":[]}
+</observed>`
+const @test_render_slot_order = @renderAsAdmin(@rs).endsWith(`${@memoLine}
+</observed>`)
+const @test_render_family_excluded = !@renderAsAdmin(@rs, ["memo"]).includes("card:") && @renderAsAdmin(@rs, ["memo"]).includes(@memoLine)
+const @test_render_empty_state = @renderAsAdmin(@empty) == ""
+const @test_render_empty_family = @renderAsAdmin(@rs, []) == ""
+>> With no role active, the record's `*` rule decides: memo shows both fields, card none.
+const @test_render_no_role = @render(@rs).includes(@memoLine) && !@render(@rs).includes("Ada")
+
+>> A slot holding two record types renders each record by its own type's read rules: `kx`
+>> shows `f` to the planner, `ky` gives the planner only a handle to it.
+record @kx [
+  key id
+  id: string [ kind "k" ]
+  f: string
+  .role:planner { read: [id, f] }
+  .role:worker { write: { shelves: true } }
+]
+record @ky [
+  key id
+  id: string [ kind "k" ]
+  f: string
+  .role:planner { read: [id, { handle: "f" }] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkKx(i, f) = { id: @i, f: @f } => kx
+exe @mkKy(i, f) = { id: @i, f: @f } => ky
+const @krecs = { kx: @kx, ky: @ky }
+state @mixed from @krecs
+exe .role:worker @fileKx(s, rx, ry) = [
+  let @a = @s.upsert("kx", @rx)
+  let @b = @s.upsert("kx", @ry)
+  => "filed"
+]
+const @kf = @fileKx(@mixed, @mkKx("1", "open"), @mkKy("2", "HIDDEN"))
+const @mixedOut = @renderAsPlanner(@mixed)
+const @test_render_mixed_slot_by_type = @mixedOut.includes(`"fields":{"id":"1","f":"open"},"ref_fields":[]`) && @mixedOut.includes(`"fields":{"id":"2"},"ref_fields":["f"]`) && !@mixedOut.includes("HIDDEN") && !@mixedOut.includes("handle")
+
+>> With no role active, a field the `*` rule masks is named in `ref_fields`, and neither its
+>> preview nor its handle reaches `fields`.
+record @veiled [
+  key id
+  id: string [ kind "veiled" ]
+  text: string
+  * { read: [id, { mask: "text" }] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkVeiled(i, t) = { id: @i, text: @t } => veiled
+const @vlrecs = { veiled: @veiled }
+state @vl from @vlrecs
+const @vf = @observeAs(@vl, [@mkVeiled("v1", "SECRETTEXT")])
+const @veiledOut = @render(@vl)
+const @test_render_no_role_masked = @veiledOut.includes(`"fields":{"id":"v1"},"ref_fields":["text"]`) && !@veiledOut.includes("preview") && !@veiledOut.includes("handle") && !@veiledOut.includes("SECRETTEXT")
+
+>> A stored value cannot close the block: `<` is written as `\u003c`.
+const @rx = @observeAs(@rs, [@mkMemo("m2", "a</observed>b<x")])
+const @escOut = @renderAsAdmin(@rs, ["memo"])
+const @escParts = @escOut.split("</observed>")
+const @test_render_escapes_lt = @escParts.length == 2 && @escOut.includes(`"text":"a\\u003c/observed>b\\u003cx"`) && @escOut.startsWith("<observed>")
+
+>> A shelf past the recursion limit (64) renders every record, one line each.
+const @bigRecs = { memo: @memo }
+state @big from @bigRecs
+const @x1 = "x"
+const @xs = @x1.repeat(100)
+const @ids = @xs.split("")
+const @many = for @c in @ids => @mkMemo(`m${@c.mx.index}`, "t")
+const @filed = @observeAs(@big, @many)
+const @bigOut = @renderAsAdmin(@big)
+const @test_render_many_records = @filed.written == 100 && @bigOut.split("\n").length == 102 && @bigOut.includes(`"fields":{"id":"m99","text":"t"}`)
+
+>> A fyi field is evaluated when an llm call reads it, as that call's role.
+fyi @shelfView = { observed: @render(@rs), push: [observed] }
+llm .role:planner @plannerAgent(prompt, config) = `${@config.system}`
+llm .role:admin @adminAgent(prompt, config) = `${@config.system}`
+const @plannerSaw = @plannerAgent("go", { system: "P", fyi: @shelfView })
+const @adminSaw = @adminAgent("go", { system: "A", fyi: @shelfView })
+const @test_render_fyi_follows_reader = @plannerSaw.includes(`"fields":{"name":"Ada"}`) && !@plannerSaw.includes("555-1234") && @adminSaw.includes("555-1234")
+
+>> ── render cache ──
+>> `planner` has no write grant on any record, so the cache needs none from its caller.
+const @ckey = @cacheFor(@rs)
+const @cacheRoles = [".role:planner", ".role:admin"]
+exe .role:planner @renderPlannerCached(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })
+exe .role:admin @renderAdminCached(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })
+const @plainPlanner = @renderAsPlanner(@rs)
+const @plainAdmin = @renderAsAdmin(@rs)
+const @cp1 = @renderPlannerCached(@rs, @ckey)
+const @ca1 = @renderAdminCached(@rs, @ckey)
+const @cp2 = @renderPlannerCached(@rs, @ckey)
+const @ca2 = @renderAdminCached(@rs, @ckey)
+const @test_cache_same_output = @cp1 == @plainPlanner && @cp2 == @plainPlanner && @ca1 == @plainAdmin && @ca2 == @plainAdmin
+>> 1. A line cached for one role is never returned to another.
+const @test_cache_role_isolated = @cp2 != @ca2 && !@cp2.includes("555-1234") && @ca2.includes("555-1234")
+>> 2. A cached render keeps every label of the uncached one. The only labels it adds name
+>> the cache's own state (its entries).
+const @plainLabels = @plainPlanner.mx.labels
+const @cachedLabels = @cp2.mx.labels
+const @test_cache_labels = @plainLabels.every(@cachedLabels.includes(@item)) && @cachedLabels.every(@plainLabels.includes(@item) || @item.startsWith(".src:state:@renderCache.")) && @cachedLabels.includes(".src:state:@renderCache.slots")
+>> 4. Two states with the same families keep separate entries.
+state @rs2 from @rrecs
+const @ckey2 = @cacheFor(@rs2)
+const @r2 = @observeAs(@rs2, [@mkMemo("other", "second state")])
+const @other1 = @renderPlannerCached(@rs2, @ckey2)
+const @mine = @renderPlannerCached(@rs, @ckey)
+const @test_cache_states_separate = @other1.includes("second state") && !@other1.includes("Ada") && @mine == @plainPlanner
+>> The key is the state's id: the same on every call, different for another state.
+const @test_cache_key_is_id = @cacheFor(@rs).id == @rs.mx.id && @ckey.id == @cacheFor(@rs).id && @cacheFor(@rs).id != @cacheFor(@rs2).id
+>> Same families, same slot versions: only the key tells these two apart.
+state @twinA from @rrecs
+state @twinB from @rrecs
+const @keyA = @cacheFor(@twinA)
+const @keyB = @cacheFor(@twinB)
+const @fa = @observeAs(@twinA, [@mkMemo("ta", "twin A")])
+const @fb = @observeAs(@twinB, [@mkMemo("tb", "twin B")])
+const @outA = @renderPlannerCached(@twinA, @keyA)
+const @outB = @renderPlannerCached(@twinB, @keyB)
+const @test_cache_twins_separate = @twinA.memo.mx.version == @twinB.memo.mx.version && @outA.includes("twin A") && @outB.includes("twin B") && !@outB.includes("twin A")
+>> A hand-made key caches like one from `@cacheFor`.
+const @handA1 = @renderPlannerCached(@twinA, { id: "hand-a" })
+const @handA2 = @renderPlannerCached(@twinA, { id: "hand-a" })
+const @test_cache_hand_key = @handA1 == @outA && @handA2 == @outA
+>> Without a key, the states' ids keep the twins apart.
+exe .role:planner @renderPlannerKeyless(s) = @render(@s, null, { cache: @cacheRoles })
+const @outA2 = @renderPlannerKeyless(@twinA)
+const @outB2 = @renderPlannerKeyless(@twinB)
+const @outA3 = @renderPlannerKeyless(@twinA)
+const @test_cache_twins_keyless = @outA2.includes("twin A") && !@outA2.includes("twin B") && @outB2.includes("twin B") && !@outB2.includes("twin A") && @outA3 == @outA2
+>> A state declared inside an exe is new on each call, so each call's render shows only its
+>> own records.
+exe @perCallRender(t) = [
+  state @c from @rrecs
+  let @w = @observeAs(@c, [@mkMemo("pc", @t)])
+  => @renderPlannerKeyless(@c)
+]
+const @pc1 = @perCallRender("first call")
+const @pc2 = @perCallRender("second call")
+const @test_cache_per_call_keyless = @pc1.includes("first call") && !@pc1.includes("second call") && @pc2.includes("second call") && !@pc2.includes("first call")
+>> A read-only view has the state's id. (A render through one shows no records: core gives its slots no version.)
+const @rsKeyless = @renderPlannerKeyless(@rs)
+const @test_cache_readonly_same_id = @cacheFor(@rs.readonly()).id == @cacheFor(@rs).id && @rsKeyless == @plainPlanner
+>> 5. A write between two cached renders shows the new record.
+const @r3 = @observeAs(@rs2, [@mkMemo("later", "after write")])
+const @other2 = @renderPlannerCached(@rs2, @ckey2)
+const @test_cache_write_shows = @other2.includes("after write") && @other2.includes("second state")
+>> A slot holding a `.secret` value caches too, and the cached text keeps `.secret`. The
+>> planner never sees the key; the admin does. A write between renders still shows.
+record @vault [
+  key id
+  id: string [ kind "vault" ]
+  label: string
+  key: string
+  .role:planner { read: [id, label, { omit: "key" }] }
+  .role:admin { read: [id, label, key] }
+  .role:worker { write: { shelves: true } }
+]
+exe @mkVault(i, l, k) = { id: @i, label: @l, key: @k } => vault
+const @vrecs2 = { vault: @vault }
+state @vaultSt from @vrecs2
+const .secret @apiKey = "sk-FAKE-123"
+exe .role:worker @vaultUpsert(s, r) = @s.upsert("vault", @r)
+const @vw1 = @vaultUpsert(@vaultSt, @mkVault("v1", "prod", @apiKey))
+const @vkey = @cacheFor(@vaultSt)
+const @vPlain = @renderAsPlanner(@vaultSt)
+const @vAdminPlain = @renderAsAdmin(@vaultSt)
+const @vp1 = @renderPlannerCached(@vaultSt, @vkey)
+const @vp2 = @renderPlannerCached(@vaultSt, @vkey)
+const @va1 = @renderAdminCached(@vaultSt, @vkey)
+const @va2 = @renderAdminCached(@vaultSt, @vkey)
+const @test_cache_secret_slot = @vp1 == @vPlain && @vp2 == @vPlain && @va1 == @vAdminPlain && @va2 == @vAdminPlain && !@vp2.includes("sk-FAKE") && @va2.includes("sk-FAKE-123")
+const @test_cache_secret_label_kept = @vAdminPlain.mx.labels.includes("secret") && @va2.mx.labels.includes("secret") && @va2.mx.labels.includes(".src:state:@renderCache.slots")
+const @vw2 = @vaultUpsert(@vaultSt, @mkVault("v2", "staging", @apiKey))
+const @vp3 = @renderPlannerCached(@vaultSt, @vkey)
+const @va3 = @renderAdminCached(@vaultSt, @vkey)
+const @test_cache_secret_write_shows = @vp3.includes("staging") && @va3.includes("staging") && @va3 == @renderAsAdmin(@vaultSt)
+
+>> A `.secret` entry in the cache does not label another state's cached render.
+const @cleanAfter = @renderPlannerCached(@rs, @ckey)
+const @test_cache_secret_not_spread = @cleanAfter == @plainPlanner && !@cleanAfter.mx.labels.includes("secret") && !@cleanAfter.mx.labels.includes(".src:state:@vaultSt.vault") && @cleanAfter.mx.labels.includes(".src:state:@renderCache.slots")
+
+>> A listed role with no key caches by the state's id; a role not listed, or no role,
+>> renders as before and caches nothing.
+exe .role:worker @renderUnlisted(s, k) = @render(@s, null, { cache: @cacheRoles, key: @k })
+exe .role:worker @renderWorker(s) = @render(@s)
+const @test_cache_needs_role = @renderPlannerKeyless(@rs) == @plainPlanner && @renderUnlisted(@rs, @ckey) == @renderWorker(@rs) && @render(@rs, null, { cache: @cacheRoles, key: @ckey }) == @render(@rs)
+>> 3 and fyi: a cached view read by a planner llm call equals the uncached one, names the
+>> handle-mode `email` in `ref_fields`, and holds no handle or preview. (A test run has no
+>> live bridge session, so `@mx.handles` is empty here and handle values are null.)
+fyi @cachedView = { observed: @render(@rs, null, { cache: [".role:planner"], key: @ckey }), push: [observed] }
+const @sawCached = @plannerAgent("go", { system: "P", fyi: @cachedView })
+const @sawCached2 = @plannerAgent("go", { system: "P", fyi: @cachedView })
+const @sawPlain = @plannerAgent("go", { system: "P", fyi: @shelfView })
+const @test_cache_fyi = @sawCached == @sawPlain && @sawCached2 == @sawPlain
+const @test_cache_no_handles = @sawCached2.includes(`"ref_fields":["email","phone"]`) && !@sawCached2.includes("handle") && !@sawCached2.includes("preview") && !@cp2.includes("handle")
+
+>> ── versions ──
+>> Each operation runs in its own exe so the version can be read before and after it.
+record @tick [
+  key id
+  id: string [ kind "tick" ]
+  n: number
+  * { read: [id, n] }
+  .role:worker { write: { state: [upsert, clear, remove] } }
+]
+record @tock [
+  key id
+  id: string [ kind "tock" ]
+  * { read: [id] }
+  .role:worker { write: { state: [upsert] } }
+]
+exe @mkTick(i, n) = { id: @i, n: @n } => tick
+exe @mkTock(i) = { id: @i } => tock
+const @vrecs = { tick: @tick, tock: @tock }
+state @vs from @vrecs
+exe .role:worker @tickUpsert(s, r) = @s.upsert("tick", @r)
+exe .role:worker @tickAppend(s, r) = @s.append("tick", @r)
+exe .role:worker @tickRemove(s, r) = @s.remove("tick", @r)
+exe .role:worker @tickSet(s, r) = @s.set({ tick: [@r] })
+exe .role:worker @tickClear(s) = @s.clear("tick")
+
+const @v0 = @version(@vs, "tick")
+const @test_version_starts_at_zero = @v0 == 0 && @version(@vs, "tock") == 0
+const @w1 = @tickUpsert(@vs, @mkTick("t1", 1))
+const @v1 = @version(@vs, "tick")
+const @test_version_upsert_bumps = @v1 > @v0
+const @w2 = @tickUpsert(@vs, @mkTick("t1", 1))
+const @v2 = @version(@vs, "tick")
+>> Versions count writes, not changes.
+const @test_version_identical_upsert_bumps = @v2 > @v1
+const @w3 = @tickAppend(@vs, @mkTick("t2", 2))
+const @v3 = @version(@vs, "tick")
+const @test_version_append_bumps = @v3 > @v2
+const @w4 = @tickRemove(@vs, @mkTick("t2", 2))
+const @v4 = @version(@vs, "tick")
+const @test_version_remove_bumps = @v4 > @v3
+const @w5 = @tickSet(@vs, @mkTick("t3", 3))
+const @v5 = @version(@vs, "tick")
+const @test_version_set_bumps = @v5 > @v4
+const @w6 = @tickClear(@vs)
+const @v6 = @version(@vs, "tick")
+const @test_version_clear_bumps = @v6 > @v5
+const @test_version_other_slot_untouched = @version(@vs, "tock") == 0
+const @test_version_unknown_family = @version(@vs, "nope") == null && @version(@vs, null) == null && @version("x", "tick") == null
+
+const @snap = @versions(@vs)
+const @test_versions_snapshot = @snap.tick == @v6 && @snap.tock == 0 && @snap.mx.keys.length == 2
+const @test_versions_families = @versions(@vs, ["tock", "nope"]).mx.keys.length == 1 && @versions(@vs, []).mx.keys.length == 0
+const @o6 = @observeAs(@vs, [@mkTock("k1")])
+const @test_changedSince_only_touched = @changedSince(@vs, @snap) == ["tock"]
+const @snap2 = @versions(@vs)
+const @o7 = @observeAs(@vs, [@mkTick("t9", 9)])
+const @test_changedSince_second_observe = @changedSince(@vs, @snap2) == ["tick"]
+const @test_changedSince_families = @changedSince(@vs, @snap, ["tick"]) == ["tick"]
+const @test_changedSince_missing_is_zero = @changedSince(@vs, { tick: @snap2.tick }) == ["tick", "tock"]
+const @test_changedSince_bad_snapshot = @changedSince(@vs, "x") == ["tick", "tock"] && @changedSince(@vs, { tick: "9999", tock: 9999 }) == ["tick"]
+const @test_changedSince_none = @changedSince(@vs, @versions(@vs)) == []
+
+>> A record-typed slot of a plain state counts the same way. Its ordinary slots are not
+>> families: they have no version, and no export lists, renders or counts them.
+state @ps = { label: string?, count: number?, items: array?, tick: tick[] }
+exe .role:worker @setLabel(s) = @s.set({ label: "x", count: 2 })
+const @pl = @setLabel(@ps)
+const @snapPs = @versions(@ps)
+const @pw = @tickUpsert(@ps, @mkTick("p1", 1))
+const @test_version_plain_state = @version(@ps, "tick") == 1 && @versions(@ps, ["tick"]).tick == 1
+const @test_version_plain_state_mixed = @families(@ps) == ["tick"] && @versions(@ps) == { tick: 1 } && @version(@ps, "label") == null && @version(@ps, "items") == null
+const @test_changedSince_plain_state_mixed = @changedSince(@ps, @snapPs) == ["tick"] && @changedSince(@ps, {}) == ["tick"]
+const @test_render_plain_state_mixed = @renderAsAdmin(@ps).includes(`"fields":{"id":"p1","n":1}`) && !@renderAsAdmin(@ps).includes("label")
+>> A single-record slot is a family too; rendering reads its one record, or none.
+state @one = { me: tick?, tick: tick[] }
+const @oneEmpty = @renderAsAdmin(@one)
+exe .role:worker @setMe(s, r) = @s.set({ me: @r })
+const @om = @setMe(@one, @mkTick("solo", 7))
+const @oneOut = @renderAsAdmin(@one)
+const @test_render_single_record_slot = @oneEmpty == "" && @families(@one) == ["me", "tick"] && @oneOut.includes(`"fields":{"id":"solo","n":7}`) && @oneOut.split("\n").length == 3
+
+>> A plain object in place of a state has no record slots, so every export answers empty.
+const @notState = { contact: [], label: "x" }
+const @nsRef = { ref: { address: "contact:c1", field: "name" } }
+const @test_plain_object_reads = @families(@notState) == [] && @find(@notState, "contact:c1") == null && @resolveRef(@nsRef, @notState) == null
+const @test_plain_object_render = @render(@notState) == "" && @renderAsAdmin(@notState) == ""
+const @test_plain_object_versions = @version(@notState, "contact") == null && @versions(@notState) == {} && @changedSince(@notState, {}) == []
+const @nsPut = @putAs(@notState, @mkContact("c9", "Zed"))
+const @nsObs = @observeAs(@notState, [@mkContact("c9", "Zed")])
+const @test_plain_object_writes = !@nsPut.written && @nsObs.written == 0 && @notState.contact == []
+
+>> ── no role labels ──
+>> An exe with a role label would run its writes as that role instead of the caller's.
+const @source = <../index.mld>
+const @test_no_role_label = !@source.includes("exe .role:")

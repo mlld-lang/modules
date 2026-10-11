@@ -1,0 +1,368 @@
+>> @mlld/shelf — record workspaces on core state.
+>>
+>> A shelf is a state built from records (`state @st from @recs`), one slot per record
+>> family. These exports find stored records by address and resolve `{ref}` citations to
+>> the field values they name, with the values' labels and proof intact.
+>>
+>> Written in mlld only: a value that crosses into a js block loses its proof labels, and
+>> keeping proof is what makes a resolved value usable in a grant.
+>>
+>> No exe carries a role label, so every state operation runs as the caller's role.
+>>
+>> Every export takes untrusted input (an address or ref an agent wrote) and answers null or
+>> false for anything malformed rather than throwing.
+
+>> ── Addresses ──
+
+>> The record family of an address: the text before the first `:`. Null for anything that
+>> is not a string with a non-empty family, so callers default to deny.
+exe @familyOf(address) = [
+  if !@address.isString() [ => null ]
+  let @i = @address.indexOf(":")
+  if @i < 1 [ => null ]
+  => @address.slice(0, @i)
+]
+
+>> The families a shelf holds: its record slots. A plain state can also have ordinary
+>> slots (`label: string?`), whose `.mx.version` reads null. Exports with a `families`
+>> parameter call `@slotNames` because the parameter shadows `@families` inside them.
+exe @slotNames(st) = [
+  if @typeof(@st) != "object" [ => [] ]
+  => for @k, @slot in @st if @st[@k].mx.version != null => @k
+]
+exe @families(st) = @slotNames(@st)
+
+>> The families a caller may resolve: the given list, or every slot of the shelf when the
+>> caller passes something that is not a list.
+exe @allowedFamilies(st, families) = [
+  => match [ @typeof(@families) == "array" => @families; * => @slotNames(@st) ]
+]
+
+>> The stored record at an address, or null. The family must be both allowed and a slot of
+>> the shelf: asking the state for a slot it lacks is an error, not a miss.
+exe @find(st, address, families = null) = [
+  let @family = @familyOf(@address)
+  if @family == null [ => null ]
+  if !@allowedFamilies(@st, @families).includes(@family) [ => null ]
+  if !@slotNames(@st).includes(@family) [ => null ]
+  let @rec = @st.byAddress(@family, @address)
+  => match [ @rec.isDefined() => @rec; * => null ]
+]
+
+>> ── {ref} citations ──
+
+>> True exactly for `{ ref: { address: <string>, field: <string> } }`.
+exe @isRef(v) = [
+  if @typeof(@v) != "object" [ => false ]
+  let @ref = @v.ref
+  if @typeof(@ref) != "object" [ => false ]
+  => @ref.address.isString() && @ref.field.isString()
+]
+
+>> Whether `field` is one of the record's own fields, so a cited field name can never reach
+>> the record's metadata (`mx`) or a method.
+exe @hasField(rec, field) = [
+  let @names = for @k, @v in @rec => @k
+  => @names.includes(@field)
+]
+
+>> The field value a ref cites, or null. Returned straight from the record so its labels
+>> and proof come with it.
+exe @resolveRef(refObj, st, families = null) = [
+  if !@isRef(@refObj) [ => null ]
+  let @rec = @find(@st, @refObj.ref.address, @families)
+  if @rec == null [ => null ]
+  if !@hasField(@rec, @refObj.ref.field) [ => null ]
+  => @rec[@refObj.ref.field]
+]
+
+>> The first arg whose value is a ref that does not resolve, as `{ arg, addr }`, so a caller
+>> can deny with the address in hand instead of a bare grant refusal. Null when every ref
+>> resolves.
+exe @unresolvedArg(name, value, st, families = null) = [
+  if !@isRef(@value) [ => null ]
+  if @resolveRef(@value, @st, @families) != null [ => null ]
+  => { arg: @name, addr: @value.ref.address }
+]
+
+exe @firstUnresolved(args, st, families = null) = [
+  if @typeof(@args) != "object" [ => null ]
+  let @misses = for @name, @value in @args => @unresolvedArg(@name, @value, @st, @families)
+  let @hits = for @m in @misses if @m != null => @m
+  => match [ @hits.length > 0 => @hits[0]; * => null ]
+]
+
+>> ── Writes ──
+>>
+>> Writes go through the state the caller passes, as the caller's role: core checks the
+>> record's write grant against that role and ends the run on a refusal.
+
+>> Structural equality: same type, scalars `==`, arrays element by element in order,
+>> objects with the same keys and equal values.
+exe @same(a, b) = [
+  let @ta = @typeof(@a)
+  if @ta != @typeof(@b) [ => false ]
+  if @ta == "array" [
+    if @a.length != @b.length [ => false ]
+    let @diffs = for @x in @a if !@same(@x, @b[@x.mx.index]) => 1
+    => @diffs.length == 0
+  ]
+  if @ta == "object" [
+    let @ka = for @k, @v in @a => @k
+    let @kb = for @k, @v in @b => @k
+    if @ka.length != @kb.length [ => false ]
+    let @diffs = for @k, @v in @a if !@kb.includes(@k) || !@same(@v, @b[@k]) => 1
+    => @diffs.length == 0
+  ]
+  => @a == @b
+]
+
+>> The address a record would be stored at, or null for anything that is not a record.
+exe @addressOf(record) = [
+  if @typeof(@record) != "object" [ => null ]
+  let @addr = @record.mx.address
+  if @typeof(@addr) != "object" [ => null ]
+  => match [ @addr.string.isString() => @addr.string; * => null ]
+]
+
+>> True when writing `record` would change what the shelf holds: nothing is stored at its
+>> address, or one of its non-null fields is missing from the stored record or differs.
+exe @addsData(st, record) = [
+  let @address = @addressOf(@record)
+  if @address == null [ => false ]
+  let @stored = @find(@st, @address)
+  if @stored == null [ => true ]
+  let @storedFields = for @k, @v in @stored => @k
+  let @news = for @k, @v in @record if @v != null && (!@storedFields.includes(@k) || !@same(@v, @stored[@k])) => @k
+  => @news.length > 0
+]
+
+>> Files one record into the slot for its family. The slot's merge mode decides between
+>> replacing a stored record with the same key and appending.
+>>
+>> The address and family are read inline from `.mx.address`, which carries none of the
+>> record's labels. Through an exe that takes the record they would come back with them: a
+>> record with one `.secret` field is labeled `.secret` as a whole, and a write whose slot
+>> name or gating condition carries that label is refused by core.
+exe @put(st, record, families = null) = [
+  let @addr = @record.mx.address
+  let @address = match [ @typeof(@addr) == "object" && @addr.string.isString() => @addr.string; * => null ]
+  let @family = match [
+    @address == null => null;
+    @address.indexOf(":") < 1 => null;
+    * => @address.slice(0, @address.indexOf(":"))
+  ]
+  let @slots = @slotNames(@st)
+  let @ok = @family != null && @slots.includes(@family) && @allowedFamilies(@st, @families).includes(@family)
+  if !@ok [ => { address: @address, family: @family, written: false, redundant: false } ]
+  let @redundant = !@addsData(@st, @record)
+  let @w = @st.upsert(@family, @record)
+  => { address: @address, family: @family, written: true, redundant: @redundant }
+]
+
+>> The `@observe` result for a list of `@put` results.
+exe @observed(results) = [
+  let @done = for @r in @results if @r.written => @r
+  let @fresh = for @r in @done if !@r.redundant => @r
+  let @addresses = for @r in @done => @r.address
+  => { addresses: @addresses, written: @done.length, redundant: @done.length > 0 && @fresh.length == 0 }
+]
+
+>> `@put` over a list of records, or one record.
+>>
+>> No write may depend on a test of a value labeled `.secret`: core refuses it. A record
+>> with a `.secret` field is labeled `.secret` as a whole, and so is its type. So `records`
+>> is first put as one record, before any test (a list is no record and writes nothing).
+>> Only then is its type tested; a list's type carries no label, so the loop that follows
+>> runs clean. `records` is iterated as given: a copied, flattened or `match`-chosen list
+>> carries its elements' labels, and a loop over it would run under them.
+exe @observe(st, records, families = null) = [
+  let @single = @put(@st, @records, @families)
+  if @typeof(@records) != "array" [ => @observed([@single]) ]
+  let @results = for @r in @records => @put(@st, @r, @families)
+  => @observed(@results)
+]
+
+>> ── Rendering ──
+>>
+>> `@render` shows only the view of the role active where it is called. It takes no role
+>> argument: `@project(@rec, <role>)` would answer another role's view, and the rendered
+>> string carries nothing that would re-project it, so a role argument would let a caller
+>> widen its own view.
+
+>> The active role's read modes for one record type, `{ field: mode }`. `@mx.actors` holds
+>> the current actor only, and drops `omit` fields.
+exe @readModes(recordName) = [
+  let @maps = for @role, @actor in @mx.actors => @actor.records[@recordName]
+  let @found = for @m in @maps if @typeof(@m) == "object" => @m
+  => match [ @found.length > 0 => @found[0]; * => {} ]
+]
+
+>> The entries of one slot. Each record's entry is built inside the loop, with no exe call per
+>> record: passing a value read from a state into an exe costs time that grows with the
+>> size of the state, which made rendering a large shelf quadratic.
+>>
+>> Fields the role may see go in `fields`; fields it may cite but not see (`mask`, `handle`,
+>> `protected`) are named in `ref_fields`. With a role active, its read modes decide, and
+>> values are taken from the projection only for `bare`/`value` fields. With none,
+>> `@mx.actors` is empty and the projection follows the record's `*` rule: its plain values
+>> are shown and its `{ preview, handle }` / `{ handle }` wrappers named. A wrapper never
+>> reaches the output either way.
+exe @slotLines(st, slot) = [
+  >> A single-record slot (`me: tick?`) holds a record or null rather than a list.
+  let @value = @st[@slot]
+  let @stored = match [
+    @typeof(@value) == "array" => @value;
+    @value == null => ([]);
+    * => ([@value])
+  ]
+  if @stored.length == 0 [ => [] ]
+  >> A slot can hold records of more than one type, and each type has its own read rules.
+  let @names = for @rec in @stored => @rec.mx.address.record
+  let @types = for @t in @names if @names.indexOf(@t) == @t.mx.index => @t
+  let @modesByType = for @t in @types => { [@t]: @readModes(@t) }
+  => for @rec in @stored [
+    let @modes = @modesByType[@rec.mx.address.record]
+    let @hasModes = @modes.mx.keys.length > 0
+    let @view = @project(@rec)
+    let @wrapped = for @f, @v in @view if @typeof(@v) == "object" && @v.mx.keys.includes("handle") && @v.mx.keys.every(@item == "handle" || @item == "preview") => @f
+    let @shown = match [
+      @hasModes => for @f, @mode in @modes if @mode == "bare" || @mode == "value" => @f;
+      * => for @f, @v in @view if !@wrapped.includes(@f) => @f
+    ]
+    let @cited = match [
+      @hasModes => for @f, @mode in @modes if @mode == "mask" || @mode == "handle" || @mode == "protected" => @f;
+      * => @wrapped
+    ]
+    >> A `for` yielding `{ [key]: value }` collects into one object; with no keys it yields `[]`.
+    let @picked = for @f in @shown => { [@f]: @view[@f] }
+    let @fields = match [ @shown.length > 0 => @picked; * => {} ]
+    => { address: @rec.mx.address.string, fields: @fields, ref_fields: @cited }
+  ]
+]
+
+>> One slot's lines, escaped. A template loop writes each entry as compact JSON on its own
+>> line and leaves a blank line after the last one, which `.trim()` drops; every entry ends
+>> in `}`. Every `<` is written as its JSON escape, so a stored value cannot close the
+>> `<observed>` block. JSON has `<` only inside strings, where the escape means the same.
+exe @slotText(st, slot) = [
+  let @entries = @slotLines(@st, @slot)
+  if @entries.length == 0 [ => "" ]
+  let @body = `
+/for @e in @entries
+${@e}
+/end
+`
+  let @lines = @body.trim()
+  => @lines.replaceAll("<", "\\u003c")
+]
+
+>> ── Render cache ──
+>>
+>> Rendered slot text, per (cache key, slot, role). An entry holds the slot's version when
+>> it was rendered; every write bumps the version, so a stale entry is never read, and the
+>> next render of that slot replaces it. The state is the module's own, with no record
+>> type, so writing it needs no grant from the caller.
+state @renderCache = { slots: object? }
+@renderCache.set({ slots: {} })
+
+>> A cache key for one state: its id. Kept so callers that pass `key: @cacheFor(@st)` keep
+>> working; `@render` keys by the same id when no key is passed.
+exe @cacheFor(st) = { id: @st.mx.id }
+
+>> `{ id, role }` when this call may use the cache: the options name the active role in
+>> `cache`. The id is `options.key.id` when a key is passed, otherwise the state's id, which
+>> is the same through a parameter or a `.readonly()` view and new for each call of a
+>> per-call state. Otherwise null, and nothing is cached.
+exe @cacheContext(st, options) = [
+  if @typeof(@options) != "object" [ => null ]
+  if @typeof(@options.cache) != "array" [ => null ]
+  let @roles = for @r, @actor in @mx.actors => @r
+  if @roles.length != 1 [ => null ]
+  if !@options.cache.includes(@roles[0]) [ => null ]
+  let @keyed = @typeof(@options.key) == "object" && @options.key.id.isString()
+  let @id = match [ @keyed => @options.key.id; * => @st.mx.id ]
+  if !@id.isString() [ => null ]
+  => { id: @id, role: @roles[0] }
+]
+
+>> True when `text` contains a handle visible in this bridge session. Rendered lines never
+>> hold one, but a line that did must not outlive the session that minted it.
+exe @holdsHandle(text) = [
+  let @groups = for @g in @mx.handles => for @f, @h in @g.instance => @h.handle
+  let @handles = @groups.flat()
+  => @handles.some(@item.isString() && @text.includes(@item))
+]
+
+>> The cache write must not depend on a branch taken on the rendered data: an `if` or an
+>> early return on a value labeled `.secret` puts every later write under that label, and
+>> core refuses a write to an unlabeled state there. So the hit and the text are computed
+>> as values, and the entry is written on every call, a hit included.
+>>
+>> Entries are read straight from the state by key. A field read that way carries only its
+>> own labels; a copy of the whole object (through `match`, say) carries every entry's, and
+>> one `.secret` slot would then label every cached render.
+exe @cachedSlotText(st, slot, ctx) = [
+  if @ctx == null [ => @slotText(@st, @slot) ]
+  let @slotVersion = @st[@slot].mx.version
+  let @entryKey = `${@ctx.id}|${@ctx.role}|${@slot}`
+  let @hit = @renderCache.slots[@entryKey]
+  let @fresh = @typeof(@hit) == "object" && @hit.version == @slotVersion && @hit.cacheable == true
+  let @text = match [ @fresh => @hit.text; * => @slotText(@st, @slot) ]
+  let @cacheable = !@holdsHandle(@text)
+  let @kept = match [ @cacheable => @text; * => "" ]
+  let @written = @renderCache.set({ slots: { ...@renderCache.slots, [@entryKey]: { version: @slotVersion, text: @kept, cacheable: @cacheable } } })
+  => @text
+]
+
+>> Every record stored in `families` (default: all slots), one JSON line each, in slot
+>> order then storage order, inside `<observed>` tags; "" when there are none.
+>> `options.cache` lists the roles whose renders are cached, per state; `options.key`
+>> overrides the state's id as the cache key.
+exe @render(st, families = null, options = null) = [
+  let @allowed = @allowedFamilies(@st, @families)
+  let @slots = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
+  let @ctx = @cacheContext(@st, @options)
+  >> A template loop, because a JSON-looking string collected by `for` is read back as an
+  >> object. Empty slots leave blank lines, which are dropped.
+  let @body = `
+/for @f in @slots
+${@cachedSlotText(@st, @f, @ctx)}
+/end
+`
+  let @lines = @body.replaceAll(/\n\n+/g, "\n").trim()
+  if @lines == "" [ => "" ]
+  => `<observed>
+${@lines}
+</observed>`
+]
+
+>> ── Versions ──
+>>
+>> Core counts every applied write to a state slot in `<slot>.mx.version`, so the module
+>> only reads it. Versions count writes, not changes: an identical `upsert` bumps it.
+
+>> A slot's write count (0 if never written), or null for a family the shelf lacks.
+exe @version(st, family) = [
+  if !@slotNames(@st).includes(@family) [ => null ]
+  => @st[@family].mx.version
+]
+
+>> `{ <family>: <version> }` for each family of the shelf in `families` (default: all).
+exe @versions(st, families = null) = [
+  let @allowed = @allowedFamilies(@st, @families)
+  let @present = for @f in @slotNames(@st) if @allowed.includes(@f) => @f
+  >> A `for` yielding `{ [key]: value }` collects into one object; with no keys it yields `[]`.
+  let @counts = for @f in @present => { [@f]: @st[@f].mx.version }
+  => match [ @present.length > 0 => @counts; * => {} ]
+]
+
+>> The families in `families` (default: all) written since `snapshot`, a `@versions`
+>> result. A family missing from the snapshot, or not counted as a number there, counts as 0.
+exe @changedSince(st, snapshot, families = null) = [
+  let @before = match [ @typeof(@snapshot) == "object" => @snapshot; * => {} ]
+  let @current = @versions(@st, @families)
+  => for @f, @v in @current if @v > match [ @typeof(@before[@f]) == "number" => @before[@f]; * => 0 ] => @f
+]
+
+export { @familyOf, @families, @find, @isRef, @resolveRef, @firstUnresolved, @addsData, @put, @observe, @render, @cacheFor, @version, @versions, @changedSince }
