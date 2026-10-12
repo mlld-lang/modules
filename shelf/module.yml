@@ -8,3 +8,4 @@ repo: "https://github.com/mlld-lang/modules"
 bugs: "https://github.com/mlld-lang/modules/issues"
 keywords: ["state", "records", "shelf", "ref", "address", "citation"]
 mlldVersion: ">=2.2.0"
+needs: []

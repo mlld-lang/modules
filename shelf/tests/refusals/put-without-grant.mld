@@ -13,7 +13,7 @@ record @person [
   id: string [ kind "person" ]
   name: string
   * { read: [id, name] }
-  .role:worker { write: { shelves: { upsert: true } } }
+  .role:worker { write: { state: { upsert: true } } }
 ]
 exe @mkPerson(i, n) = { id: @i, name: @n } => person
 const @recs = { person: @person }

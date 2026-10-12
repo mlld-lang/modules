@@ -100,7 +100,7 @@ show @miss   >> { "arg": "to", "addr": "contact:gone" }
 
 `@put` and `@observe` carry no role label, so they write as whoever calls them. Core checks the record's write grant against the caller's role and ends the run on a refusal (`WRITE_DENIED_*`; `try` does not catch it). Call them from an exe labelled with a role the record grants, as `@file` does in the tldr above.
 
-The grant is spelled `.role:<name> { write: { state: [upsert] } }` (`shelves` is its older name). There is no separate `append` capability: appending to a keyless record's slot is checked against `upsert` too.
+The grant is spelled `.role:<name> { write: { state: [upsert] } }`. There is no separate `append` capability: appending to a keyless record's slot is checked against `upsert` too.
 
 ### `@addsData(st, record)`
 

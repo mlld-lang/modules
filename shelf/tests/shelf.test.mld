@@ -8,14 +8,14 @@ record @contact [
   id: string [ kind "contact" ]
   name: string
   * { read: [id, name] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 record @note [
   key id
   id: string [ kind "note" ]
   text: string
   * { read: [id, text] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 exe @mkContact(i, n) = { id: @i, name: @n } => contact
 exe @mkNote(i, t) = { id: @i, text: @t } => note
@@ -121,12 +121,12 @@ record @person [
   tags: array?
   info: object?
   * { read: [id, name, phone, tags, info] }
-  .role:worker { write: { shelves: { upsert: true } } }
+  .role:worker { write: { state: { upsert: true } } }
 ]
 record @event [
   title: string
   * { read: [title] }
-  .role:worker { write: { shelves: { upsert: true } } }
+  .role:worker { write: { state: { upsert: true } } }
 ]
 exe @mkPerson(i, n, p, t, info) = { id: @i, name: @n, phone: @p, tags: @t, info: @info } => person
 exe @mkEvent(t) = { title: @t } => event
@@ -235,14 +235,14 @@ record @card [
   secret: string
   .role:planner { read: [name, { handle: "email" }, { mask: "phone" }, { omit: "secret" }] }
   .role:admin { read: [email, name, phone, secret] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 record @memo [
   key id
   id: string [ kind "memo" ]
   text: string
   * { read: [id, text] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 exe @mkCard(e, n, p, x) = { email: @e, name: @n, phone: @p, secret: @x } => card
 exe @mkMemo(i, t) = { id: @i, text: @t } => memo
@@ -281,14 +281,14 @@ record @kx [
   id: string [ kind "k" ]
   f: string
   .role:planner { read: [id, f] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 record @ky [
   key id
   id: string [ kind "k" ]
   f: string
   .role:planner { read: [id, { handle: "f" }] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 exe @mkKx(i, f) = { id: @i, f: @f } => kx
 exe @mkKy(i, f) = { id: @i, f: @f } => ky
@@ -310,7 +310,7 @@ record @veiled [
   id: string [ kind "veiled" ]
   text: string
   * { read: [id, { mask: "text" }] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 exe @mkVeiled(i, t) = { id: @i, text: @t } => veiled
 const @vlrecs = { veiled: @veiled }
@@ -419,7 +419,7 @@ record @vault [
   key: string
   .role:planner { read: [id, label, { omit: "key" }] }
   .role:admin { read: [id, label, key] }
-  .role:worker { write: { shelves: true } }
+  .role:worker { write: { state: true } }
 ]
 exe @mkVault(i, l, k) = { id: @i, label: @l, key: @k } => vault
 const @vrecs2 = { vault: @vault }
